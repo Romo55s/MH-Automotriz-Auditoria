@@ -1,0 +1,130 @@
+{
+    "designSystem": {
+      "colorPalette": {
+        "background": "#000000",
+        "primaryText": "#FFFFFF",
+        "secondaryText": "#CCCCCC",
+        "accent": "#FFFFFF",
+        "highlight": "linear-gradient(120deg, #f6d365 0%, #fda085 100%)",
+        "border": "#333333"
+      },
+      "typography": {
+        "headingFont": "Sans-serif, bold, uppercase",
+        "bodyFont": "Sans-serif, regular",
+        "headingSizes": {
+          "hero": "clamp(2.5rem, 5vw, 5rem)",
+          "section": "2rem",
+          "subheading": "1.25rem"
+        },
+        "bodySize": "1rem",
+        "letterSpacing": {
+          "hero": "0.05em",
+          "body": "0.01em"
+        },
+        "lineHeight": {
+          "heading": "1.1",
+          "body": "1.6"
+        }
+      },
+      "layout": {
+        "grid": {
+          "columns": 12,
+          "gap": "2rem",
+          "maxWidth": "1200px"
+        },
+        "sections": {
+          "hero": {
+            "height": "100vh",
+            "alignment": "center",
+            "textAlign": "center",
+            "padding": "4rem 2rem"
+          },
+          "content": {
+            "padding": "6rem 2rem",
+            "maxWidth": "1000px",
+            "alignment": "left"
+          },
+          "services": {
+            "layout": "grid",
+            "gridTemplate": "repeat(auto-fit, minmax(280px, 1fr))",
+            "gap": "1.5rem"
+          },
+          "cta": {
+            "padding": "4rem 2rem",
+            "textAlign": "center",
+            "alignment": "center"
+          }
+        }
+      },
+      "components": {
+        "navbar": {
+          "position": "top",
+          "height": "80px",
+          "background": "transparent",
+          "alignment": "space-between",
+          "menuItems": "inline, spaced evenly",
+          "ctaButton": {
+            "style": "rounded-pill",
+            "background": "#FFFFFF",
+            "color": "#000000",
+            "padding": "0.75rem 1.5rem"
+          }
+        },
+        "hero": {
+          "titleStyle": "large bold uppercase, multi-line",
+          "overlayElements": "floating 3D abstract shapes with glass/gradient effects",
+          "button": {
+            "shape": "pill",
+            "border": "1px solid white",
+            "background": "transparent",
+            "hover": "invert colors"
+          }
+        },
+        "serviceCard": {
+          "background": "transparent or white depending on emphasis",
+          "borderRadius": "1rem",
+          "padding": "2rem",
+          "border": "1px solid #333333",
+          "hoverEffect": "slight scale-up with glow"
+        },
+        "stats": {
+          "layout": "horizontal row",
+          "textStyle": "large numeric with small label",
+          "spacing": "2rem between items"
+        },
+        "ctaSection": {
+          "background": "transparent",
+          "textStyle": "uppercase, bold",
+          "accentShape": "3D abstract gradient element"
+        }
+      },
+      "imagery": {
+        "style": "3D abstract shapes, soft edges, glass effect, gradient highlights",
+        "placement": "floating, partially overlapping text sections",
+        "opacity": 0.9
+      },
+      "effects": {
+        "hover": {
+          "scale": "1.03",
+          "shadow": "0px 4px 20px rgba(255, 255, 255, 0.2)"
+        },
+        "animation": {
+          "elementFloat": "slow vertical floating of 3D shapes",
+          "fadeIn": "content appears with soft fade on scroll"
+        }
+      },
+      "spacing": {
+        "sectionSpacing": "6rem",
+        "componentSpacing": "2rem"
+      },
+      "buttons": {
+        "shape": "pill",
+        "padding": "0.75rem 1.5rem",
+        "borderRadius": "9999px",
+        "fontWeight": "600",
+        "border": "1px solid #fff",
+        "hoverStyle": "invert background/text colors"
+      }
+    }
+  }
+  
