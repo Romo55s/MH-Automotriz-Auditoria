@@ -7,11 +7,12 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requireAuth = true 
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requireAuth = true,
 }) => {
-  const { isAuthenticated, isLoading, user, error, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, isLoading, user, error, getAccessTokenSilently } =
+    useAuth0();
 
   // Console log Auth0 data for debugging
   console.log('🔐 ProtectedRoute Auth0 Data:', {
@@ -20,7 +21,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     user,
     error,
     requireAuth,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   // Log any Auth0 errors in detail
@@ -30,7 +31,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         error,
         message: error.message,
         stack: error.stack,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }, [error]);
@@ -42,7 +43,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const state = urlParams.get('state');
     const authError = urlParams.get('error');
     const errorDescription = urlParams.get('error_description');
-    
+
     console.log('🔍 URL Parameters Analysis:', {
       currentUrl: window.location.href,
       pathname: window.location.pathname,
@@ -53,15 +54,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       errorDescription,
       hasCode: !!code,
       hasState: !!state,
-      hasError: !!authError
+      hasError: !!authError,
     });
-    
+
     if (code || state || authError) {
-      console.log('🔄 Auth0 Callback Detected:', { 
-        code: !!code, 
-        state: !!state, 
+      console.log('🔄 Auth0 Callback Detected:', {
+        code: !!code,
+        state: !!state,
         error: authError,
-        errorDescription 
+        errorDescription,
       });
     }
   }, []);
@@ -71,7 +72,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (isAuthenticated && user) {
       getAccessTokenSilently()
         .then(token => {
-          console.log('🎫 Access Token Retrieved:', token ? 'SUCCESS' : 'FAILED');
+          console.log(
+            '🎫 Access Token Retrieved:',
+            token ? 'SUCCESS' : 'FAILED'
+          );
         })
         .catch(err => {
           console.error('❌ Token Retrieval Failed:', err);
@@ -85,10 +89,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (isLoading) {
     console.log('⏳ Auth0 is loading...');
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center relative overflow-hidden">
-        <div className="text-center z-10 relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-6"></div>
-          <h2 className="text-xl text-gray-300">Loading...</h2>
+      <div className='min-h-screen bg-black flex items-center justify-center relative overflow-hidden'>
+        <div className='text-center z-10 relative'>
+          <div className='animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-6'></div>
+          <h2 className='text-xl text-gray-300'>Loading...</h2>
         </div>
       </div>
     );
@@ -97,13 +101,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // For protected routes (requireAuth = true)
   if (requireAuth && !isAuthenticated) {
     console.log('🚫 Access denied - redirecting to login');
-    return <Navigate to="/login" replace />;
+    return <Navigate to='/login' replace />;
   }
 
   // For public routes (requireAuth = false) - redirect if already authenticated
   if (!requireAuth && isAuthenticated) {
     console.log('✅ Already authenticated - redirecting to agency selector');
-    return <Navigate to="/select-agency" replace />;
+    return <Navigate to='/select-agency' replace />;
   }
 
   console.log('✅ Access granted to protected route');

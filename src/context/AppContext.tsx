@@ -28,7 +28,9 @@ interface AppProviderProps {
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
-  const [currentSession, setCurrentSession] = useState<InventorySession | null>(null);
+  const [currentSession, setCurrentSession] = useState<InventorySession | null>(
+    null
+  );
   const [scannedCodes, setScannedCodes] = useState<ScannedCode[]>([]);
 
   const addScannedCode = (code: ScannedCode) => {
@@ -36,10 +38,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const confirmScannedCode = (id: string) => {
-    setScannedCodes(prev => 
-      prev.map(code => 
-        code.id === id ? { ...code, confirmed: true } : code
-      )
+    setScannedCodes(prev =>
+      prev.map(code => (code.id === id ? { ...code, confirmed: true } : code))
     );
   };
 
@@ -58,9 +58,5 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     clearScannedCodes,
   };
 
-  return (
-    <AppContext.Provider value={value}>
-      {children}
-    </AppContext.Provider>
-  );
-}; 
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+};

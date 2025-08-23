@@ -1,26 +1,26 @@
 # 🚗 Car Inventory App
 
-A full-stack React application for automating car inventory in agencies using barcode scanning and REPUVE integration.
+A modern React application for automating car inventory management in agencies using barcode scanning technology.
 
 ## ✨ Features
 
 - **🔐 Secure Authentication** - Auth0 integration for user management
-- **🏢 Multi-Agency Support** - Support for multiple car agencies (Suzuki, Mazda, Toyota, etc.)
+- **🏢 Multi-Agency Support** - Support for multiple car agencies (Suzuki, Mazda, Toyota, Honda, Nissan)
 - **📱 Barcode Scanning** - Real-time barcode scanning using device camera
 - **📸 Photo Capture** - Optional vehicle photo capture during scanning
 - **📊 Real-time Dashboard** - Live session statistics and scanned codes table
-- **📋 Google Sheets Integration** - Export scanned data to Google Sheets
-- **🔄 REPUVE Integration** - Python script integration for vehicle data retrieval
+- **🎨 Modern UI/UX** - Clean, professional interface with glass morphism effects
+- **📱 Responsive Design** - Works on desktop and mobile devices
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 18 + TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS with custom design system
 - **Authentication**: Auth0
 - **Barcode Scanning**: ZXing library
 - **Routing**: React Router v6
 - **Icons**: Lucide React
-- **Build Tool**: Create React App
+- **Build Tool**: Vite (Create React App)
 
 ## 🚀 Getting Started
 
@@ -28,7 +28,7 @@ A full-stack React application for automating car inventory in agencies using ba
 
 - Node.js 16+ and npm
 - Auth0 account and application
-- Google Sheets API credentials (for production)
+- Modern web browser with camera access
 
 ### Installation
 
@@ -86,19 +86,19 @@ A full-stack React application for automating car inventory in agencies using ba
 - No database required - authentication is handled by Auth0
 
 ### 2. Agency Selection
-- Choose the agency you're working with
-- Each agency has its own Google Sheet for data storage
+- Choose the agency you're working with from the dropdown
+- Each agency can have its own configuration
 
 ### 3. Inventory Session
 - Start an inventory session
-- Use the device camera to scan barcodes
+- Use the device camera to scan barcodes and QR codes
 - Confirm each scan with optional photo capture
-- View real-time statistics and scanned codes
+- View real-time statistics and scanned codes table
 
-### 4. Data Export
-- On "Stop Inventory", data is sent to Google Sheets
-- Python script is triggered to get REPUVE data
-- Sheet is updated with complete vehicle information
+### 4. Session Management
+- Track session duration and scan count
+- View photos taken during scanning
+- Stop session when complete
 
 ## 🔧 Configuration
 
@@ -111,7 +111,7 @@ export const agencies: Agency[] = [
   {
     id: 'suzuki',
     name: 'Suzuki',
-    googleSheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+    googleSheetId: 'your-google-sheet-id',
   },
   // Add more agencies...
 ];
@@ -119,49 +119,50 @@ export const agencies: Agency[] = [
 
 ### Styling Customization
 
-The app uses Tailwind CSS. Customize colors and styles in `tailwind.config.js`:
+The app uses Tailwind CSS with a custom design system. Customize colors and styles in:
 
-```javascript
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          500: '#your-primary-color',
-        },
-      },
-    },
-  },
-};
-```
+- `tailwind.config.js` - Tailwind configuration
+- `desing-syestm.json` - Design system specifications
+- `src/index.css` - Custom CSS classes
 
 ## 📁 Project Structure
 
 ```
-src/
-├── components/          # React components
-│   ├── Login.tsx       # Authentication page
-│   ├── AgencySelector.tsx  # Agency selection
-│   ├── InventoryPage.tsx   # Main inventory interface
-│   ├── BarcodeScanner.tsx  # Barcode scanning modal
-│   └── ConfirmationModal.tsx # Scan confirmation
-├── context/            # React context
-│   └── AppContext.tsx  # Application state management
-├── types/              # TypeScript type definitions
-│   └── index.ts        # Interface definitions
-├── data/               # Static data
-│   └── agencies.ts     # Agency configurations
-├── config/             # Configuration files
-│   └── auth0-config.ts # Auth0 settings
-├── App.tsx             # Main application component
-└── index.css           # Global styles with Tailwind
+car-inventory-app/
+├── src/
+│   ├── components/          # React components
+│   │   ├── Login.tsx       # Authentication page
+│   │   ├── AgencySelector.tsx  # Agency selection
+│   │   ├── InventoryPage.tsx   # Main inventory interface
+│   │   ├── BarcodeScanner.tsx  # Barcode scanning modal
+│   │   ├── ConfirmationModal.tsx # Scan confirmation
+│   │   └── ProtectedRoute.tsx   # Route protection
+│   ├── context/            # React context
+│   │   └── AppContext.tsx  # Application state management
+│   ├── types/              # TypeScript type definitions
+│   │   └── index.ts        # Interface definitions
+│   ├── data/               # Static data
+│   │   └── agencies.ts     # Agency configurations
+│   ├── config/             # Configuration files
+│   │   └── auth0-config.ts # Auth0 settings
+│   ├── App.tsx             # Main application component
+│   ├── index.tsx           # Application entry point
+│   └── index.css           # Global styles with Tailwind
+├── public/
+│   ├── index.html          # Main HTML file
+│   └── favicon.ico         # App icon
+├── package.json            # Dependencies and scripts
+├── tailwind.config.js      # Tailwind configuration
+├── desing-syestm.json      # Design system specifications
+└── README.md               # Project documentation
 ```
 
 ## 🔒 Security Features
 
 - **Auth0 Integration**: Secure user authentication
-- **HTTPS Required**: Production deployment requires HTTPS
+- **HTTPS Required**: Production deployment requires HTTPS for camera access
 - **Camera Permissions**: User must grant camera access for scanning
+- **Route Protection**: Protected routes require authentication
 - **Data Validation**: Input validation for scanned codes
 
 ## 🚀 Deployment
@@ -179,20 +180,29 @@ Ensure these are set in your production environment:
 - `REACT_APP_AUTH0_CLIENT_ID`
 - `REACT_APP_AUTH0_AUDIENCE`
 
-### Google Sheets Integration
+### Production Considerations
 
-For production, you'll need to:
-1. Set up Google Sheets API
-2. Create service account credentials
-3. Share your sheets with the service account
-4. Implement the backend API for sheet operations
+- Deploy to HTTPS-enabled hosting (required for camera access)
+- Set up proper Auth0 production configuration
+- Configure CORS and security headers
+- Test barcode scanning functionality in production environment
+
+## 🎨 Design System
+
+The app follows a custom design system defined in `desing-syestm.json`:
+
+- **Color Palette**: Dark theme with white accents
+- **Typography**: Clean, readable fonts with proper hierarchy
+- **Components**: Glass morphism effects and smooth transitions
+- **Layout**: Responsive grid system with proper spacing
+- **Buttons**: Pill-shaped buttons with hover effects
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Ensure the app builds and runs correctly
 5. Submit a pull request
 
 ## 📄 License
@@ -204,18 +214,20 @@ This project is licensed under the MIT License.
 For support and questions:
 - Create an issue in the repository
 - Check the Auth0 documentation for authentication issues
-- Review the Google Sheets API documentation for integration help
+- Review the browser console for any errors
 
 ## 🔮 Future Enhancements
 
+- [ ] Google Sheets integration for data export
+- [ ] REPUVE integration for vehicle data
 - [ ] Offline support with local storage
 - [ ] Multiple barcode format support
-- [ ] Advanced photo editing
-- [ ] Real-time collaboration
+- [ ] Advanced photo editing capabilities
+- [ ] Real-time collaboration features
 - [ ] Mobile app version
 - [ ] Advanced analytics dashboard
 - [ ] Integration with other inventory systems
 
 ---
 
-**Note**: This is a frontend application. The Google Sheets integration and REPUVE data retrieval require backend implementation or serverless functions. 
+**Note**: This is a frontend application focused on barcode scanning and inventory management. The app is production-ready for basic inventory scanning operations. 

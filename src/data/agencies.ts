@@ -26,4 +26,4 @@ export const agencies: Agency[] = [
     name: 'Nissan',
     googleSheetId: 'your-nissan-sheet-id',
   },
-]; 
+];

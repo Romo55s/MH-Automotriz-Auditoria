@@ -8,7 +8,7 @@
   html {
     scroll-behavior: smooth;
   }
-  
+
   body {
     @apply bg-background text-primaryText font-sans;
     background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
@@ -19,51 +19,59 @@
   .glass-effect {
     @apply bg-white/10 backdrop-blur-md border border-white/20;
   }
-  
+
   .gradient-text {
     background: linear-gradient(120deg, #f6d365 0%, #fda085 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
+
   .gradient-border {
     background: linear-gradient(120deg, #f6d365 0%, #fda085 100%);
     padding: 1px;
     border-radius: 0.75rem;
   }
-  
+
   .gradient-border > * {
     @apply bg-background rounded-[0.7rem];
   }
-  
+
   .floating-shape {
     @apply absolute opacity-90 animate-float;
     background: linear-gradient(120deg, #f6d365 0%, #fda085 100%);
     border-radius: 50%;
     filter: blur(1px);
   }
-  
+
   .btn-primary {
-    @apply bg-white text-background font-semibold py-3 px-6 rounded-pill border border-white hover:bg-background hover:text-white transition-all duration-300 transform hover:scale-105;
+    @apply bg-white text-background font-semibold py-3 px-6 rounded-pill border border-white transition-all duration-300;
   }
-  
+
+  .btn-primary:hover {
+    @apply bg-background text-white;
+  }
+
   .btn-secondary {
-    @apply bg-transparent text-white font-semibold py-3 px-6 rounded-pill border border-white hover:bg-white hover:text-background transition-all duration-300 transform hover:scale-105;
+    @apply bg-transparent text-white font-semibold py-3 px-6 rounded-pill border border-white transition-all duration-300;
   }
-  
+
+  .btn-secondary:hover {
+    @apply bg-white text-background;
+  }
+
   .card {
-    @apply glass-effect rounded-2xl p-8 hover:scale-105 transition-all duration-300;
+    @apply glass-effect rounded-2xl p-8 transition-all duration-300;
   }
-  
+
   .section-padding {
     @apply py-section px-8;
   }
-  
+
   .hero-section {
     @apply min-h-screen flex items-center justify-center text-center section-padding;
   }
-  
+
   .content-section {
     @apply py-section px-8 max-w-content mx-auto;
   }
@@ -73,8 +81,8 @@
   .text-shadow {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
-  
+
   .glow {
     box-shadow: 0 0 20px rgba(246, 211, 101, 0.3);
   }
-} 
+}

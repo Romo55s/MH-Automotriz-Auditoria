@@ -27,16 +27,18 @@ class Auth0ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-red-900 text-white flex items-center justify-center p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">🚨 Auth0 Error</h1>
-            <p className="mb-4">Something went wrong with the authentication system.</p>
-            <pre className="bg-black/50 p-4 rounded text-sm overflow-auto max-w-2xl">
+        <div className='min-h-screen bg-red-900 text-white flex items-center justify-center p-8'>
+          <div className='text-center'>
+            <h1 className='text-2xl font-bold mb-4'>🚨 Auth0 Error</h1>
+            <p className='mb-4'>
+              Something went wrong with the authentication system.
+            </p>
+            <pre className='bg-black/50 p-4 rounded text-sm overflow-auto max-w-2xl'>
               {this.state.error?.toString()}
             </pre>
             <button
               onClick={() => window.location.reload()}
-              className="mt-4 bg-white text-red-900 px-4 py-2 rounded hover:bg-gray-100"
+              className='mt-4 bg-white text-red-900 px-4 py-2 rounded hover:bg-gray-100'
             >
               Reload Page
             </button>

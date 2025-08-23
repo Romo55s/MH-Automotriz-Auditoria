@@ -14,7 +14,6 @@ export interface ScannedCode {
   id: string;
   code: string;
   timestamp: Date;
-  photo?: string;
   confirmed: boolean;
 }
 
@@ -22,8 +21,26 @@ export interface InventorySession {
   id: string;
   agencyId: string;
   userId: string;
+  userName: string;
   startTime: Date;
   endTime?: Date;
   scannedCodes: ScannedCode[];
-  status: 'active' | 'completed';
-} 
+  status: 'Active' | 'Completed' | 'Paused';
+  month: string; // Format: "MM" (e.g., "01")
+  year: number;
+  sessionId?: string;
+}
+
+export interface MonthlyInventory {
+  id: string;
+  agencyId: string;
+  month: string; // Format: "MM"
+  year: number;
+  monthName: string; // e.g., "January 2024"
+  status: 'Active' | 'Completed' | 'Paused';
+  createdAt: Date;
+  createdBy: string;
+  totalScans: number;
+  sessionId?: string;
+  lastUpdated?: Date;
+}
