@@ -69,7 +69,7 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-black flex items-center justify-center relative overflow-hidden p-4'>
+    <div className='min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden p-4'>
       <div className='z-10 relative max-w-2xl mx-auto text-center'>
         <div className='mb-12'>
           <div className='mx-auto w-24 h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-8 border border-white/20'>
@@ -82,8 +82,7 @@ const Login: React.FC = () => {
             </span>
           </h1>
           <p className='text-xl text-gray-300 max-w-lg mx-auto'>
-            Automate your car inventory with advanced barcode scanning and
-            REPUVE integration
+            Automate your car inventory with advanced barcode scanning
           </p>
         </div>
 

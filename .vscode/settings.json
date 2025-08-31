@@ -10,7 +10,7 @@
   "typescript.suggest.paths": true,
   "typescript.validate.enable": true,
   "editor.codeActionsOnSave": {
-    "source.organizeImports": true
+    "source.organizeImports": "explicit"
   },
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",

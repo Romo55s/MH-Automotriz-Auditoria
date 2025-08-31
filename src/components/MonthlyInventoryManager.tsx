@@ -60,18 +60,57 @@ const MonthlyInventoryManager: React.FC = () => {
 
     try {
       const response = await getAgencyInventories(selectedAgency.name);
-      if (response.success && response.data) {
-        setInventories(response.data.inventories || []);
-        setLastRefresh(new Date());
-        showSuccess(
-          'Data Loaded',
-          `Successfully loaded ${
-            response.data.inventories?.length || 0
-          } inventories from Google Sheets`
-        );
-      } else {
-        throw new Error(response.message || 'Failed to load inventories');
+      // Handle different response formats
+      let inventories = [];
+      
+      if (response && typeof response === 'object') {
+        // Check if response is an array itself (getAgencyInventories returns array directly)
+        if (Array.isArray(response)) {
+          inventories = response;
+        }
+        // Check if response has a data property
+        else if (response.data && Array.isArray(response.data.inventories)) {
+          inventories = response.data.inventories;
+        }
+        // Check if response has inventories directly
+        else if (Array.isArray(response.inventories)) {
+          inventories = response.inventories;
+        }
+        else {
+          throw new Error('Invalid response format from backend');
+        }
       }
+      
+      // Transform backend data to match frontend interface
+      const transformedInventories = inventories.map((inv: any, index: number) => {
+        // Convert month name to month number
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        const monthNumber = (monthNames.indexOf(inv.month) + 1).toString().padStart(2, '0');
+        
+        return {
+          id: inv.sessionId || `inv_${index}`,
+          agencyId: inv.agency?.toLowerCase() || 'unknown',
+          month: monthNumber,
+          year: parseInt(inv.year) || new Date().getFullYear(),
+          monthName: inv.month,
+          status: inv.status,
+          createdAt: new Date(inv.createdAt),
+          createdBy: inv.createdBy || inv.userName || 'Unknown',
+          totalScans: parseInt(inv.totalScans) || 0,
+          sessionId: inv.sessionId,
+          lastUpdated: new Date()
+        };
+      });
+      
+      setInventories(transformedInventories);
+      setLastRefresh(new Date());
+      showSuccess(
+        'Data Loaded',
+        `Successfully loaded ${transformedInventories.length} inventories from Google Sheets`
+      );
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load inventories';
@@ -125,7 +164,7 @@ const MonthlyInventoryManager: React.FC = () => {
         currentYear
       );
 
-      if (response.exists && response.inventory?.status === 'Completed') {
+      if (response.exists && response.status === 'Completed') {
         showError(
           'Inventory Exists',
           `An inventory for ${getMonthName(
@@ -135,7 +174,7 @@ const MonthlyInventoryManager: React.FC = () => {
         return;
       }
 
-      if (response.exists && response.inventory?.status === 'Active') {
+      if (response.exists && response.status === 'Active') {
         showInfo(
           'Continue Existing',
           `An active inventory for ${getMonthName(

@@ -100,16 +100,18 @@ export const useInventory = () => {
     if (!selectedAgency || !currentMonth || !currentYear) return;
 
     try {
-      const response = await checkMonthlyInventory(
+      // First check if monthly inventory exists
+      const checkResponse = await checkMonthlyInventory(
         selectedAgency.name,
         currentMonth,
         currentYear
       );
 
+      console.log('🔍 checkMonthlyInventory response:', checkResponse);
+
       if (
-        response.exists &&
-        response.inventory &&
-        response.inventory.status === 'active'
+        checkResponse.exists &&
+        checkResponse.status === 'Active'
       ) {
         // Load existing inventory data
         const inventoryResponse = await getMonthlyInventory(
@@ -117,6 +119,8 @@ export const useInventory = () => {
           currentMonth,
           currentYear
         );
+
+        console.log('🔍 getMonthlyInventory response:', inventoryResponse);
 
         if (inventoryResponse.success && inventoryResponse.data.scans) {
           const existingScans: ScannedCode[] = inventoryResponse.data.scans.map(
@@ -180,7 +184,7 @@ export const useInventory = () => {
         currentYear
       );
 
-      if (response.exists && response.inventory.status === 'completed') {
+      if (response.exists && response.status === 'Completed') {
         setError(
           `An inventory for ${getMonthName(
             currentMonth

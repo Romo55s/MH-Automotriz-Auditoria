@@ -97,16 +97,82 @@ const InventoryPage: React.FC = () => {
     setInventoriesError(null);
     
     try {
+      console.log('🔄 Making API call to getAgencyInventories...');
       const response = await getAgencyInventories(selectedAgency.name);
-      console.log('📡 API Response:', response);
+      console.log('📡 API Response (raw):', response);
+      console.log('📡 API Response type:', typeof response);
+      console.log('📡 API Response keys:', Object.keys(response || {}));
+      console.log('📡 API Response stringified:', JSON.stringify(response, null, 2));
       
-      if (response.success && response.data) {
-        const inventories = response.data.inventories || [];
-        console.log('📋 Setting inventories:', inventories);
-        setInventories(inventories);
-      } else {
-        throw new Error(response.message || 'Failed to load inventories');
+      // Handle different response formats
+      let inventories = [];
+      
+      if (response && typeof response === 'object') {
+        // Check if response is an array itself (getAgencyInventories returns array directly)
+        if (Array.isArray(response)) {
+          inventories = response;
+          console.log('✅ Found inventories as direct array:', inventories);
+        }
+        // Check if response has a data property
+        else if (response.data && Array.isArray(response.data.inventories)) {
+          inventories = response.data.inventories;
+          console.log('✅ Found inventories in response.data.inventories:', inventories);
+        }
+        // Check if response has inventories directly
+        else if (Array.isArray(response.inventories)) {
+          inventories = response.inventories;
+          console.log('✅ Found inventories in response.inventories:', inventories);
+        }
+        // Check if response has a different structure
+        else if (response.inventories && Array.isArray(response.inventories)) {
+          inventories = response.inventories;
+          console.log('✅ Found inventories in response.inventories:', inventories);
+        }
+        else {
+          console.log('❌ No inventories found in response structure:', response);
+          console.log('❌ Response structure analysis:', {
+            hasData: !!response.data,
+            dataType: typeof response.data,
+            hasInventories: !!response.inventories,
+            inventoriesType: typeof response.inventories,
+            isArray: Array.isArray(response),
+            keys: Object.keys(response)
+          });
+        }
       }
+      
+      // Transform backend data to match frontend interface
+      const transformedInventories = inventories.map((inv: any, index: number) => {
+        // Convert month name to month number
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        const monthNumber = (monthNames.indexOf(inv.month) + 1).toString().padStart(2, '0');
+        
+        return {
+          id: inv.sessionId || `inv_${index}`,
+          agencyId: inv.agency?.toLowerCase() || 'unknown',
+          month: monthNumber,
+          year: parseInt(inv.year) || new Date().getFullYear(),
+          monthName: inv.month,
+          status: inv.status,
+          createdAt: new Date(inv.createdAt),
+          createdBy: inv.createdBy || inv.userName || 'Unknown',
+          totalScans: parseInt(inv.totalScans) || 0,
+          sessionId: inv.sessionId,
+          lastUpdated: new Date()
+        };
+      });
+      
+      console.log('📋 Original inventories:', inventories);
+      console.log('📋 Transformed inventories:', transformedInventories);
+      setInventories(transformedInventories);
+      
+      if (inventories.length === 0) {
+        console.log('⚠️ No inventories found - this might be correct if no data exists yet');
+      }
+      
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load inventories';
@@ -125,14 +191,30 @@ const InventoryPage: React.FC = () => {
     if (!selectedAgency) return;
 
     try {
+      console.log('🔍 Checking monthly inventory for:', {
+        agency: selectedAgency.name,
+        month: currentMonth,
+        year: currentYear
+      });
+      
       // Check if monthly inventory already exists
       const response = await checkMonthlyInventory(
         selectedAgency.name,
         currentMonth,
         currentYear
       );
+      
+      console.log('🔍 checkMonthlyInventory response:', response);
+      console.log('🔍 Response structure:', {
+        type: typeof response,
+        keys: Object.keys(response || {}),
+        exists: response?.exists,
+        inventory: response?.inventory,
+        status: response?.inventory?.status
+      });
 
-      if (response.exists && response.inventory?.status === 'Completed') {
+      // The backend returns status directly, not nested in inventory object
+      if (response.exists && response.status === 'Completed') {
         showError(
           'Inventory Exists',
           `An inventory for ${monthName} ${currentYear} has already been completed. You cannot start a new one for the same month.`
@@ -140,7 +222,7 @@ const InventoryPage: React.FC = () => {
         return;
       }
 
-      if (response.exists && response.inventory?.status === 'Active') {
+      if (response.exists && response.status === 'Active') {
         showInfo(
           'Continue Existing',
           `An active inventory for ${monthName} ${currentYear} already exists. You can continue it or complete it first.`
@@ -532,6 +614,8 @@ const InventoryPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+
 
         {/* Monthly Inventory Management - Moved below select section */}
         <div className='card mb-section'>
