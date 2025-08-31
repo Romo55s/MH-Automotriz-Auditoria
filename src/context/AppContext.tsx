@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { agencies } from '../data/agencies';
 import { Agency, InventorySession, ScannedCode } from '../types';
 
 interface AppContextType {
@@ -27,11 +28,37 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
+  // Initialize selectedAgency from localStorage or null
+  const [selectedAgency, setSelectedAgencyState] = useState<Agency | null>(() => {
+    const savedAgencyId = localStorage.getItem('selectedAgencyId');
+    if (savedAgencyId) {
+      const agency = agencies.find(a => a.id === savedAgencyId);
+      return agency || null;
+    }
+    return null;
+  });
+
   const [currentSession, setCurrentSession] = useState<InventorySession | null>(
     null
   );
   const [scannedCodes, setScannedCodes] = useState<ScannedCode[]>([]);
+
+  // Persist selectedAgency to localStorage whenever it changes
+  const setSelectedAgency = (agency: Agency | null) => {
+    setSelectedAgencyState(agency);
+    if (agency) {
+      localStorage.setItem('selectedAgencyId', agency.id);
+    } else {
+      localStorage.removeItem('selectedAgencyId');
+    }
+  };
+
+  // Clear localStorage when component unmounts (optional cleanup)
+  useEffect(() => {
+    return () => {
+      // Keep the agency in localStorage even when component unmounts
+    };
+  }, []);
 
   const addScannedCode = (code: ScannedCode) => {
     setScannedCodes(prev => [...prev, code]);

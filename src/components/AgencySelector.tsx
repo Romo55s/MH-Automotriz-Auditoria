@@ -11,9 +11,97 @@ const AgencySelector: React.FC = () => {
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const { setSelectedAgency } = useAppContext();
+  const { selectedAgency, setSelectedAgency } = useAppContext();
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Don't auto-redirect - let user see their selection and choose when to proceed
+  // useEffect(() => {
+  //   if (selectedAgency) {
+  //     navigate('/inventory');
+  //   }
+  // }, [selectedAgency, navigate]);
+
+  // Initialize dropdown selection when component mounts
+  useEffect(() => {
+    if (selectedAgency) {
+      setSelectedAgencyId(selectedAgency.id);
+    }
+  }, [selectedAgency]);
+
+  // If user already has an agency selected, show a message and option to continue
+  if (selectedAgency) {
+    return (
+      <div className='min-h-screen bg-background relative overflow-hidden'>
+        {/* Floating 3D shapes */}
+        <div className='floating-shape w-32 h-32 top-20 right-20'></div>
+        <div
+          className='floating-shape w-24 h-24 bottom-1/4 left-16'
+          style={{ animationDelay: '3s' }}
+        ></div>
+        <div
+          className='floating-shape w-20 h-20 top-1/3 left-1/4'
+          style={{ animationDelay: '1s' }}
+        ></div>
+
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>
+          {/* Header */}
+          <div className='mt-6 sm:mt-8 mb-6 sm:mb-section'>
+            <Header
+              title='Car Inventory App'
+              subtitle='Agency already selected'
+              showBackButton={false}
+              showUserInfo={true}
+            />
+          </div>
+
+          {/* Agency Already Selected */}
+          <div className='card mb-6 sm:mb-section'>
+            <div className='text-center mb-6'>
+              <div className='w-20 h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-6'>
+                <Building2 className='w-10 h-10 text-white' />
+              </div>
+              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
+                Agency Already Selected
+              </h2>
+              <p className='text-sm sm:text-base text-secondaryText mb-6'>
+                You have already selected <strong className='text-white'>{selectedAgency.name}</strong> as your agency.
+              </p>
+            </div>
+
+            <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6'>
+              <button
+                onClick={() => navigate('/inventory')}
+                className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Play className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Continue to Inventory</span>
+              </button>
+              <button
+                onClick={() => navigate('/monthly-inventories')}
+                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Calendar className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Manage Inventories</span>
+              </button>
+            </div>
+
+            <div className='text-center'>
+              <button
+                onClick={() => setSelectedAgency(null)}
+                className='text-sm text-secondaryText hover:text-white transition-colors underline'
+              >
+                Select Different Agency
+              </button>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <Footer />
+        </div>
+      </div>
+    );
+  }
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -57,7 +145,7 @@ const AgencySelector: React.FC = () => {
     }
   };
 
-  const selectedAgency = agencies.find(a => a.id === selectedAgencyId);
+  const selectedAgencyFromDropdown = agencies.find(a => a.id === selectedAgencyId);
 
   return (
     <div className='min-h-screen bg-background relative overflow-hidden'>
@@ -100,7 +188,7 @@ const AgencySelector: React.FC = () => {
                 }
               >
                 {selectedAgencyId
-                  ? selectedAgency?.name
+                  ? selectedAgencyFromDropdown?.name
                   : 'Select an agency...'}
               </span>
               <ChevronDown
@@ -113,7 +201,7 @@ const AgencySelector: React.FC = () => {
             {isDropdownOpen && (
               <div
                 ref={dropdownRef}
-                className='absolute top-full left-0 right-0 mt-2 glass-effect rounded-2xl border border-white/20 max-h-60 overflow-y-auto z-50'
+                className='top-full left-0 right-0 mt-2 glass-effect rounded-2xl border border-white/20 max-h-60 overflow-y-auto z-50'
               >
                 {agencies.map(agency => (
                   <button
@@ -134,7 +222,7 @@ const AgencySelector: React.FC = () => {
             )}
           </div>
 
-          <div className='space-y-3 sm:space-y-4'>
+          <div className='flex flex-col justify-between gap-6 md:flex-row sm:flex-row'>
             <button
               onClick={handleStartInventory}
               disabled={!selectedAgencyId}
@@ -163,7 +251,7 @@ const AgencySelector: React.FC = () => {
             )}
           </div>
 
-          {selectedAgency && (
+          {selectedAgencyFromDropdown && (
             <div className='mt-6 sm:mt-8 p-4 sm:p-6 glass-effect rounded-2xl border border-white/20'>
               <h3 className='font-bold text-white mb-3 sm:mb-4 flex items-center'>
                 <Building2 className='w-4 h-4 sm:w-5 sm:h-5 mr-2' />
@@ -172,17 +260,19 @@ const AgencySelector: React.FC = () => {
               <div className='text-sm sm:text-base text-secondaryText space-y-2'>
                 <p>
                   <strong className='text-white'>Name:</strong>{' '}
-                  {selectedAgency.name}
+                  {selectedAgencyFromDropdown.name}
                 </p>
                 <p>
                   <strong className='text-white'>ID:</strong>{' '}
-                  {selectedAgency.id}
+                  {selectedAgencyFromDropdown.id}
                 </p>
                 <p className='break-all'>
                   <strong className='text-white'>Google Sheet ID:</strong>{' '}
-                  {selectedAgency.googleSheetId}
+                  {selectedAgencyFromDropdown.googleSheetId}
                 </p>
               </div>
+              
+
             </div>
           )}
         </div>
@@ -244,7 +334,7 @@ const AgencySelector: React.FC = () => {
                   <strong>Note:</strong> After completing an inventory, manually
                   search each barcode on the
                   <a
-                    href='https://www.repuve.gob.mx/'
+                    href='https://www2.repuve.gob.mx:8443/ciudadania/'
                     target='_blank'
                     rel='noopener noreferrer'
                     className='text-blue-400 hover:text-blue-300 underline mx-1'

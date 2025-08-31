@@ -1,6 +1,8 @@
 import { useAuth0 } from '@auth0/auth0-react';
-import { ArrowLeft, LogOut, User } from 'lucide-react';
+import { ArrowLeft, Building2, LogOut, User } from 'lucide-react';
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
 
 interface HeaderProps {
   title: string;
@@ -8,6 +10,7 @@ interface HeaderProps {
   showBackButton?: boolean;
   onBackClick?: () => void;
   showUserInfo?: boolean;
+  showChangeAgency?: boolean;
   className?: string;
 }
 
@@ -17,12 +20,22 @@ const Header: React.FC<HeaderProps> = ({
   showBackButton = false,
   onBackClick,
   showUserInfo = true,
+  showChangeAgency = false,
   className = '',
 }) => {
   const { user, logout } = useAuth0();
+  const { selectedAgency, setSelectedAgency } = useAppContext();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
+    // Clear selected agency when logging out
+    setSelectedAgency(null);
     logout({ logoutParams: { returnTo: window.location.origin } });
+  };
+
+  const handleChangeAgency = () => {
+    setSelectedAgency(null);
+    navigate('/select-agency');
   };
 
   return (
@@ -52,13 +65,24 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Section - User Info and Logout */}
+          {/* Right Section - User Info, Change Agency, and Logout */}
           {showUserInfo && (
             <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6'>
               <div className='flex items-center justify-center sm:justify-start space-x-2 sm:space-x-3 text-secondaryText'>
                 <User className='w-4 h-4 sm:w-5 sm:h-5' />
                 <span className='text-sm sm:text-base truncate'>{user?.name || user?.email}</span>
               </div>
+              
+              {showChangeAgency && selectedAgency && (
+                <button
+                  onClick={handleChangeAgency}
+                  className='btn-secondary text-xs sm:text-sm px-3 sm:px-4 py-2 flex items-center justify-center hover:scale-105 transition-all duration-300'
+                >
+                  <Building2 className='w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2' />
+                  Change Agency
+                </button>
+              )}
+              
               <button
                 onClick={handleLogout}
                 className='btn-secondary text-xs sm:text-sm px-3 sm:px-4 py-2 flex items-center justify-center hover:scale-105 transition-all duration-300'

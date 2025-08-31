@@ -59,6 +59,7 @@ const InventoryPage: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [showStopOptions, setShowStopOptions] = useState(false);
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [currentScannedCode, setCurrentScannedCode] = useState<string>('');
   const [sessionStartTime] = useState(new Date());
 
@@ -67,25 +68,18 @@ const InventoryPage: React.FC = () => {
   const [isLoadingInventories, setIsLoadingInventories] = useState(false);
   const [inventoriesError, setInventoriesError] = useState<string | null>(null);
 
-  // Redirect if no agency is selected
+  // Handle agency selection - if no agency is selected, redirect to agency selector
   useEffect(() => {
     if (!selectedAgency) {
       navigate('/select-agency');
+      return;
     }
+    
+    // If we have an agency, load inventories
+    loadInventories();
   }, [selectedAgency, navigate]);
 
-  // Load agency inventories when component mounts
-  useEffect(() => {
-    console.log('🔄 useEffect triggered:', {
-      selectedAgency: selectedAgency?.name,
-      currentMonth,
-      currentYear
-    });
-    
-    if (selectedAgency) {
-      loadInventories();
-    }
-  }, [selectedAgency]);
+
 
   // Load agency inventories
   const loadInventories = async () => {
@@ -541,6 +535,7 @@ const InventoryPage: React.FC = () => {
         showBackButton={true}
         onBackClick={() => navigate('/select-agency')}
         showUserInfo={true}
+        showChangeAgency={true}
       />
 
       {/* Error Display */}
@@ -865,7 +860,7 @@ const InventoryPage: React.FC = () => {
               </div>
               <div className='mt-3 sm:mt-4'>
                 <a
-                  href='https://www.repuve.gob.mx/'
+                  href='https://www2.repuve.gob.mx:8443/ciudadania/'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='inline-flex items-center space-x-2 text-orange-400 hover:text-orange-300 transition-colors underline'
@@ -878,7 +873,7 @@ const InventoryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Inventory Session Controls */}
         <div className='card mb-6'>
           <div className='text-center mb-6'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
@@ -893,60 +888,49 @@ const InventoryPage: React.FC = () => {
             </p>
           </div>
 
-          <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
-            {!isSessionActive && !hasExistingInventory && (
-              <button
-                onClick={handleStartNewInventory}
-                className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-              >
-                <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Start New Inventory Session</span>
-              </button>
-            )}
+          {!isSessionActive ? (
+            // Session not active - show start/continue options
+            <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
+              {!hasExistingInventory && (
+                <button
+                  onClick={handleStartNewInventory}
+                  className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Start New Inventory Session</span>
+                </button>
+              )}
 
-            {!isSessionActive && hasExistingInventory && existingInventory?.status === 'Active' && (
-              <button
-                onClick={() => handleContinueInventory(existingInventory)}
-                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-              >
-                <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Continue Inventory Session</span>
-              </button>
-            )}
+              {hasExistingInventory && existingInventory?.status === 'Active' && (
+                <button
+                  onClick={() => handleContinueInventory(existingInventory)}
+                  className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Continue Inventory Session</span>
+                </button>
+              )}
 
-            {!isSessionActive && hasExistingInventory && existingInventory?.status === 'Paused' && (
-              <button
-                onClick={() => handleContinueInventory(existingInventory)}
-                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-              >
-                <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Continue Paused Session</span>
-              </button>
-            )}
+              {hasExistingInventory && existingInventory?.status === 'Paused' && (
+                <button
+                  onClick={() => handleContinueInventory(existingInventory)}
+                  className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Continue Paused Session</span>
+                </button>
+              )}
 
-            {hasExistingInventory && existingInventory?.status === 'Completed' && (
-              <div className='text-center text-secondaryText py-4'>
-                <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
-                <p>Inventory for {monthName} {currentYear} has been completed.</p>
-                <p className='text-sm mt-1'>You can view the data but cannot add new scans.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Session Controls */}
-        {isSessionActive && (
-          <div className='card mb-6'>
-            <div className='text-center mb-6'>
-              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
-                Active Session Controls
-              </h2>
-              <p className='text-sm sm:text-base text-secondaryText'>
-                Your inventory session is active. Use the controls below to manage
-                your session or scan new barcodes.
-              </p>
+              {hasExistingInventory && existingInventory?.status === 'Completed' && (
+                <div className='text-center text-secondaryText py-4'>
+                  <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
+                  <p>Inventory for {monthName} {currentYear} has been completed.</p>
+                  <p className='text-sm mt-1'>You can view the data but cannot add new scans.</p>
+                </div>
+              )}
             </div>
-
+          ) : (
+            // Session is active - show scanning and management options
             <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
               <button
                 onClick={() => setShowScanner(true)}
@@ -972,8 +956,8 @@ const InventoryPage: React.FC = () => {
                 <span>Manage Session</span>
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Scanned Codes Display */}
         {scannedCodes.length > 0 && (
@@ -988,7 +972,7 @@ const InventoryPage: React.FC = () => {
                    Total scans: {scannedCodes.length}
                  </span>
                  <button
-                   onClick={reset}
+                   onClick={() => setShowResetConfirmation(true)}
                    className='btn-secondary text-xs sm:text-sm py-2 px-3 flex items-center space-x-1 sm:space-x-2'
                  >
                    <RotateCcw className='w-4 h-4' />
@@ -1045,36 +1029,24 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
 
-        {/* Empty State */}
-        {scannedCodes.length === 0 && !isSessionActive && (
+        {/* Ready to Start Section - No Buttons, Just Info */}
+        {!isSessionActive && (
           <div className='card text-center'>
             <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Ready to Start
             </h3>
             <p className='text-body text-secondaryText mb-8 max-w-md mx-auto'>
-              Start an inventory session to begin scanning barcodes for{' '}
+              Use the Inventory Session Controls below to start or continue an inventory session for{' '}
               {monthName} {currentYear}
             </p>
-            {!hasExistingInventory ? (
-              <button
-                onClick={() => void startSession()}
-                className='btn-primary text-lg px-8 py-4'
-              >
-                Start Inventory Session
-              </button>
-            ) : existingInventory?.status === 'Active' ? (
-              <button
-                onClick={() => handleContinueInventory(existingInventory)}
-                className='btn-primary text-lg px-8 py-4'
-              >
-                Continue Inventory Session
-              </button>
-            ) : (
-              <p className='text-sm text-green-400'>
-                This month&apos;s inventory has been completed. You cannot start
-                a new one.
-              </p>
+            
+            {hasExistingInventory && existingInventory?.status === 'Completed' && (
+              <div className='text-center text-secondaryText py-4'>
+                <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
+                <p>Inventory for {monthName} {currentYear} has been completed.</p>
+                <p className='text-sm mt-1'>You can view the data but cannot add new scans.</p>
+              </div>
             )}
           </div>
         )}
@@ -1090,20 +1062,6 @@ const InventoryPage: React.FC = () => {
               Start scanning barcodes to build your inventory list for{' '}
               {monthName} {currentYear}
             </p>
-            <div className='flex flex-col sm:flex-row gap-4'>
-              <button
-                onClick={() => setShowScanner(true)}
-                className='btn-primary text-lg px-8 py-4'
-              >
-                Scan First Barcode
-              </button>
-              <button
-                onClick={() => setShowManualInput(true)}
-                className='btn-secondary text-lg px-8 py-4'
-              >
-                Manual Input
-              </button>
-            </div>
           </div>
         )}
       </div>
@@ -1168,12 +1126,43 @@ const InventoryPage: React.FC = () => {
                 <RotateCcw className='w-6 h-6' />
                 <span>Continue Scanning</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirmation && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'>
+          <div className='card max-w-md w-full'>
+            <div className='text-center mb-6'>
+              <AlertTriangle className='w-16 h-16 text-yellow-500 mx-auto mb-4' />
+              <h3 className='text-xl font-bold text-white mb-2'>
+                Reset Inventory Session
+              </h3>
+              <p className='text-secondaryText'>
+                Are you sure you want to reset the current inventory session? This will clear all scanned codes and cannot be undone.
+              </p>
+            </div>
+
+            <div className='space-y-4'>
+              <button
+                onClick={() => {
+                  reset();
+                  setShowResetConfirmation(false);
+                }}
+                className='w-full bg-red-600 hover:bg-red-700 text-white text-lg py-4 px-6 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-3'
+              >
+                <RotateCcw className='w-6 h-6' />
+                <span>Yes, Reset Session</span>
+              </button>
 
               <button
-                onClick={() => setShowStopOptions(false)}
-                className='w-full bg-border hover:bg-white/20 text-white text-lg py-4 px-6 rounded-pill font-bold transition-all duration-300'
+                onClick={() => setShowResetConfirmation(false)}
+                className='w-full btn-secondary text-lg py-4 px-6 flex items-center justify-center space-x-3'
               >
-                Cancel
+                <X className='w-6 h-6' />
+                <span>Cancel</span>
               </button>
             </div>
           </div>

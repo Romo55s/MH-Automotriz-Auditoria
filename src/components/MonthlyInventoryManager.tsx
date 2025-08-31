@@ -45,12 +45,7 @@ const MonthlyInventoryManager: React.FC = () => {
     setCurrentYear(year);
   }, []);
 
-  // Load agency inventories
-  useEffect(() => {
-    if (selectedAgency) {
-      loadInventories();
-    }
-  }, [selectedAgency]);
+
 
   const loadInventories = async () => {
     if (!selectedAgency) return;
@@ -252,9 +247,19 @@ const MonthlyInventoryManager: React.FC = () => {
     }
   };
 
+  // Handle agency selection - if no agency is selected, redirect to agency selector
+  useEffect(() => {
+    if (!selectedAgency) {
+      navigate('/select-agency');
+      return;
+    }
+    
+    // If we have an agency, load inventories
+    loadInventories();
+  }, [selectedAgency, navigate]);
+
   if (!selectedAgency) {
-    navigate('/select-agency');
-    return null;
+    return null; // Don't render anything while redirecting
   }
 
   return (
@@ -277,6 +282,7 @@ const MonthlyInventoryManager: React.FC = () => {
         showBackButton={true}
         onBackClick={() => navigate('/select-agency')}
         showUserInfo={true}
+        showChangeAgency={true}
       />
 
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
