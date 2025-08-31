@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, Result } from '@zxing/library';
-import { Camera, X, RotateCcw, ScanLine } from 'lucide-react';
+import { Camera, RotateCcw, ScanLine, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface BarcodeScannerProps {
   onScan: (result: string) => void;
@@ -205,14 +205,14 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
 
         {/* Camera Selection */}
         {devices.length > 1 && (
-          <div className='px-8 py-6 border-b border-white/20'>
-            <label className='block text-body font-semibold text-secondaryText mb-3'>
+          <div className='px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-white/20'>
+            <label className='block text-sm sm:text-base font-semibold text-secondaryText mb-2 sm:mb-3'>
               Camera Device
             </label>
             <select
               value={selectedDevice}
               onChange={e => handleDeviceChange(e.target.value)}
-              className='w-full px-4 py-3 glass-effect border border-white/20 rounded-xl focus:outline-none focus:border-white/40 text-white bg-transparent'
+              className='w-full px-3 sm:px-4 py-2 sm:py-3 glass-effect border border-white/20 rounded-xl focus:outline-none focus:border-white/40 text-white bg-transparent text-sm sm:text-base'
             >
               {devices.map(device => (
                 <option
@@ -228,12 +228,17 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         )}
 
         {/* Video Container */}
-        <div className='p-8'>
+        <div className='p-4 sm:p-6 lg:p-8'>
           <div className='relative glass-effect rounded-2xl overflow-hidden'>
             <video
               ref={videoRef}
-              className='w-full h-80 object-cover'
-              style={{ width: '640px', height: '480px' }}
+              className='w-full h-48 sm:h-64 lg:h-80 object-cover'
+              style={{ 
+                width: '100%', 
+                height: 'auto',
+                maxWidth: '640px',
+                maxHeight: '480px'
+              }}
               width={640}
               height={480}
               playsInline
@@ -244,12 +249,12 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             {/* Scanning Overlay */}
             {isScanning && (
               <div className='absolute inset-0 flex items-center justify-center'>
-                <div className='border-2 border-white rounded-2xl p-3 glow'>
-                  <div className='w-56 h-40 border-2 border-white rounded-xl relative'>
-                    <div className='absolute -top-2 -left-2 w-6 h-6 border-l-2 border-t-2 border-white'></div>
-                    <div className='absolute -top-2 -right-2 w-6 h-6 border-r-2 border-t-2 border-white'></div>
-                    <div className='absolute -bottom-2 -left-2 w-6 h-6 border-l-2 border-b-2 border-white'></div>
-                    <div className='absolute -bottom-2 -right-2 w-6 h-6 border-r-2 border-b-2 border-white'></div>
+                <div className='border-2 border-white rounded-2xl p-2 sm:p-3 glow'>
+                  <div className='w-40 h-32 sm:w-56 sm:h-40 border-2 border-white rounded-xl relative'>
+                    <div className='absolute -top-2 -left-2 w-4 h-4 sm:w-6 sm:h-6 border-l-2 border-t-2 border-white'></div>
+                    <div className='absolute -top-2 -right-2 w-4 h-4 sm:w-6 sm:h-6 border-r-2 border-t-2 border-white'></div>
+                    <div className='absolute -bottom-2 -left-2 w-4 h-4 sm:w-6 sm:h-6 border-l-2 border-b-2 border-white'></div>
+                    <div className='absolute -bottom-2 -right-2 w-4 h-4 sm:w-6 sm:h-6 border-l-2 border-b-2 border-white'></div>
                   </div>
                 </div>
               </div>
@@ -257,15 +262,15 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
           </div>
 
           {/* Instructions */}
-          <div className='mt-6 text-center'>
-            <div className='flex items-center justify-center space-x-2 mb-3'>
-              <ScanLine className='w-5 h-5 text-secondaryText' />
-              <p className='text-body text-secondaryText'>
+          <div className='mt-4 sm:mt-6 text-center'>
+            <div className='flex items-center justify-center space-x-2 mb-2 sm:mb-3'>
+              <ScanLine className='w-4 h-4 sm:w-5 sm:h-5 text-secondaryText' />
+              <p className='text-sm sm:text-base text-secondaryText'>
                 Position the barcode within the frame to scan
               </p>
             </div>
             <div className='mb-3 p-3 glass-effect border border-white/20 rounded-xl'>
-              <p className='text-sm text-secondaryText'>
+              <p className='text-xs sm:text-sm text-secondaryText'>
                 <strong>Expected Format:</strong> 8-digit numeric code (e.g.,
                 12345678)
               </p>
@@ -274,7 +279,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
               </p>
             </div>
             {isScanning && (
-              <p className='text-body text-white font-semibold animate-pulse'>
+              <p className='text-sm sm:text-base text-white font-semibold animate-pulse'>
                 Scanning... Please wait
               </p>
             )}
@@ -282,19 +287,19 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
 
           {/* Error Display */}
           {error && (
-            <div className='mt-6 p-4 glass-effect border border-red-500/30 rounded-2xl'>
-              <p className='text-body text-red-300 mb-3'>{error}</p>
-              <div className='flex space-x-3'>
+            <div className='mt-4 sm:mt-6 p-3 sm:p-4 glass-effect border border-red-500/30 rounded-2xl'>
+              <p className='text-sm sm:text-base text-red-300 mb-3'>{error}</p>
+              <div className='flex flex-col sm:flex-row gap-2 sm:gap-3'>
                 <button
                   onClick={() => setError('')}
-                  className='flex items-center space-x-2 text-body text-red-300 hover:text-red-200 transition-colors'
+                  className='flex items-center justify-center space-x-2 text-sm sm:text-base text-red-300 hover:text-red-200 transition-colors'
                 >
                   <X className='w-4 h-4' />
                   <span>Clear Error</span>
                 </button>
                 <button
                   onClick={retryScanning}
-                  className='flex items-center space-x-2 text-body text-red-300 hover:text-red-200 transition-colors'
+                  className='flex items-center justify-center space-x-2 text-sm sm:text-base text-red-300 hover:text-red-200 transition-colors'
                 >
                   <RotateCcw className='w-4 h-4' />
                   <span>Retry</span>
@@ -305,15 +310,15 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className='px-8 py-6 border-t border-white/20 glass-effect'>
-          <div className='flex space-x-4'>
+        <div className='px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-t border-white/20 glass-effect'>
+          <div className='flex flex-col sm:flex-row gap-3 sm:gap-4'>
             <button
               onClick={retryScanning}
-              className='flex-1 btn-secondary py-4 px-6'
+              className='flex-1 btn-secondary py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
             >
               Retry
             </button>
-            <button onClick={onClose} className='flex-1 btn-primary py-4 px-6'>
+            <button onClick={onClose} className='flex-1 btn-primary py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'>
               Cancel
             </button>
           </div>

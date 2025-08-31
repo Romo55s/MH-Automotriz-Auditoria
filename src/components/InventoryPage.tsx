@@ -14,22 +14,20 @@ import LoadingSpinner from './LoadingSpinner';
 import ManualInputModal from './ManualInputModal';
 
 import {
-  AlertCircle,
-  BarChart3,
+  AlertTriangle,
+  Barcode,
   Calendar,
   Camera,
   CheckCircle,
   ChevronRight,
   Clock,
-  Download,
+  ExternalLink,
   FileText,
   Info,
   Pause,
-  Play,
-  QrCode,
+  Plus,
   RefreshCw,
   RotateCcw,
-  StopCircle,
   User,
   X
 } from 'lucide-react';
@@ -53,6 +51,7 @@ const InventoryPage: React.FC = () => {
     startSession,
     continueSession,
     clearError,
+    reset,
   } = useInventory();
   const { showSuccess, showError, showInfo, showWarning } = useToast();
 
@@ -564,282 +563,240 @@ const InventoryPage: React.FC = () => {
         </div>
       )}
 
-      <div className='max-w-max mx-auto px-8 py-section relative z-10'>
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
         {/* Monthly Inventory Info */}
-        <div className='card mb-section'>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-              <Calendar className='w-6 h-6 mr-3' />
+        <div className='card mb-6'>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
+            <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
+              <Calendar className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
               Monthly Inventory Details
             </h2>
             {sessionId && (
-              <div className='text-sm text-secondaryText bg-white/10 px-3 py-1 rounded-lg'>
+              <div className='text-xs sm:text-sm text-secondaryText bg-white/10 px-2 sm:px-3 py-1 rounded-lg'>
                 Session: {sessionId.slice(-8)}
               </div>
             )}
           </div>
-          <div className='grid md:grid-cols-3 gap-6'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
             <div className='text-center'>
-              <div className='w-16 h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-4'>
-                <Calendar className='w-8 h-8 text-white' />
+              <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4'>
+                <Calendar className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-2'>Month & Year</p>
-              <p className='text-2xl font-bold text-white'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2'>Month & Year</p>
+              <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {monthName} {currentYear}
               </p>
             </div>
 
             <div className='text-center'>
-              <div className='w-16 h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-4'>
-                <User className='w-8 h-8 text-white' />
+              <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4'>
+                <User className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-2'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2'>
                 Inventory Creator
               </p>
-              <p className='text-lg font-semibold text-white'>
+              <p className='text-sm sm:text-base lg:text-lg font-semibold text-white truncate px-2'>
                 {user?.name || user?.email || 'Unknown User'}
               </p>
             </div>
 
             <div className='text-center'>
-              <div className='w-16 h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-4'>
-                <Clock className='w-8 h-8 text-white' />
+              <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4'>
+                <Clock className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-2'>
-                Session Duration
-              </p>
-              <p className='text-2xl font-bold text-white'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2'>Session Duration</p>
+              <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {getSessionDuration()}
               </p>
             </div>
           </div>
         </div>
 
-
-
-        {/* Monthly Inventory Management - Moved below select section */}
-        <div className='card mb-section'>
-          <div className='flex items-center justify-between mb-6'>
-            <h2 className='text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-              <FileText className='w-6 h-6 mr-3' />
+        {/* Monthly Inventory Management */}
+        <div className='card mb-6'>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
+            <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
+              <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
               Monthly Inventory Management
             </h2>
-            <div className='flex items-center space-x-4'>
-              <button
-                onClick={handleRefreshInventories}
-                disabled={isLoadingInventories}
-                className='btn-secondary text-lg py-3 px-6 flex items-center justify-center space-x-3'
-              >
-                <RefreshCw
-                  className={`w-5 h-5 ${
-                    isLoadingInventories ? 'animate-spin' : ''
-                  }`}
-                />
-                <span>Refresh</span>
-              </button>
-            </div>
+            <button
+              onClick={handleRefreshInventories}
+              disabled={isLoadingInventories}
+              className='btn-secondary text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 flex items-center justify-center space-x-2'
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${isLoadingInventories ? 'animate-spin' : ''}`}
+              />
+              <span>Refresh</span>
+            </button>
           </div>
 
-          {/* Current Month Status */}
-          <div className='mb-6 p-4 glass-effect border border-white/20 rounded-2xl'>
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center space-x-3'>
-                <Calendar className='w-5 h-5 text-blue-400' />
-                <span className='text-sm font-semibold text-blue-400'>
-                  Current Month Status
-                </span>
+          {isLoadingInventories ? (
+            <div className='p-8 text-center'>
+              <LoadingSpinner />
+              <p className='text-sm sm:text-base text-secondaryText mt-4'>
+                Loading inventories...
+              </p>
+            </div>
+          ) : inventories.length === 0 ? (
+            <div className='p-8 text-center'>
+              <FileText className='w-16 h-16 text-secondaryText mx-auto mb-4 opacity-50' />
+              <p className='text-sm sm:text-base text-secondaryText'>
+                No inventories found for {selectedAgency.name}
+              </p>
+            </div>
+          ) : (
+            <div className='overflow-hidden'>
+              {/* Desktop Table View */}
+              <div className='hidden lg:block overflow-x-auto'>
+                <table className='w-full'>
+                  <thead className='border-b border-white/10'>
+                    <tr>
+                      <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Month & Year
+                      </th>
+                      <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Status
+                      </th>
+                      <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Created By
+                      </th>
+                      <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Total Scans
+                      </th>
+                      <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className='divide-y divide-white/10'>
+                    {inventories.map(inventory => (
+                      <tr
+                        key={inventory.id}
+                        className='transition-colors hover:bg-white/5'
+                      >
+                        <td className='px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap'>
+                          <div className='flex items-center space-x-2 lg:space-x-3'>
+                            <Calendar className='w-4 h-4 lg:w-5 lg:h-5 text-secondaryText' />
+                            <span className='font-semibold text-white text-sm lg:text-base'>
+                              {getMonthName(inventory.month)} {inventory.year}
+                            </span>
+                          </div>
+                        </td>
+                        <td className='px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap'>
+                          <span
+                            className={`inline-flex items-center px-2 lg:px-3 py-1 lg:py-2 rounded-pill text-xs font-semibold border ${getStatusColor(
+                              inventory.status
+                            )}`}
+                          >
+                            {getStatusIcon(inventory.status)}
+                            <span className='ml-2'>
+                              {getStatusText(inventory.status)}
+                            </span>
+                          </span>
+                        </td>
+                        <td className='px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-secondaryText'>
+                          {inventory.createdBy}
+                        </td>
+                        <td className='px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap'>
+                          <span className='font-mono text-sm lg:text-base text-white bg-white/10 px-2 lg:px-3 py-1 lg:py-2 rounded-lg'>
+                            {inventory.totalScans}
+                          </span>
+                        </td>
+                        <td className='px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap'>
+                          <button
+                            onClick={() => handleContinueInventory(inventory)}
+                            className='btn-secondary text-xs lg:text-sm py-1 lg:py-2 px-2 lg:px-3 flex items-center space-x-1 lg:space-x-2'
+                          >
+                            <span>
+                              {inventory.status === 'Completed'
+                                ? 'View'
+                                : 'Continue'}
+                            </span>
+                            <ChevronRight className='w-3 h-3 lg:w-4 lg:h-4' />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              {existingInventory && (
-                <span
-                  className={`inline-flex items-center px-3 py-1 rounded-pill text-sm font-semibold border ${getStatusColor(
-                    existingInventory.status
-                  )}`}
-                >
-                  {getStatusIcon(existingInventory.status)}
-                  <span className='ml-2'>
-                    {getStatusText(existingInventory.status)}
-                  </span>
-                </span>
-              )}
-            </div>
-            <p className='text-sm text-secondaryText mt-2'>
-              {hasExistingInventory
-                ? `Inventory for ${monthName} ${currentYear} is ${
-                    existingInventory?.status || 'unknown'
-                  }`
-                : `No inventory started for ${monthName} ${currentYear}`}
-            </p>
-          </div>
 
-          {/* Existing Inventories Table */}
-          {inventories.length > 0 && (
-            <div className='overflow-x-auto'>
-              <table className='w-full'>
-                <thead className='border-b border-white/10'>
-                  <tr>
-                    <th className='px-6 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Month & Year
-                    </th>
-                    <th className='px-6 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Status
-                    </th>
-                    <th className='px-6 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Created By
-                    </th>
-                    <th className='px-6 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Total Scans
-                    </th>
-                    <th className='px-6 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className='divide-y divide-white/10'>
-                  {inventories.map(inventory => (
-                    <tr
-                      key={inventory.id}
-                      className='transition-colors hover:bg-white/5'
-                    >
-                      <td className='px-6 py-4 whitespace-nowrap'>
-                        <div className='flex items-center space-x-3'>
-                          <Calendar className='w-5 h-5 text-secondaryText' />
-                          <span className='font-semibold text-white'>
-                            {getMonthName(inventory.month)} {inventory.year}
-                          </span>
-                        </div>
-                      </td>
-                      <td className='px-6 py-4 whitespace-nowrap'>
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-pill text-sm font-semibold border ${getStatusColor(
-                            inventory.status
-                          )}`}
-                        >
-                          {getStatusIcon(inventory.status)}
-                          <span className='ml-2'>
-                            {getStatusText(inventory.status)}
-                          </span>
+              {/* Mobile Card View */}
+              <div className='lg:hidden space-y-3 p-4'>
+                {inventories.map(inventory => (
+                  <div
+                    key={inventory.id}
+                    className='glass-effect rounded-xl p-3 border border-white/20'
+                  >
+                    <div className='flex items-center justify-between mb-3'>
+                      <div className='flex items-center space-x-2'>
+                        <Calendar className='w-4 h-4 text-secondaryText' />
+                        <span className='font-semibold text-white text-sm'>
+                          {getMonthName(inventory.month)} {inventory.year}
                         </span>
-                      </td>
-                      <td className='px-6 py-4 whitespace-nowrap text-body text-secondaryText'>
-                        {inventory.createdBy}
-                      </td>
-                      <td className='px-6 py-4 whitespace-nowrap'>
-                        <span className='font-mono text-lg text-white bg-white/10 px-3 py-1 rounded-lg'>
+                      </div>
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-pill text-xs font-semibold border ${getStatusColor(
+                          inventory.status
+                        )}`}
+                      >
+                        {getStatusIcon(inventory.status)}
+                        <span className='ml-1'>
+                          {getStatusText(inventory.status)}
+                        </span>
+                      </span>
+                    </div>
+                    
+                    <div className='space-y-2 mb-3'>
+                      <div className='flex justify-between text-xs'>
+                        <span className='text-secondaryText'>Created By:</span>
+                        <span className='text-white'>{inventory.createdBy}</span>
+                      </div>
+                      <div className='flex justify-between text-xs'>
+                        <span className='text-secondaryText'>Total Scans:</span>
+                        <span className='font-mono text-white bg-white/10 px-2 py-1 rounded'>
                           {inventory.totalScans}
                         </span>
-                      </td>
-                      <td className='px-6 py-4 whitespace-nowrap'>
-                        <button
-                          onClick={() => handleContinueInventory(inventory)}
-                          className='btn-secondary text-sm py-2 px-4 flex items-center space-x-2'
-                        >
-                          <span>
-                            {inventory.status === 'Completed'
-                              ? 'View'
-                              : 'Continue'}
-                          </span>
-                          <ChevronRight className='w-4 h-4' />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* No Inventories State */}
-          {!isLoadingInventories && inventories.length === 0 && (
-            <div className='text-center py-8'>
-              <FileText className='w-16 h-16 text-secondaryText mx-auto mb-4 opacity-50' />
-              <p className='text-body text-secondaryText mb-4'>
-                No inventory data found for {selectedAgency.name} in Google
-                Sheets.
-              </p>
-              {!hasExistingInventory && (
-                <button
-                  onClick={handleStartNewInventory}
-                  className='btn-primary text-lg px-6 py-3'
-                >
-                  Start First Inventory
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Loading State */}
-          {isLoadingInventories && (
-            <div className='text-center py-8'>
-              <LoadingSpinner />
-              <p className='text-secondaryText mt-4'>
-                Loading inventories from Google Sheets...
-              </p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {inventoriesError && (
-            <div className='p-4 border border-red-500/20 bg-red-500/10 rounded-xl'>
-              <div className='flex items-center space-x-3'>
-                <AlertCircle className='w-5 h-5 text-red-400' />
-                <span className='text-red-400 text-sm'>{inventoriesError}</span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleContinueInventory(inventory)}
+                      className='w-full btn-secondary text-xs py-2 px-3 flex items-center justify-center space-x-1'
+                    >
+                      <span>
+                        {inventory.status === 'Completed'
+                          ? 'View'
+                          : 'Continue'}
+                      </span>
+                      <ChevronRight className='w-3 h-3' />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
-        </div>
-
-        {/* Session Stats */}
-        <div className='grid md:grid-cols-3 gap-6 mb-section'>
-          <div className='card text-center'>
-            <div className='w-16 h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-4'>
-              <CheckCircle className='w-8 h-8 text-white' />
-            </div>
-            <p className='text-body text-secondaryText mb-2'>Scanned Codes</p>
-            <p className='text-2xl font-bold text-white'>
-              {scannedCodes.length}
-            </p>
-          </div>
-
-          <div className='card text-center'>
-            <div className='w-16 h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-4'>
-              <Download className='w-8 h-8 text-white' />
-            </div>
-            <p className='text-body text-secondaryText mb-2'>Ready to Export</p>
-            <p className='text-2xl font-bold text-white'>
-              {scannedCodes.filter(code => code.confirmed).length}
-            </p>
-          </div>
-
-          <div className='card text-center'>
-            <div className='w-16 h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-4'>
-              <BarChart3 className='w-8 h-8 text-white' />
-            </div>
-            <p className='text-body text-secondaryText mb-2'>Total Scans</p>
-            <p className='text-2xl font-bold text-white'>
-              {scannedCodes.length}
-            </p>
-          </div>
         </div>
 
         {/* Session Management Info */}
-        <div className='card mb-section border-green-500/20 bg-green-500/10'>
-          <div className='flex items-start space-x-4'>
-            <Info className='w-8 h-8 text-green-400 mt-1 flex-shrink-0' />
+        <div className='card mb-6 border-green-500/20 bg-green-500/10'>
+          <div className='flex items-start space-x-3 sm:space-x-4'>
+            <Info className='w-5 h-5 sm:w-6 sm:h-6 text-green-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
-              <h3 className='text-lg font-semibold text-green-400 mb-2'>
+              <h3 className='text-base sm:text-lg font-semibold text-green-400 mb-2 sm:mb-3'>
                 Session Management
               </h3>
-              <p className='text-body text-secondaryText mb-3'>
-                Your session data is automatically saved. You can pause the
-                session to continue later, or complete it when you&apos;re done
-                scanning. All scanned codes are saved to Google Sheets in
-                real-time.
+              <p className='text-sm sm:text-base text-secondaryText mb-3'>
+                Your inventory session is automatically saved as you scan. You can
+                pause at any time and continue later, or complete the session when
+                finished. All data is synchronized with Google Sheets in real-time.
               </p>
-              <div className='p-3 glass-effect border border-green-500/20 rounded-xl'>
-                <p className='text-sm text-green-300'>
-                  <strong>Note:</strong> If you refresh the page, your session
-                  will be restored automatically. You can also continue the same
-                  monthly inventory across multiple days.
+              <div className='p-3 sm:p-4 glass-effect border border-green-500/20 rounded-xl'>
+                <p className='text-xs sm:text-sm text-green-300'>
+                  <strong>Tip:</strong> Use the "Pause Session" button if you need
+                  to take a break. Your progress will be saved and you can continue
+                  later from exactly where you left off.
                 </p>
               </div>
             </div>
@@ -847,33 +804,33 @@ const InventoryPage: React.FC = () => {
         </div>
 
         {/* Paused Session Notice */}
-        {scannedCodes.length > 0 && !isSessionActive && (
-          <div className='card mb-section border-yellow-500/20 bg-yellow-500/10'>
-            <div className='flex items-start space-x-4'>
-              <Clock className='w-8 h-8 text-yellow-400 mt-1 flex-shrink-0' />
+        {existingInventory?.status === 'Paused' && (
+          <div className='card mb-6 border-yellow-500/20 bg-yellow-500/10'>
+            <div className='flex items-start space-x-3 sm:space-x-4'>
+              <Clock className='w-5 h-5 sm:w-6 sm:h-6 text-yellow-400 mt-1 flex-shrink-0' />
               <div className='flex-1'>
-                <h3 className='text-lg font-semibold text-yellow-400 mb-2'>
-                  Session Paused
+                <h3 className='text-base sm:text-lg font-semibold text-yellow-400 mb-2 sm:mb-3'>
+                  Paused Session Available
                 </h3>
-                <p className='text-body text-secondaryText mb-3'>
-                  Your inventory session has been paused with{' '}
-                  {scannedCodes.length} scanned codes. You can continue scanning
-                  or complete the session when ready.
+                <p className='text-sm sm:text-base text-secondaryText mb-3'>
+                  You have a paused inventory session for {monthName} {currentYear}
+                  with {existingInventory.totalScans} scans. You can continue this
+                  session or start a new one.
                 </p>
-                <div className='flex space-x-4'>
+                <div className='flex flex-col sm:flex-row gap-2 sm:gap-3'>
                   <button
-                    onClick={continueSession}
-                    className='btn-primary text-lg py-3 px-6 flex items-center space-x-3'
+                    onClick={() => handleContinueInventory(existingInventory)}
+                    className='btn-secondary text-sm py-2 px-4 flex items-center justify-center space-x-2'
                   >
-                    <Play className='w-5 h-5' />
-                    <span>Unpause & Continue</span>
+                    <RotateCcw className='w-4 h-4' />
+                    <span>Continue Session</span>
                   </button>
                   <button
-                    onClick={handleStopInventory}
-                    className='btn-secondary text-lg py-3 px-6 flex items-center space-x-3'
+                    onClick={handleStartNewInventory}
+                    className='btn-primary text-sm py-2 px-4 flex items-center justify-center space-x-2'
                   >
-                    <StopCircle className='w-5 h-5' />
-                    <span>Manage Session</span>
+                    <Plus className='w-4 h-4' />
+                    <span>Start New</span>
                   </button>
                 </div>
               </div>
@@ -881,202 +838,209 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
 
-        {/* REPUVE Reminder */}
-        <div className='card mb-section border-blue-500/20 bg-blue-500/10'>
-          <div className='flex items-start space-x-4'>
-            <Info className='w-8 h-8 text-blue-400 mt-1 flex-shrink-0' />
+        {/* REPUVE Manual Search Reminder */}
+        <div className='card mb-6 border-orange-500/20 bg-orange-500/10'>
+          <div className='flex items-start space-x-3 sm:space-x-4'>
+            <AlertTriangle className='w-5 h-5 sm:w-6 sm:h-6 text-orange-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
-              <h3 className='text-lg font-semibold text-blue-400 mb-2'>
+              <h3 className='text-base sm:text-lg font-semibold text-orange-400 mb-2 sm:mb-3'>
                 Important: Manual REPUVE Search Required
               </h3>
-              <p className='text-body text-secondaryText mb-3'>
-                After completing this inventory session, you will need to
-                manually search for each scanned barcode on the
+              <p className='text-sm sm:text-base text-secondaryText mb-3'>
+                After completing your inventory, you must manually search each
+                scanned barcode on the REPUVE website to extract complete vehicle
+                information (make, model, year, VIN, etc.).
+              </p>
+              <div className='p-3 sm:p-4 glass-effect border border-orange-500/20 rounded-xl'>
+                <p className='text-xs sm:text-sm text-orange-300 mb-3'>
+                  <strong>Step-by-step process:</strong>
+                </p>
+                <ol className='text-xs sm:text-sm text-orange-300 space-y-1 list-decimal list-inside'>
+                  <li>Complete your inventory session</li>
+                  <li>Go to the REPUVE website</li>
+                  <li>Search each barcode individually</li>
+                  <li>Extract and record vehicle details</li>
+                  <li>Update your records with complete information</li>
+                </ol>
+              </div>
+              <div className='mt-3 sm:mt-4'>
                 <a
                   href='https://www.repuve.gob.mx/'
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='text-blue-400 hover:text-blue-300 underline mx-1'
+                  className='inline-flex items-center space-x-2 text-orange-400 hover:text-orange-300 transition-colors underline'
                 >
-                  REPUVE website
+                  <ExternalLink className='w-4 h-4' />
+                  <span>Open REPUVE Website</span>
                 </a>
-                to extract the complete vehicle information.
-              </p>
-              <div className='p-3 glass-effect border border-blue-500/20 rounded-xl'>
-                <p className='text-sm text-blue-300'>
-                  <strong>Note:</strong> The scanned barcodes are saved to
-                  Google Sheets with your user information and timestamp. Use
-                  the exported data to manually search REPUVE for each
-                  vehicle&apos;s details.
-                </p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className='card mb-section'>
-          {/* Info Section */}
-          <div className='mb-6 p-4 glass-effect border border-white/20 rounded-2xl'>
-            <div className='flex items-center space-x-3 mb-2'>
-              <AlertCircle className='w-5 h-5 text-blue-400' />
-              <span className='text-sm font-semibold text-blue-400'>
-                Scanning Options
-              </span>
-            </div>
-            <p className='text-sm text-secondaryText mb-2'>
-              Use the camera scanner for clear barcodes, or manual input for
-              damaged codes or when scanning isn&apos;t working.
+        <div className='card mb-6'>
+          <div className='text-center mb-6'>
+            <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
+              Inventory Session Controls
+            </h2>
+            <p className='text-sm sm:text-base text-secondaryText'>
+              {isSessionActive
+                ? 'Your inventory session is currently active. Scan barcodes or manage your session below.'
+                : hasExistingInventory && existingInventory?.status === 'Completed'
+                ? `Inventory for ${monthName} ${currentYear} has been completed. You cannot start a new one for the same month.`
+                : 'Start a new inventory session or continue an existing one.'}
             </p>
-            <div className='p-3 glass-effect border border-white/20 rounded-xl'>
-              <p className='text-xs text-secondaryText'>
-                <strong>Important:</strong> Only 8-digit numeric barcodes are
-                supported (e.g., 12345678). QR codes and alphanumeric codes will
-                be rejected.
-              </p>
-            </div>
           </div>
 
-          {!isSessionActive ? (
-            <div className='text-center'>
-              {!hasExistingInventory ? (
-                <button
-                  onClick={() => void startSession()}
-                  className='btn-primary text-lg py-5 px-8 flex items-center justify-center space-x-4 mx-auto'
-                >
-                  <Play className='w-6 h-6' />
-                  <span>Start New Inventory Session</span>
-                </button>
-              ) : existingInventory?.status === 'Active' ? (
-                <button
-                  onClick={() => handleContinueInventory(existingInventory)}
-                  className='btn-primary text-lg py-5 px-8 flex items-center justify-center space-x-4 mx-auto'
-                >
-                  <Play className='w-6 h-6' />
-                  <span>Continue Inventory Session</span>
-                </button>
-              ) : existingInventory?.status === 'Completed' ? (
-                <div className='text-center'>
-                  <p className='text-body text-secondaryText mb-4'>
-                    Inventory for {monthName} {currentYear} has been completed.
-                  </p>
-                  <p className='text-sm text-green-400 mb-4'>
-                    This month&apos;s inventory has been completed. You cannot
-                    start a new one.
-                  </p>
-                </div>
-              ) : (
-                <div className='text-center'>
-                  <p className='text-body text-secondaryText mb-4'>
-                    Inventory for {monthName} {currentYear} is{' '}
-                    {existingInventory?.status || 'unknown'}
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className='flex flex-col gap-4'>
-              {/* Primary Action Buttons */}
-              <div className='flex flex-col sm:flex-row gap-4'>
-                <button
-                  onClick={() => setShowScanner(true)}
-                  className='flex-1 btn-primary text-lg py-5 px-8 flex items-center justify-center space-x-4'
-                >
-                  <Camera className='w-6 h-6' />
-                  <span>Scan Barcode</span>
-                </button>
+          <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
+            {!isSessionActive && !hasExistingInventory && (
+              <button
+                onClick={handleStartNewInventory}
+                className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Start New Inventory Session</span>
+              </button>
+            )}
 
-                <button
-                  onClick={() => setShowManualInput(true)}
-                  className='flex-1 btn-secondary text-lg py-5 px-8 flex items-center justify-center space-x-4'
-                >
-                  <QrCode className='w-6 h-6' />
-                  <span>Manual Input</span>
-                </button>
+            {!isSessionActive && hasExistingInventory && existingInventory?.status === 'Active' && (
+              <button
+                onClick={() => handleContinueInventory(existingInventory)}
+                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Continue Inventory Session</span>
+              </button>
+            )}
+
+            {!isSessionActive && hasExistingInventory && existingInventory?.status === 'Paused' && (
+              <button
+                onClick={() => handleContinueInventory(existingInventory)}
+                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Continue Paused Session</span>
+              </button>
+            )}
+
+            {hasExistingInventory && existingInventory?.status === 'Completed' && (
+              <div className='text-center text-secondaryText py-4'>
+                <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
+                <p>Inventory for {monthName} {currentYear} has been completed.</p>
+                <p className='text-sm mt-1'>You can view the data but cannot add new scans.</p>
               </div>
-
-              {/* Session Control Buttons */}
-              <div className='flex flex-col sm:flex-row gap-4'>
-                <button
-                  onClick={handleStopInventory}
-                  disabled={isLoading || scannedCodes.length === 0}
-                  className={`flex-1 text-lg py-5 px-8 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-4 ${
-                    isLoading || scannedCodes.length === 0
-                      ? 'bg-border text-secondaryText cursor-not-allowed'
-                      : 'btn-secondary'
-                  }`}
-                >
-                  <StopCircle className='w-6 h-6' />
-                  <span>{isLoading ? 'Processing...' : 'Manage Session'}</span>
-                </button>
-
-                <button
-                  onClick={() => void handlePauseSession()}
-                  disabled={isLoading || scannedCodes.length === 0}
-                  className={`flex-1 text-lg py-5 px-8 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-4 ${
-                    isLoading || scannedCodes.length === 0
-                      ? 'bg-border text-secondaryText cursor-not-allowed'
-                      : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                  }`}
-                >
-                  <Pause className='w-6 h-6' />
-                  <span>Pause Session</span>
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Scanned Codes Table */}
-        {scannedCodes.length > 0 && (
-          <div className='card overflow-hidden'>
-            <div className='px-8 py-6 border-b border-white/20'>
-              <h2 className='text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-                <BarChart3 className='w-6 h-6 mr-3' />
-                Scanned Codes
+        {/* Session Controls */}
+        {isSessionActive && (
+          <div className='card mb-6'>
+            <div className='text-center mb-6'>
+              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
+                Active Session Controls
               </h2>
+              <p className='text-sm sm:text-base text-secondaryText'>
+                Your inventory session is active. Use the controls below to manage
+                your session or scan new barcodes.
+              </p>
             </div>
-            <div className='overflow-x-auto'>
-              <table className='w-full'>
-                <thead className='border-b border-white/10'>
-                  <tr>
-                    <th className='px-8 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Code
-                    </th>
-                    <th className='px-8 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Time
-                    </th>
-                    <th className='px-8 py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className='divide-y divide-white/10'>
-                  {scannedCodes.map(code => (
-                    <tr key={code.id} className='transition-colors'>
-                      <td className='px-8 py-6 whitespace-nowrap'>
-                        <span className='font-mono text-lg text-white bg-white/10 px-3 py-1 rounded-lg'>
-                          {code.code}
-                        </span>
-                      </td>
-                      <td className='px-8 py-6 whitespace-nowrap text-body text-secondaryText'>
+
+            <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
+              <button
+                onClick={() => setShowScanner(true)}
+                className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Scan Barcode</span>
+              </button>
+
+              <button
+                onClick={() => setShowManualInput(true)}
+                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <FileText className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Manual Input</span>
+              </button>
+
+              <button
+                onClick={handleStopInventory}
+                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Pause className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Manage Session</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Scanned Codes Display */}
+        {scannedCodes.length > 0 && (
+          <div className='card mb-6'>
+            <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
+              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
+                <Barcode className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
+                Scanned Codes ({scannedCodes.length})
+              </h2>
+                             <div className='flex items-center space-x-2 sm:space-x-3'>
+                 <span className='text-xs sm:text-sm text-secondaryText'>
+                   Total scans: {scannedCodes.length}
+                 </span>
+                 <button
+                   onClick={reset}
+                   className='btn-secondary text-xs sm:text-sm py-2 px-3 flex items-center space-x-1 sm:space-x-2'
+                 >
+                   <RotateCcw className='w-4 h-4' />
+                   <span>Reset</span>
+                 </button>
+               </div>
+            </div>
+
+            <div className='overflow-hidden'>
+              {/* Desktop Grid View */}
+              <div className='hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4'>
+                {scannedCodes.map((code, index) => (
+                  <div
+                    key={index}
+                    className='glass-effect rounded-xl p-3 sm:p-4 border border-white/20'
+                  >
+                    <div className='flex items-center justify-between mb-2'>
+                      <span className='text-xs sm:text-sm text-secondaryText'>
+                        #{index + 1}
+                      </span>
+                      <span className='text-xs text-secondaryText'>
                         {formatTime(code.timestamp)}
-                      </td>
-                      <td className='px-8 py-6 whitespace-nowrap'>
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-pill text-sm font-semibold ${
-                            code.confirmed
-                              ? 'bg-white/20 text-white border border-white/30'
-                              : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                          }`}
-                        >
-                          {code.confirmed ? 'Confirmed' : 'Pending'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </span>
+                    </div>
+                    <div className='font-mono text-sm sm:text-base text-white break-all'>
+                      {code.code}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Mobile List View */}
+              <div className='sm:hidden space-y-2'>
+                {scannedCodes.map((code, index) => (
+                  <div
+                    key={index}
+                    className='glass-effect rounded-xl p-3 border border-white/20'
+                  >
+                    <div className='flex items-center justify-between mb-2'>
+                      <span className='text-xs text-secondaryText'>
+                        #{index + 1}
+                      </span>
+                      <span className='text-xs text-secondaryText'>
+                        {formatTime(code.timestamp)}
+                      </span>
+                    </div>
+                    <div className='font-mono text-sm text-white break-all'>
+                      {code.code}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

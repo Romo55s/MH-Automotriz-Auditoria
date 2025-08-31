@@ -10,17 +10,17 @@ import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
 
 import {
-  AlertCircle,
-  BarChart3,
-  Calendar,
-  CheckCircle,
-  ChevronRight,
-  Clock,
-  Database,
-  FileText,
-  Plus,
-  RefreshCw,
-  User,
+    AlertCircle,
+    BarChart3,
+    Calendar,
+    CheckCircle,
+    ChevronRight,
+    Clock,
+    Database,
+    FileText,
+    Plus,
+    RefreshCw,
+    User,
 } from 'lucide-react';
 
 const MonthlyInventoryManager: React.FC = () => {
@@ -279,74 +279,74 @@ const MonthlyInventoryManager: React.FC = () => {
         showUserInfo={true}
       />
 
-      <div className='max-w-max mx-auto px-8 py-section relative z-10'>
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
         {/* Current Month Info */}
-        <div className='card mb-8'>
-          <div className='flex items-center justify-between mb-8'>
-            <h2 className='text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-              <Calendar className='w-6 h-6 mr-3' />
+        <div className='card mb-6'>
+          <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4'>
+            <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
+              <Calendar className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
               Current Month: {getMonthName(currentMonth)} {currentYear}
             </h2>
-            <div className='flex items-center space-x-4'>
+            <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4'>
               <button
                 onClick={handleRefresh}
                 disabled={isLoading}
-                className='btn-secondary text-lg py-4 px-6 flex items-center justify-center space-x-3'
+                className='btn-secondary text-sm sm:text-base py-3 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <RefreshCw
-                  className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`}
+                  className={`w-4 h-4 sm:w-5 sm:h-5 ${isLoading ? 'animate-spin' : ''}`}
                 />
                 <span>Refresh Data</span>
               </button>
               <button
                 onClick={handleStartNewInventory}
-                className='btn-primary text-lg py-4 px-8 flex items-center justify-center space-x-3'
+                className='btn-primary text-sm sm:text-base py-3 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
-                <Plus className='w-5 h-5' />
+                <Plus className='w-4 h-4 sm:w-5 sm:h-5' />
                 <span>Start New Inventory</span>
               </button>
             </div>
           </div>
 
-          <div className='grid md:grid-cols-4 gap-8'>
+          <div className='grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8'>
             <div className='text-center'>
-              <div className='w-20 h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-6'>
-                <Calendar className='w-10 h-10 text-white' />
+              <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
+                <Calendar className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-3'>Current Month</p>
-              <p className='text-2xl font-bold text-white'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Current Month</p>
+              <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {getMonthName(currentMonth)} {currentYear}
               </p>
             </div>
 
             <div className='text-center'>
-              <div className='w-20 h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-6'>
-                <User className='w-10 h-10 text-white' />
+              <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
+                <User className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-3'>Current User</p>
-              <p className='text-lg font-semibold text-white'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Current User</p>
+              <p className='text-sm sm:text-base lg:text-lg font-semibold text-white truncate px-2'>
                 {user?.name || user?.email || 'Unknown User'}
               </p>
             </div>
 
             <div className='text-center'>
-              <div className='w-20 h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-6'>
-                <BarChart3 className='w-10 h-10 text-white' />
+              <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
+                <BarChart3 className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-3'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>
                 Total Inventories
               </p>
-              <p className='text-2xl font-bold text-white'>
+              <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {inventories.length}
               </p>
             </div>
 
             <div className='text-center'>
-              <div className='w-20 h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-6'>
-                <Database className='w-10 h-10 text-white' />
+              <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
+                <Database className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-body text-secondaryText mb-3'>Last Updated</p>
-              <p className='text-lg font-semibold text-white'>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Last Updated</p>
+              <p className='text-sm sm:text-base lg:text-lg font-semibold text-white'>
                 {lastRefresh.toLocaleTimeString('en-US', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -357,20 +357,20 @@ const MonthlyInventoryManager: React.FC = () => {
         </div>
 
         {/* Data Source Info */}
-        <div className='card mb-8 border-blue-500/20 bg-blue-500/10'>
-          <div className='flex items-start space-x-4'>
-            <Database className='w-8 h-8 text-blue-400 mt-1 flex-shrink-0' />
+        <div className='card mb-6 border-blue-500/20 bg-blue-500/10'>
+          <div className='flex items-start space-x-3 sm:space-x-4'>
+            <Database className='w-6 h-6 sm:w-8 sm:h-8 text-blue-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
-              <h3 className='text-lg font-semibold text-blue-400 mb-3'>
+              <h3 className='text-base sm:text-lg font-semibold text-blue-400 mb-2 sm:mb-3'>
                 Data Source: Google Sheets
               </h3>
-              <p className='text-body text-secondaryText mb-4'>
+              <p className='text-sm sm:text-base text-secondaryText mb-3 sm:mb-4'>
                 All inventory data is automatically synchronized with Google
                 Sheets in real-time. Each scan is immediately saved, and session
                 data is updated as you work.
               </p>
-              <div className='p-4 glass-effect border border-blue-500/20 rounded-xl'>
-                <p className='text-sm text-blue-300'>
+              <div className='p-3 sm:p-4 glass-effect border border-blue-500/20 rounded-xl'>
+                <p className='text-xs sm:text-sm text-blue-300'>
                   <strong>Note:</strong> The data shown here is pulled directly
                   from your Google Sheets. If you don't see recent data, click
                   the "Refresh Data" button above.
@@ -382,11 +382,11 @@ const MonthlyInventoryManager: React.FC = () => {
 
         {/* Error Display */}
         {error && (
-          <div className='card border-red-500/20 bg-red-500/10 mb-8'>
+          <div className='card border-red-500/20 bg-red-500/10 mb-6'>
             <div className='flex items-center justify-between'>
               <div className='flex items-center space-x-3'>
                 <AlertCircle className='w-5 h-5 text-red-400' />
-                <span className='text-red-400 font-medium'>{error}</span>
+                <span className='text-sm sm:text-base text-red-400 font-medium'>{error}</span>
               </div>
               <button
                 onClick={() => setError(null)}
@@ -400,13 +400,13 @@ const MonthlyInventoryManager: React.FC = () => {
 
         {/* Existing Inventories */}
         <div className='card'>
-          <div className='px-8 py-8 border-b border-white/20'>
-            <div className='flex items-center justify-between'>
-              <h2 className='text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-                <FileText className='w-6 h-6 mr-3' />
+          <div className='px-4 sm:px-6 lg:px-8 py-6 sm:py-8 border-b border-white/20'>
+            <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
+              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
+                <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
                 Existing Inventories
               </h2>
-              <div className='text-sm text-secondaryText'>
+              <div className='text-xs sm:text-sm text-secondaryText'>
                 {inventories.length} inventory
                 {inventories.length !== 1 ? 'ies' : 'y'} found
               </div>
@@ -414,128 +414,189 @@ const MonthlyInventoryManager: React.FC = () => {
           </div>
 
           {isLoading ? (
-            <div className='p-16 text-center'>
+            <div className='p-8 sm:p-16 text-center'>
               <LoadingSpinner />
-              <p className='text-secondaryText mt-6 text-lg'>
+              <p className='text-sm sm:text-base lg:text-lg text-secondaryText mt-4 sm:mt-6'>
                 Loading inventories from Google Sheets...
               </p>
             </div>
           ) : inventories.length === 0 ? (
-            <div className='p-16 text-center'>
-              <FileText className='w-24 h-24 text-secondaryText mx-auto mb-8 opacity-50' />
-              <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-6'>
+            <div className='p-8 sm:p-16 text-center'>
+              <FileText className='w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 text-secondaryText mx-auto mb-4 sm:mb-6 lg:mb-8 opacity-50' />
+              <h3 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4 sm:mb-6'>
                 No Inventories Found
               </h3>
-              <p className='text-body text-secondaryText mb-10 max-w-md mx-auto'>
+              <p className='text-sm sm:text-base text-secondaryText mb-6 sm:mb-8 lg:mb-10 max-w-md mx-auto px-4'>
                 No inventory data found for {selectedAgency.name} in Google
                 Sheets. Start your first inventory session for{' '}
                 {getMonthName(currentMonth)} {currentYear}
               </p>
               <button
                 onClick={handleStartNewInventory}
-                className='btn-primary text-lg px-10 py-5'
+                className='btn-primary text-sm sm:text-base px-6 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5'
               >
                 Start First Inventory
               </button>
             </div>
           ) : (
-            <div className='overflow-x-auto'>
-              <table className='w-full'>
-                <thead className='border-b border-white/10'>
-                  <tr>
-                    <th className='px-8 py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Month & Year
-                    </th>
-                    <th className='px-8 py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Status
-                    </th>
-                    <th className='px-8 py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Created By
-                    </th>
-                    <th className='px-8 py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Created At
-                    </th>
-                    <th className='px-8 py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Total Scans
-                    </th>
-                    <th className='px-8 py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className='divide-y divide-white/10'>
-                  {inventories.map(inventory => (
-                    <tr
-                      key={inventory.id}
-                      className='transition-colors hover:bg-white/5'
-                    >
-                      <td className='px-8 py-8 whitespace-nowrap'>
-                        <div className='flex items-center space-x-4'>
-                          <Calendar className='w-6 h-6 text-secondaryText' />
-                          <span className='font-semibold text-white text-lg'>
-                            {getMonthName(inventory.month)} {inventory.year}
+            <div className='overflow-hidden'>
+              {/* Desktop Table View */}
+              <div className='hidden lg:block overflow-x-auto'>
+                <table className='w-full'>
+                  <thead className='border-b border-white/10'>
+                    <tr>
+                      <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Month & Year
+                      </th>
+                      <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Status
+                      </th>
+                      <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Created By
+                      </th>
+                      <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Created At
+                      </th>
+                      <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Total Scans
+                      </th>
+                      <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className='divide-y divide-white/10'>
+                    {inventories.map(inventory => (
+                      <tr
+                        key={inventory.id}
+                        className='transition-colors hover:bg-white/5'
+                      >
+                        <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap'>
+                          <div className='flex items-center space-x-3 lg:space-x-4'>
+                            <Calendar className='w-5 h-5 lg:w-6 lg:h-6 text-secondaryText' />
+                            <span className='font-semibold text-white text-base lg:text-lg'>
+                              {getMonthName(inventory.month)} {inventory.year}
+                            </span>
+                          </div>
+                        </td>
+                        <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap'>
+                          <span
+                            className={`inline-flex items-center px-3 lg:px-4 py-2 rounded-pill text-xs lg:text-sm font-semibold border ${getStatusColor(
+                              inventory.status
+                            )}`}
+                          >
+                            {getStatusIcon(inventory.status)}
+                            <span className='ml-2 lg:ml-3'>
+                              {getStatusText(inventory.status)}
+                            </span>
                           </span>
-                        </div>
-                      </td>
-                      <td className='px-8 py-8 whitespace-nowrap'>
-                        <span
-                          className={`inline-flex items-center px-4 py-2 rounded-pill text-sm font-semibold border ${getStatusColor(
-                            inventory.status
-                          )}`}
-                        >
-                          {getStatusIcon(inventory.status)}
-                          <span className='ml-3'>
-                            {getStatusText(inventory.status)}
+                        </td>
+                        <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap text-sm lg:text-base text-secondaryText'>
+                          {inventory.createdBy}
+                        </td>
+                        <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap text-sm lg:text-base text-secondaryText'>
+                          {formatDate(inventory.createdAt)}
+                        </td>
+                        <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap'>
+                          <span className='font-mono text-lg lg:text-xl text-white bg-white/10 px-3 lg:px-4 py-2 rounded-lg'>
+                            {inventory.totalScans}
                           </span>
+                        </td>
+                        <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap'>
+                          <button
+                            onClick={() => handleContinueInventory(inventory)}
+                            className='btn-secondary text-xs lg:text-sm py-2 lg:py-3 px-4 lg:px-6 flex items-center space-x-2 lg:space-x-3'
+                          >
+                            <span>
+                              {inventory.status === 'Completed'
+                                ? 'View'
+                                : 'Continue'}
+                            </span>
+                            <ChevronRight className='w-3 h-3 lg:w-4 lg:h-4' />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className='lg:hidden space-y-4 p-4'>
+                {inventories.map(inventory => (
+                  <div
+                    key={inventory.id}
+                    className='glass-effect rounded-xl p-4 border border-white/20'
+                  >
+                    <div className='flex items-center justify-between mb-3'>
+                      <div className='flex items-center space-x-3'>
+                        <Calendar className='w-5 h-5 text-secondaryText' />
+                        <span className='font-semibold text-white text-base'>
+                          {getMonthName(inventory.month)} {inventory.year}
                         </span>
-                      </td>
-                      <td className='px-8 py-8 whitespace-nowrap text-body text-secondaryText'>
-                        {inventory.createdBy}
-                      </td>
-                      <td className='px-8 py-8 whitespace-nowrap text-body text-secondaryText'>
-                        {formatDate(inventory.createdAt)}
-                      </td>
-                      <td className='px-8 py-8 whitespace-nowrap'>
-                        <span className='font-mono text-xl text-white bg-white/10 px-4 py-2 rounded-lg'>
+                      </div>
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-pill text-xs font-semibold border ${getStatusColor(
+                          inventory.status
+                        )}`}
+                      >
+                        {getStatusIcon(inventory.status)}
+                        <span className='ml-2'>
+                          {getStatusText(inventory.status)}
+                        </span>
+                      </span>
+                    </div>
+                    
+                    <div className='space-y-2 mb-4'>
+                      <div className='flex justify-between text-sm'>
+                        <span className='text-secondaryText'>Created By:</span>
+                        <span className='text-white'>{inventory.createdBy}</span>
+                      </div>
+                      <div className='flex justify-between text-sm'>
+                        <span className='text-secondaryText'>Created:</span>
+                        <span className='text-white'>{formatDate(inventory.createdAt)}</span>
+                      </div>
+                      <div className='flex justify-between text-sm'>
+                        <span className='text-secondaryText'>Total Scans:</span>
+                        <span className='font-mono text-white bg-white/10 px-2 py-1 rounded'>
                           {inventory.totalScans}
                         </span>
-                      </td>
-                      <td className='px-8 py-8 whitespace-nowrap'>
-                        <button
-                          onClick={() => handleContinueInventory(inventory)}
-                          className='btn-secondary text-sm py-3 px-6 flex items-center space-x-3'
-                        >
-                          <span>
-                            {inventory.status === 'Completed'
-                              ? 'View'
-                              : 'Continue'}
-                          </span>
-                          <ChevronRight className='w-4 h-4' />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleContinueInventory(inventory)}
+                      className='w-full btn-secondary text-sm py-3 px-4 flex items-center justify-center space-x-2'
+                    >
+                      <span>
+                        {inventory.status === 'Completed'
+                          ? 'View'
+                          : 'Continue'}
+                      </span>
+                      <ChevronRight className='w-4 h-4' />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Info Section */}
-        <div className='card border-blue-500/20 bg-blue-500/10 mt-8'>
-          <div className='flex items-start space-x-4'>
-            <AlertCircle className='w-8 h-8 text-blue-400 mt-1 flex-shrink-0' />
+        <div className='card border-blue-500/20 bg-blue-500/10 mt-6'>
+          <div className='flex items-start space-x-3 sm:space-x-4'>
+            <AlertCircle className='w-6 h-6 sm:w-8 sm:h-8 text-blue-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
-              <h3 className='text-lg font-semibold text-blue-400 mb-4'>
+              <h3 className='text-base sm:text-lg font-semibold text-blue-400 mb-2 sm:mb-4'>
                 Monthly Inventory Management
               </h3>
-              <p className='text-body text-secondaryText mb-4'>
+              <p className='text-sm sm:text-base text-secondaryText mb-3 sm:mb-4'>
                 Each agency can have one inventory per month. Once an inventory
                 is completed for a month, you cannot start a new one for the
                 same month. This ensures data integrity and prevents duplicates.
               </p>
-              <div className='p-4 glass-effect border border-blue-500/20 rounded-xl'>
-                <p className='text-sm text-blue-300'>
+              <div className='p-3 sm:p-4 glass-effect border border-blue-500/20 rounded-xl'>
+                <p className='text-xs sm:text-sm text-blue-300'>
                   <strong>Note:</strong> After completing an inventory, you'll
                   need to manually search each barcode on the REPUVE website to
                   extract complete vehicle information.

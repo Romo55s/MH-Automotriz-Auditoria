@@ -1,5 +1,5 @@
+import { AlertCircle, CheckCircle, X, XCircle } from 'lucide-react';
 import React, { useEffect } from 'react';
-import { CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
 
 export interface ToastProps {
   id: string;
@@ -58,20 +58,20 @@ const Toast: React.FC<ToastProps> = ({
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 max-w-sm w-full ${getBgColor()} border rounded-lg shadow-lg p-4 transition-all duration-300 ease-in-out`}
+      className={`fixed top-4 right-2 sm:right-4 z-50 max-w-sm w-[calc(100vw-1rem)] sm:w-full ${getBgColor()} border rounded-lg shadow-lg p-3 sm:p-4 transition-all duration-300 ease-in-out`}
     >
-      <div className='flex items-start space-x-3'>
+      <div className='flex items-start space-x-2 sm:space-x-3'>
         <div className='flex-shrink-0'>{getIcon()}</div>
         <div className='flex-1 min-w-0'>
-          <h4 className='text-sm font-medium text-white'>{title}</h4>
-          {message && <p className='mt-1 text-sm text-gray-300'>{message}</p>}
+          <h4 className='text-xs sm:text-sm font-medium text-white'>{title}</h4>
+          {message && <p className='mt-1 text-xs sm:text-sm text-gray-300'>{message}</p>}
         </div>
         <div className='flex-shrink-0'>
           <button
             onClick={() => onClose(id)}
-            className='inline-flex text-gray-400 hover:text-white focus:outline-none focus:text-white'
+            className='inline-flex text-gray-400 hover:text-white focus:outline-none focus:text-white p-1'
           >
-            <X className='w-4 h-4' />
+            <X className='w-3 h-3 sm:w-4 sm:h-4' />
           </button>
         </div>
       </div>
