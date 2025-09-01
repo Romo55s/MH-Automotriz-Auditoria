@@ -58,7 +58,7 @@ const Toast: React.FC<ToastProps> = ({
 
   return (
     <div
-      className={`fixed top-4 right-2 sm:right-4 z-50 max-w-sm w-[calc(100vw-1rem)] sm:w-full ${getBgColor()} border rounded-lg shadow-lg p-3 sm:p-4 transition-all duration-300 ease-in-out`}
+      className={`w-[calc(100vw-2rem)] sm:w-full max-w-md ${getBgColor()} border rounded-lg shadow-lg p-3 sm:p-4 transition-all duration-300 ease-in-out`}
     >
       <div className='flex items-start space-x-2 sm:space-x-3'>
         <div className='flex-shrink-0'>{getIcon()}</div>

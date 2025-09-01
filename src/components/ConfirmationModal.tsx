@@ -26,7 +26,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Header */}
         <div className='flex items-center justify-between p-4 sm:p-6 lg:p-8 border-b border-white/20'>
           <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading text-shadow'>
-            Confirm Scan
+            Confirmar Escaneo
           </h2>
           <button
             onClick={handleCancel}
@@ -41,7 +41,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           {/* Scanned Code Display */}
           <div className='mb-6 sm:mb-8'>
             <label className='block text-sm sm:text-base font-semibold text-secondaryText mb-3 sm:mb-4'>
-              Scanned Barcode
+              Código de Barras Escaneado
             </label>
             <div className='glass-effect border border-white/20 rounded-2xl p-4 sm:p-6 text-center'>
               <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 glow'>
@@ -61,14 +61,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               onClick={handleCancel}
               className='flex-1 btn-secondary py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
             >
-              Cancel
+              Cancelar
             </button>
             <button
               onClick={handleConfirm}
               className='flex-1 btn-primary py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3 glow text-sm sm:text-base'
             >
               <Check className='w-4 h-4 sm:w-5 sm:h-5' />
-              <span>Confirm</span>
+              <span>Confirmar</span>
             </button>
           </div>
         </div>

@@ -39,7 +39,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
       }
     } catch (err) {
       setError(
-        'Failed to initialize scanner. Please check camera permissions.'
+        'Falló al inicializar el escáner. Por favor verifica los permisos de la cámara.'
       );
       // console.error('Scanner initialization error:', err); // Removed console.error
     }
@@ -105,7 +105,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
           video.removeEventListener('canplay', onCanPlay);
           video.removeEventListener('error', onError);
           reject(
-            new Error('Video loading timeout - camera may not be accessible')
+            new Error('Tiempo de espera agotado para el video - la cámara puede no ser accesible')
           );
         }, 15000); // Increased timeout to 15 seconds
       });
@@ -125,7 +125,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             } else {
               // Show error for invalid code format
               setError(
-                `Invalid code format: "${scannedCode}". Expected 8-digit number (e.g., 12345678). Please scan a valid barcode or use manual input.`
+                `Formato de código inválido: "${scannedCode}". Se esperaba un número de 8 dígitos (ej., 12345678). Por favor escanea un código de barras válido o usa entrada manual.`
               );
               // Don't stop scanning, let user try again
             }
@@ -142,16 +142,16 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
       const errorMsg = err instanceof Error ? err.message : String(err);
 
       // Provide more helpful error messages
-      let userFriendlyError = 'Failed to start scanning. ';
+      let userFriendlyError = 'Falló al iniciar el escaneo. ';
       if (errorMsg.includes('timeout')) {
         userFriendlyError +=
-          'Camera is not responding. Please check camera permissions and try again.';
+          'La cámara no responde. Por favor verifica los permisos de la cámara e intenta de nuevo.';
       } else if (errorMsg.includes('NotAllowedError')) {
         userFriendlyError +=
-          'Camera access denied. Please allow camera permissions.';
+          'Acceso a la cámara denegado. Por favor permite los permisos de la cámara.';
       } else if (errorMsg.includes('NotFoundError')) {
         userFriendlyError +=
-          'Camera not found. Please check your camera connection.';
+          'Cámara no encontrada. Por favor verifica la conexión de tu cámara.';
       } else {
         userFriendlyError += errorMsg;
       }
@@ -192,7 +192,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
               <Camera className='w-6 h-6 text-white' />
             </div>
             <h2 className='text-subheading font-bold uppercase tracking-hero leading-heading text-shadow'>
-              Scan Barcode
+              Escanear Código de Barras
             </h2>
           </div>
           <button
@@ -207,7 +207,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         {devices.length > 1 && (
           <div className='px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-white/20'>
             <label className='block text-sm sm:text-base font-semibold text-secondaryText mb-2 sm:mb-3'>
-              Camera Device
+              Dispositivo de Cámara
             </label>
             <select
               value={selectedDevice}
@@ -220,7 +220,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                   value={device.deviceId}
                   className='bg-background text-white'
                 >
-                  {device.label || `Camera ${device.deviceId.slice(0, 8)}...`}
+                  {device.label || `Cámara ${device.deviceId.slice(0, 8)}...`}
                 </option>
               ))}
             </select>
@@ -266,21 +266,21 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             <div className='flex items-center justify-center space-x-2 mb-2 sm:mb-3'>
               <ScanLine className='w-4 h-4 sm:w-5 sm:h-5 text-secondaryText' />
               <p className='text-sm sm:text-base text-secondaryText'>
-                Position the barcode within the frame to scan
+                Posiciona el código de barras dentro del marco para escanear
               </p>
             </div>
             <div className='mb-3 p-3 glass-effect border border-white/20 rounded-xl'>
               <p className='text-xs sm:text-sm text-secondaryText'>
-                <strong>Expected Format:</strong> 8-digit numeric code (e.g.,
+                <strong>Formato Esperado:</strong> Código numérico de 8 dígitos (ej.,
                 12345678)
               </p>
               <p className='text-xs text-secondaryText mt-1'>
-                QR codes and alphanumeric codes are not supported
+                Los códigos QR y códigos alfanuméricos no son compatibles
               </p>
             </div>
             {isScanning && (
               <p className='text-sm sm:text-base text-white font-semibold animate-pulse'>
-                Scanning... Please wait
+                Escaneando... Por favor espera
               </p>
             )}
           </div>
@@ -295,14 +295,14 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                   className='flex items-center justify-center space-x-2 text-sm sm:text-base text-red-300 hover:text-red-200 transition-colors'
                 >
                   <X className='w-4 h-4' />
-                  <span>Clear Error</span>
+                  <span>Limpiar Error</span>
                 </button>
                 <button
                   onClick={retryScanning}
                   className='flex items-center justify-center space-x-2 text-sm sm:text-base text-red-300 hover:text-red-200 transition-colors'
                 >
                   <RotateCcw className='w-4 h-4' />
-                  <span>Retry</span>
+                  <span>Reintentar</span>
                 </button>
               </div>
             </div>
@@ -316,10 +316,10 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
               onClick={retryScanning}
               className='flex-1 btn-secondary py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
             >
-              Retry
+              Reintentar
             </button>
             <button onClick={onClose} className='flex-1 btn-primary py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'>
-              Cancel
+              Cancelar
             </button>
           </div>
         </div>

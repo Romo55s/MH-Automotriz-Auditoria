@@ -92,7 +92,7 @@ const MonthlyInventoryManager: React.FC = () => {
           year: parseInt(inv.year) || new Date().getFullYear(),
           monthName: inv.month,
           status: inv.status,
-          createdAt: new Date(inv.createdAt),
+          createdAt: parseDateSafely(inv.createdAt),
           createdBy: inv.createdBy || inv.userName || 'Unknown',
           totalScans: parseInt(inv.totalScans) || 0,
           sessionId: inv.sessionId,
@@ -103,14 +103,14 @@ const MonthlyInventoryManager: React.FC = () => {
       setInventories(transformedInventories);
       setLastRefresh(new Date());
       showSuccess(
-        'Data Loaded',
-        `Successfully loaded ${transformedInventories.length} inventories from Google Sheets`
+        'Datos Cargados',
+        `Se cargaron exitosamente ${transformedInventories.length} inventarios desde Google Sheets`
       );
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load inventories';
+        err instanceof Error ? err.message : 'Falló al cargar inventarios';
       setError(errorMessage);
-      showError('Load Error', errorMessage);
+      showError('Error de Carga', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -122,30 +122,58 @@ const MonthlyInventoryManager: React.FC = () => {
 
   const getMonthName = (month: string) => {
     const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
     ];
     return monthNames[parseInt(month) - 1];
   };
 
+  const parseDateSafely = (dateString: string | Date): Date => {
+    if (!dateString) return new Date();
+    
+    try {
+      // If it's already a Date object, return it
+      if (dateString instanceof Date) return dateString;
+      
+      // Try to parse the date string
+      const parsed = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(parsed.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return new Date();
+      }
+      
+      return parsed;
+    } catch (error) {
+      console.warn('Error parsing date:', dateString, error);
+      return new Date();
+    }
+  };
+
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      return date.toLocaleDateString('es-MX', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (error) {
+      console.warn('Error formatting date:', date, error);
+      return 'Fecha no disponible';
+    }
   };
 
   const handleStartNewInventory = async () => {
@@ -161,20 +189,20 @@ const MonthlyInventoryManager: React.FC = () => {
 
       if (response.exists && response.status === 'Completed') {
         showError(
-          'Inventory Exists',
-          `An inventory for ${getMonthName(
+          'Inventario Existe',
+          `Un inventario para ${getMonthName(
             currentMonth
-          )} ${currentYear} has already been completed. You cannot start a new one for the same month.`
+          )} ${currentYear} ya ha sido completado. No puedes iniciar uno nuevo para el mismo mes.`
         );
         return;
       }
 
       if (response.exists && response.status === 'Active') {
         showInfo(
-          'Continue Existing',
-          `An active inventory for ${getMonthName(
+          'Continuar Existente',
+          `Un inventario activo para ${getMonthName(
             currentMonth
-          )} ${currentYear} already exists. You can continue it or complete it first.`
+          )} ${currentYear} ya existe. Puedes continuarlo o completarlo primero.`
         );
         // Navigate to inventory page to continue
         navigate('/inventory');
@@ -185,28 +213,18 @@ const MonthlyInventoryManager: React.FC = () => {
       navigate('/inventory');
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to check inventory status';
+        err instanceof Error ? err.message : 'Falló al verificar el estado del inventario';
       showError('Error', errorMessage);
     }
   };
 
   const handleContinueInventory = (inventory: MonthlyInventory) => {
-    if (inventory.status === 'Completed') {
-      showInfo(
-        'Inventory Complete',
-        'This inventory has already been completed. You can view the data but cannot add new scans.'
-      );
-      // For completed inventories, we could navigate to a read-only view
-      // For now, just show the info message
-      return;
-    }
-
-    // For active inventories, navigate to inventory page to continue
+    // For active/paused inventories, navigate to inventory page to continue
     showInfo(
-      'Continuing Inventory',
-      `Continuing inventory session for ${getMonthName(inventory.month)} ${
+      'Continuando Inventario',
+      `Continuando sesión de inventario para ${getMonthName(inventory.month)} ${
         inventory.year
-      } with ${inventory.totalScans} existing scans.`
+      } con ${inventory.totalScans} escaneos existentes.`
     );
     navigate('/inventory');
   };
@@ -238,12 +256,12 @@ const MonthlyInventoryManager: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'Completed':
-        return 'Completed';
+        return 'Completado';
       case 'Paused':
-        return 'Paused';
+        return 'Pausado';
       case 'Active':
       default:
-        return 'Active';
+        return 'Activo';
     }
   };
 
@@ -277,8 +295,8 @@ const MonthlyInventoryManager: React.FC = () => {
 
       {/* Header */}
       <Header
-        title={`${selectedAgency.name} - Monthly Inventories`}
-        subtitle='Manage and track monthly inventory sessions'
+        title={`${selectedAgency.name} - Inventarios Mensuales`}
+        subtitle='Gestiona y rastrea sesiones de inventario mensuales'
         showBackButton={true}
         onBackClick={() => navigate('/select-agency')}
         showUserInfo={true}
@@ -291,7 +309,7 @@ const MonthlyInventoryManager: React.FC = () => {
           <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
               <Calendar className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-              Current Month: {getMonthName(currentMonth)} {currentYear}
+              Mes Actual: {getMonthName(currentMonth)} {currentYear}
             </h2>
             <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4'>
               <button
@@ -302,14 +320,14 @@ const MonthlyInventoryManager: React.FC = () => {
                 <RefreshCw
                   className={`w-4 h-4 sm:w-5 sm:h-5 ${isLoading ? 'animate-spin' : ''}`}
                 />
-                <span>Refresh Data</span>
+                <span>Actualizar Datos</span>
               </button>
               <button
                 onClick={handleStartNewInventory}
                 className='btn-primary text-sm sm:text-base py-3 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <Plus className='w-4 h-4 sm:w-5 sm:h-5' />
-                <span>Start New Inventory</span>
+                <span>Iniciar Nuevo Inventario</span>
               </button>
             </div>
           </div>
@@ -319,7 +337,7 @@ const MonthlyInventoryManager: React.FC = () => {
               <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
                 <Calendar className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Current Month</p>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Mes Actual</p>
               <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {getMonthName(currentMonth)} {currentYear}
               </p>
@@ -329,9 +347,9 @@ const MonthlyInventoryManager: React.FC = () => {
               <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
                 <User className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Current User</p>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Usuario Actual</p>
               <p className='text-sm sm:text-base lg:text-lg font-semibold text-white truncate px-2'>
-                {user?.name || user?.email || 'Unknown User'}
+                {user?.name || user?.email || 'Usuario Desconocido'}
               </p>
             </div>
 
@@ -340,7 +358,7 @@ const MonthlyInventoryManager: React.FC = () => {
                 <BarChart3 className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
               <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>
-                Total Inventories
+                Total de Inventarios
               </p>
               <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {inventories.length}
@@ -351,7 +369,7 @@ const MonthlyInventoryManager: React.FC = () => {
               <div className='w-16 h-16 sm:w-20 sm:h-20 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-6'>
                 <Database className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
               </div>
-              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Last Updated</p>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2 sm:mb-3'>Última Actualización</p>
               <p className='text-sm sm:text-base lg:text-lg font-semibold text-white'>
                 {lastRefresh.toLocaleTimeString('en-US', {
                   hour: '2-digit',
@@ -368,18 +386,18 @@ const MonthlyInventoryManager: React.FC = () => {
             <Database className='w-6 h-6 sm:w-8 sm:h-8 text-blue-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
               <h3 className='text-base sm:text-lg font-semibold text-blue-400 mb-2 sm:mb-3'>
-                Data Source: Google Sheets
+                Fuente de Datos: Google Sheets
               </h3>
               <p className='text-sm sm:text-base text-secondaryText mb-3 sm:mb-4'>
-                All inventory data is automatically synchronized with Google
-                Sheets in real-time. Each scan is immediately saved, and session
-                data is updated as you work.
+                Todos los datos del inventario se sincronizan automáticamente con Google
+                Sheets en tiempo real. Cada escaneo se guarda inmediatamente, y los datos
+                de la sesión se actualizan mientras trabajas.
               </p>
               <div className='p-3 sm:p-4 glass-effect border border-blue-500/20 rounded-xl'>
                 <p className='text-xs sm:text-sm text-blue-300'>
-                  <strong>Note:</strong> The data shown here is pulled directly
-                  from your Google Sheets. If you don't see recent data, click
-                  the "Refresh Data" button above.
+                  <strong>Nota:</strong> Los datos mostrados aquí se obtienen directamente
+                  de tus Google Sheets. Si no ves datos recientes, haz clic en
+                  el botón "Actualizar Datos" de arriba.
                 </p>
               </div>
             </div>
@@ -410,11 +428,11 @@ const MonthlyInventoryManager: React.FC = () => {
             <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
               <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
                 <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-                Existing Inventories
+                Inventarios Existentes
               </h2>
               <div className='text-xs sm:text-sm text-secondaryText'>
-                {inventories.length} inventory
-                {inventories.length !== 1 ? 'ies' : 'y'} found
+                {inventories.length} inventario
+                {inventories.length !== 1 ? 's' : ''} encontrado
               </div>
             </div>
           </div>
@@ -423,25 +441,25 @@ const MonthlyInventoryManager: React.FC = () => {
             <div className='p-8 sm:p-16 text-center'>
               <LoadingSpinner />
               <p className='text-sm sm:text-base lg:text-lg text-secondaryText mt-4 sm:mt-6'>
-                Loading inventories from Google Sheets...
+                Cargando inventarios desde Google Sheets...
               </p>
             </div>
           ) : inventories.length === 0 ? (
             <div className='p-8 sm:p-16 text-center'>
               <FileText className='w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 text-secondaryText mx-auto mb-4 sm:mb-6 lg:mb-8 opacity-50' />
               <h3 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4 sm:mb-6'>
-                No Inventories Found
+                No Se Encontraron Inventarios
               </h3>
               <p className='text-sm sm:text-base text-secondaryText mb-6 sm:mb-8 lg:mb-10 max-w-md mx-auto px-4'>
-                No inventory data found for {selectedAgency.name} in Google
-                Sheets. Start your first inventory session for{' '}
+                No se encontraron datos de inventario para {selectedAgency.name} en Google
+                Sheets. Inicia tu primera sesión de inventario para{' '}
                 {getMonthName(currentMonth)} {currentYear}
               </p>
               <button
                 onClick={handleStartNewInventory}
                 className='btn-primary text-sm sm:text-base px-6 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5'
               >
-                Start First Inventory
+                Iniciar Primer Inventario
               </button>
             </div>
           ) : (
@@ -452,22 +470,22 @@ const MonthlyInventoryManager: React.FC = () => {
                   <thead className='border-b border-white/10'>
                     <tr>
                       <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Month & Year
+                        Mes y Año
                       </th>
                       <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Status
+                        Estado
                       </th>
                       <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Created By
+                        Creado Por
                       </th>
                       <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Created At
+                        Creado En
                       </th>
                       <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Total Scans
+                        Total de Escaneos
                       </th>
                       <th className='px-6 lg:px-8 py-4 lg:py-6 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Actions
+                        Acciones
                       </th>
                     </tr>
                   </thead>
@@ -509,17 +527,20 @@ const MonthlyInventoryManager: React.FC = () => {
                           </span>
                         </td>
                         <td className='px-6 lg:px-8 py-4 lg:py-8 whitespace-nowrap'>
-                          <button
-                            onClick={() => handleContinueInventory(inventory)}
-                            className='btn-secondary text-xs lg:text-sm py-2 lg:py-3 px-4 lg:px-6 flex items-center space-x-2 lg:space-x-3'
-                          >
-                            <span>
-                              {inventory.status === 'Completed'
-                                ? 'View'
-                                : 'Continue'}
+                          {inventory.status !== 'Completed' && (
+                            <button
+                              onClick={() => handleContinueInventory(inventory)}
+                              className='btn-secondary text-xs lg:text-sm py-2 lg:py-3 px-4 lg:px-6 flex items-center space-x-2 lg:space-x-3'
+                            >
+                              <span>Continuar</span>
+                              <ChevronRight className='w-3 h-3 lg:w-4 lg:h-4' />
+                            </button>
+                          )}
+                          {inventory.status === 'Completed' && (
+                            <span className='text-secondaryText text-sm'>
+                              Completado
                             </span>
-                            <ChevronRight className='w-3 h-3 lg:w-4 lg:h-4' />
-                          </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -555,32 +576,37 @@ const MonthlyInventoryManager: React.FC = () => {
                     
                     <div className='space-y-2 mb-4'>
                       <div className='flex justify-between text-sm'>
-                        <span className='text-secondaryText'>Created By:</span>
+                        <span className='text-secondaryText'>Creado Por:</span>
                         <span className='text-white'>{inventory.createdBy}</span>
                       </div>
                       <div className='flex justify-between text-sm'>
-                        <span className='text-secondaryText'>Created:</span>
+                        <span className='text-secondaryText'>Creado:</span>
                         <span className='text-white'>{formatDate(inventory.createdAt)}</span>
                       </div>
                       <div className='flex justify-between text-sm'>
-                        <span className='text-secondaryText'>Total Scans:</span>
+                        <span className='text-secondaryText'>Total de Escaneos:</span>
                         <span className='font-mono text-white bg-white/10 px-2 py-1 rounded'>
                           {inventory.totalScans}
                         </span>
                       </div>
                     </div>
                     
-                    <button
-                      onClick={() => handleContinueInventory(inventory)}
-                      className='w-full btn-secondary text-sm py-3 px-4 flex items-center justify-center space-x-2'
-                    >
-                      <span>
-                        {inventory.status === 'Completed'
-                          ? 'View'
-                          : 'Continue'}
-                      </span>
-                      <ChevronRight className='w-4 h-4' />
-                    </button>
+                    {inventory.status !== 'Completed' && (
+                      <button
+                        onClick={() => handleContinueInventory(inventory)}
+                        className='w-full btn-secondary text-sm py-3 px-4 flex items-center justify-center space-x-2'
+                      >
+                        <span>Continuar</span>
+                        <ChevronRight className='w-4 h-4' />
+                      </button>
+                    )}
+                    {inventory.status === 'Completed' && (
+                      <div className='text-center py-3'>
+                        <span className='text-secondaryText text-sm'>
+                          Inventario Completado
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -594,18 +620,18 @@ const MonthlyInventoryManager: React.FC = () => {
             <AlertCircle className='w-6 h-6 sm:w-8 sm:h-8 text-blue-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
               <h3 className='text-base sm:text-lg font-semibold text-blue-400 mb-2 sm:mb-4'>
-                Monthly Inventory Management
+                Gestión de Inventarios Mensuales
               </h3>
               <p className='text-sm sm:text-base text-secondaryText mb-3 sm:mb-4'>
-                Each agency can have one inventory per month. Once an inventory
-                is completed for a month, you cannot start a new one for the
-                same month. This ensures data integrity and prevents duplicates.
+                Cada agencia puede tener un inventario por mes. Una vez que un inventario
+                es completado para un mes, no puedes iniciar uno nuevo para el
+                mismo mes. Esto asegura la integridad de los datos y previene duplicados.
               </p>
               <div className='p-3 sm:p-4 glass-effect border border-blue-500/20 rounded-xl'>
                 <p className='text-xs sm:text-sm text-blue-300'>
-                  <strong>Note:</strong> After completing an inventory, you'll
-                  need to manually search each barcode on the REPUVE website to
-                  extract complete vehicle information.
+                  <strong>Nota:</strong> Después de completar un inventario, necesitarás
+                  buscar manualmente cada código de barras en el sitio web de REPUVE para
+                  extraer la información completa del vehículo.
                 </p>
               </div>
             </div>

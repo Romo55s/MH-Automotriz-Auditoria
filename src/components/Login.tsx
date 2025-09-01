@@ -40,7 +40,7 @@ const Login: React.FC = () => {
       <div className='min-h-screen bg-black flex items-center justify-center relative overflow-hidden'>
         <div className='text-center z-10 relative'>
           <div className='animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-white mx-auto mb-4 sm:mb-6'></div>
-          <h2 className='text-lg sm:text-xl text-gray-300'>Loading...</h2>
+          <h2 className='text-lg sm:text-xl text-gray-300'>Cargando...</h2>
         </div>
       </div>
     );
@@ -53,14 +53,14 @@ const Login: React.FC = () => {
         <div className='z-10 relative max-w-2xl mx-auto text-center'>
           <div className='bg-red-900/20 border border-red-500/50 rounded-lg p-4 sm:p-6 mb-6'>
             <h2 className='text-xl sm:text-2xl font-bold text-red-400 mb-3 sm:mb-4'>
-              Authentication Error
+              Error de Autenticación
             </h2>
             <p className='text-sm sm:text-base text-red-300 mb-3 sm:mb-4'>{error.message}</p>
             <button
               onClick={() => window.location.reload()}
               className='bg-red-600 text-white px-3 sm:px-4 py-2 rounded hover:bg-red-700 transition-colors text-sm sm:text-base'
             >
-              Try Again
+              Intentar de Nuevo
             </button>
           </div>
         </div>
@@ -76,13 +76,13 @@ const Login: React.FC = () => {
             <Car className='w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-white' />
           </div>
           <h1 className='text-3xl sm:text-4xl lg:text-5xl font-bold uppercase mb-4 sm:mb-6 text-white'>
-            Car Inventory
+            Aplicación de
             <span className='block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent'>
               App
             </span>
           </h1>
           <p className='text-base sm:text-lg lg:text-xl text-gray-300 max-w-lg mx-auto px-4'>
-            Automate your car inventory with advanced barcode scanning
+            Automatiza tu inventario de autos con escaneo avanzado de códigos de barras
           </p>
         </div>
 
@@ -91,19 +91,19 @@ const Login: React.FC = () => {
             <div className='bg-white/10 backdrop-blur-md rounded-full p-2 sm:p-3 border border-white/20'>
               <Shield className='w-5 h-5 sm:w-6 sm:h-6 text-white' />
             </div>
-            <span className='text-sm sm:text-base'>Secure authentication with Auth0</span>
+            <span className='text-sm sm:text-base'>Autenticación segura con Auth0</span>
           </div>
           <div className='flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 text-gray-300'>
             <div className='bg-white/10 backdrop-blur-md rounded-full p-2 sm:p-3 border border-white/20'>
               <Users className='w-5 h-5 sm:w-6 sm:h-6 text-white' />
             </div>
-            <span className='text-sm sm:text-base'>Multi-agency support</span>
+            <span className='text-sm sm:text-base'>Soporte multi-agencia</span>
           </div>
           <div className='flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 text-gray-300'>
             <div className='bg-white/10 backdrop-blur-md rounded-full p-2 sm:p-3 border border-white/20'>
               <Zap className='w-5 h-5 sm:w-6 sm:h-6 text-white' />
             </div>
-            <span className='text-sm sm:text-base'>Real-time barcode scanning</span>
+            <span className='text-sm sm:text-base'>Escaneo de códigos de barras en tiempo real</span>
           </div>
         </div>
 
@@ -112,12 +112,12 @@ const Login: React.FC = () => {
             onClick={() => void handleMainLogin()}
             className='bg-white text-black font-semibold py-3 sm:py-4 px-6 sm:px-8 rounded-full border border-white hover:bg-black hover:text-white transition-all duration-300 transform hover:scale-105 text-sm sm:text-base'
           >
-            Sign In to Continue
+            Iniciar Sesión para Continuar
           </button>
         </div>
 
         <p className='text-xs text-gray-400 text-center mt-6 sm:mt-8 opacity-70 px-4'>
-          By signing in, you agree to our terms of service and privacy policy
+          Al iniciar sesión, aceptas nuestros términos de servicio y política de privacidad
         </p>
       </div>
 

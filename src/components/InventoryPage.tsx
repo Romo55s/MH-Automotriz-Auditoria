@@ -1,27 +1,11 @@
 import { useAuth0 } from '@auth0/auth0-react';
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { useToast } from '../context/ToastContext';
-import { useInventory } from '../hooks/useInventory';
-import { checkMonthlyInventory, getAgencyInventories } from '../services/api';
-import { MonthlyInventory } from '../types/index';
-import BarcodeScanner from './BarcodeScanner';
-import ConfirmationModal from './ConfirmationModal';
-import Footer from './Footer';
-import Header from './Header';
-import LoadingSpinner from './LoadingSpinner';
-import ManualInputModal from './ManualInputModal';
-
 import {
   AlertTriangle,
   Barcode,
   Calendar,
   Camera,
   CheckCircle,
-  ChevronRight,
   Clock,
-  ExternalLink,
   FileText,
   Info,
   Pause,
@@ -31,11 +15,42 @@ import {
   User,
   X
 } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
+import { useInventory } from '../hooks/useInventory';
+import {
+  getAgencyInventories
+} from '../services/api';
+import { MonthlyInventory } from '../types';
+import BarcodeScanner from './BarcodeScanner';
+import ConfirmationModal from './ConfirmationModal';
+import Footer from './Footer';
+import Header from './Header';
+import LoadingSpinner from './LoadingSpinner';
+import ManualInputModal from './ManualInputModal';
 
 const InventoryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth0();
   const { selectedAgency } = useAppContext();
+  const { showSuccess, showError, showWarning, showInfo } = useToast();
+
+  // State for UI modals and displays
+  const [showScanner, setShowScanner] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [currentScannedCode, setCurrentScannedCode] = useState('');
+  const [showStopOptions, setShowStopOptions] = useState(false);
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+
+  // State for monthly inventory management
+  const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
+  const [isLoadingInventories, setIsLoadingInventories] = useState(false);
+  const [inventoriesError, setInventoriesError] = useState<string | null>(null);
+
+  // Get inventory functions from the hook
   const {
     scannedCodes,
     isLoading,
@@ -53,93 +68,35 @@ const InventoryPage: React.FC = () => {
     clearError,
     reset,
   } = useInventory();
-  const { showSuccess, showError, showInfo, showWarning } = useToast();
-
-  const [showScanner, setShowScanner] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showManualInput, setShowManualInput] = useState(false);
-  const [showStopOptions, setShowStopOptions] = useState(false);
-  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
-  const [currentScannedCode, setCurrentScannedCode] = useState<string>('');
-  const [sessionStartTime] = useState(new Date());
-
-  // Monthly inventory management state
-  const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
-  const [isLoadingInventories, setIsLoadingInventories] = useState(false);
-  const [inventoriesError, setInventoriesError] = useState<string | null>(null);
-
-  // Handle agency selection - if no agency is selected, redirect to agency selector
-  useEffect(() => {
-    if (!selectedAgency) {
-      navigate('/select-agency');
-      return;
-    }
-    
-    // If we have an agency, load inventories
-    loadInventories();
-  }, [selectedAgency, navigate]);
-
-
 
   // Load agency inventories
-  const loadInventories = async () => {
+  const loadInventories = useCallback(async () => {
     if (!selectedAgency) return;
 
-    console.log('🔄 Loading inventories for agency:', selectedAgency.name);
     setIsLoadingInventories(true);
     setInventoriesError(null);
     
     try {
-      console.log('🔄 Making API call to getAgencyInventories...');
       const response = await getAgencyInventories(selectedAgency.name);
-      console.log('📡 API Response (raw):', response);
-      console.log('📡 API Response type:', typeof response);
-      console.log('📡 API Response keys:', Object.keys(response || {}));
-      console.log('📡 API Response stringified:', JSON.stringify(response, null, 2));
       
       // Handle different response formats
       let inventories = [];
       
       if (response && typeof response === 'object') {
-        // Check if response is an array itself (getAgencyInventories returns array directly)
         if (Array.isArray(response)) {
           inventories = response;
-          console.log('✅ Found inventories as direct array:', inventories);
-        }
-        // Check if response has a data property
-        else if (response.data && Array.isArray(response.data.inventories)) {
+        } else if (response.data && Array.isArray(response.data.inventories)) {
           inventories = response.data.inventories;
-          console.log('✅ Found inventories in response.data.inventories:', inventories);
-        }
-        // Check if response has inventories directly
-        else if (Array.isArray(response.inventories)) {
+        } else if (Array.isArray(response.inventories)) {
           inventories = response.inventories;
-          console.log('✅ Found inventories in response.inventories:', inventories);
-        }
-        // Check if response has a different structure
-        else if (response.inventories && Array.isArray(response.inventories)) {
-          inventories = response.inventories;
-          console.log('✅ Found inventories in response.inventories:', inventories);
-        }
-        else {
-          console.log('❌ No inventories found in response structure:', response);
-          console.log('❌ Response structure analysis:', {
-            hasData: !!response.data,
-            dataType: typeof response.data,
-            hasInventories: !!response.inventories,
-            inventoriesType: typeof response.inventories,
-            isArray: Array.isArray(response),
-            keys: Object.keys(response)
-          });
         }
       }
       
       // Transform backend data to match frontend interface
       const transformedInventories = inventories.map((inv: any, index: number) => {
-        // Convert month name to month number
         const monthNames = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
+          'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
         const monthNumber = (monthNames.indexOf(inv.month) + 1).toString().padStart(2, '0');
         
@@ -158,109 +115,152 @@ const InventoryPage: React.FC = () => {
         };
       });
       
-      console.log('📋 Original inventories:', inventories);
-      console.log('📋 Transformed inventories:', transformedInventories);
       setInventories(transformedInventories);
-      
-      if (inventories.length === 0) {
-        console.log('⚠️ No inventories found - this might be correct if no data exists yet');
-      }
       
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load inventories';
-      console.error('❌ Error loading inventories:', err);
       setInventoriesError(errorMessage);
     } finally {
       setIsLoadingInventories(false);
     }
-  };
+  }, [selectedAgency]);
 
-  const handleRefreshInventories = () => {
+  // Load inventories when agency changes
+  useEffect(() => {
+    if (!selectedAgency) {
+      navigate('/select-agency');
+      return;
+    }
+    
     loadInventories();
+  }, [selectedAgency, navigate, loadInventories]);
+
+  const handleScan = (code: string) => {
+    setCurrentScannedCode(code);
+    setShowScanner(false);
+    setShowManualInput(false);
+    setShowConfirmation(true);
   };
 
-  const handleStartNewInventory = async () => {
-    if (!selectedAgency) return;
+  const handleConfirmScan = async (code: string) => {
+    try {
+      const success = await addScannedCode(code);
+      if (success) {
+        showSuccess(
+          'Escaneo Confirmado',
+          `El código de barras ${code} ha sido guardado exitosamente`
+        );
+        setShowConfirmation(false);
+        setCurrentScannedCode('');
+      }
+      // Note: If success is false, the useInventory hook will handle showing the appropriate toast
+      // (like duplicate barcode warning), so we don't need to show an additional error here
+    } catch (error) {
+      showError('Error de Escaneo', 'Ocurrió un error al guardar el escaneo');
+    }
+  };
+
+  const handleCancelScan = () => {
+    setShowConfirmation(false);
+    setShowScanner(false);
+    setShowManualInput(false);
+    setCurrentScannedCode('');
+  };
+
+  const handleStopInventory = () => {
+    if (scannedCodes.length === 0) {
+      showWarning(
+        'Sin Escaneos',
+        'Por favor escanea al menos un código de barras antes de detener la sesión'
+      );
+      return;
+    }
+    setShowStopOptions(true);
+  };
+
+  const handleCompleteSession = async () => {
+    setShowStopOptions(false);
 
     try {
-      console.log('🔍 Checking monthly inventory for:', {
-        agency: selectedAgency.name,
-        month: currentMonth,
-        year: currentYear
-      });
-      
-      // Check if monthly inventory already exists
-      const response = await checkMonthlyInventory(
-        selectedAgency.name,
-        currentMonth,
-        currentYear
+      showInfo(
+        'Procesando Sesión',
+        'Finalizando sesión de inventario y guardando en Google Sheets...'
       );
-      
-      console.log('🔍 checkMonthlyInventory response:', response);
-      console.log('🔍 Response structure:', {
-        type: typeof response,
-        keys: Object.keys(response || {}),
-        exists: response?.exists,
-        inventory: response?.inventory,
-        status: response?.inventory?.status
-      });
 
-      // The backend returns status directly, not nested in inventory object
-      if (response.exists && response.status === 'Completed') {
-        showError(
-          'Inventory Exists',
-          `An inventory for ${monthName} ${currentYear} has already been completed. You cannot start a new one for the same month.`
+      const success = await finishInventorySession();
+      if (success) {
+        showSuccess(
+          'Sesión Completada',
+          'La sesión de inventario ha sido finalizada exitosamente'
         );
-        return;
+        loadInventories();
+        navigate('/select-agency');
+      } else {
+        showError('Error de Sesión', 'Falló al finalizar la sesión de inventario');
       }
-
-      if (response.exists && response.status === 'Active') {
-        showInfo(
-          'Continue Existing',
-          `An active inventory for ${monthName} ${currentYear} already exists. You can continue it or complete it first.`
-        );
-        return;
-      }
-
-      // Start new session
-      startSession();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to check inventory status';
-      showError('Error', errorMessage);
+    } catch (error) {
+      console.error('Error stopping inventory:', error);
+      showError(
+        'Error de Sesión',
+        'Ocurrió un error al finalizar la sesión'
+      );
     }
   };
 
-  const handleContinueInventory = (inventory: MonthlyInventory) => {
-    console.log('🔄 handleContinueInventory called with:', inventory);
-    
-    if (inventory.status === 'Completed') {
-      console.log('❌ Inventory is completed, cannot continue');
-      showInfo(
-        'Inventory Complete',
-        'This inventory has already been completed. You can view the data but cannot add new scans.'
-      );
-      return;
-    }
+  const handlePauseSession = async () => {
+    setShowStopOptions(false);
 
-    if (inventory.status === 'Paused') {
-      console.log('⏸️ Inventory is paused, continuing session');
-      showInfo(
-        'Continuing Paused Inventory',
-        `Continuing paused inventory session for ${monthName} ${currentYear} with ${inventory.totalScans} existing scans.`
+    try {
+      const success = await pauseInventorySession();
+      if (success) {
+        showSuccess(
+          'Sesión Pausada',
+          'Tu sesión ha sido pausada. Puedes continuar más tarde o completarla cuando estés listo.'
+        );
+        loadInventories();
+        navigate('/select-agency');
+      } else {
+        showError('Error de Pausa', 'Falló al pausar la sesión');
+      }
+    } catch (error) {
+      console.error('Error pausing session:', error);
+      showError(
+        'Error de Pausa',
+        'Ocurrió un error al pausar la sesión'
       );
-      continueSession();
-      return;
     }
+  };
 
-    // For active inventories, continue the session
-    console.log('✅ Continuing active inventory session');
-    showInfo(
-      'Continuing Inventory',
-      `Continuing inventory session for ${monthName} ${currentYear} with ${inventory.totalScans} existing scans.`
-    );
+  const handleContinueSession = () => {
     continueSession();
+    setShowStopOptions(false);
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('es-MX', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const getSessionDuration = () => {
+    const now = new Date();
+    const startTime = new Date(); // This should come from the hook
+    const diff = now.getTime() - startTime.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getMonthName = (month: string) => {
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const monthIndex = parseInt(month) - 1;
+    return monthNames[monthIndex] || month;
   };
 
   const getStatusColor = (status: string) => {
@@ -290,32 +290,90 @@ const InventoryPage: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'Completed':
-        return 'Completed';
+        return 'Completado';
       case 'Paused':
-        return 'Paused';
+        return 'Pausado';
       case 'Active':
       default:
-        return 'Active';
+        return 'Activo';
     }
   };
 
-  // Get month name from month number
-  const getMonthName = (month: string) => {
-    const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return monthNames[parseInt(month) - 1] || 'Unknown';
+  const handleRefreshInventories = () => {
+    loadInventories();
+  };
+
+  const handleStartNewInventory = async () => {
+    if (!selectedAgency) return;
+
+    try {
+      // Check if this specific user already has an active session
+      const userHasActiveSession = inventories.some(
+        inv => inv.month === currentMonth && 
+               inv.year === currentYear && 
+               inv.status === 'Active' && 
+               inv.createdBy === user?.email
+      );
+
+      if (userHasActiveSession) {
+        showInfo(
+          'Sesión Activa',
+          `Ya tienes una sesión activa para ${monthName} ${currentYear}. Puedes continuar tu sesión existente.`
+        );
+        return;
+      }
+
+      // Check if the monthly inventory is completed (no more sessions allowed)
+      const monthlyCompleted = inventories.some(
+        inv => inv.month === currentMonth && 
+               inv.year === currentYear && 
+               inv.status === 'Completed'
+      );
+
+      if (monthlyCompleted) {
+        showError(
+          'Inventario Completado',
+          `El inventario para ${monthName} ${currentYear} ya fue completado. No se pueden iniciar nuevas sesiones.`
+        );
+        return;
+      }
+
+      // Allow starting new session (multiple users can have active sessions)
+      startSession();
+      showSuccess(
+        'Nueva Sesión Iniciada',
+        `Sesión de inventario iniciada para ${monthName} ${currentYear}. Otros usuarios también pueden trabajar en el mismo inventario.`
+      );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to check inventory status';
+      showError('Error', errorMessage);
+    }
+  };
+
+  const handleContinueInventory = (inventory: MonthlyInventory) => {
+    if (inventory.status === 'Completed') {
+      showInfo(
+        'Inventario Completado',
+        'Este inventario ya ha sido completado. Puedes ver los datos pero no agregar nuevos escaneos.'
+      );
+      return;
+    }
+
+    if (inventory.status === 'Paused') {
+      showInfo(
+        'Continuando Inventario Pausado',
+        `Continuando sesión de inventario pausada para ${monthName} ${currentYear} con ${inventory.totalScans} escaneos existentes.`
+      );
+      continueSession();
+      return;
+    }
+
+    showInfo(
+      'Continuando Inventario',
+      `Continuando sesión de inventario para ${monthName} ${currentYear} con ${inventory.totalScans} escaneos existentes.`
+    );
+    continueSession();
   };
 
   // Check if there's existing inventory data for current month
@@ -323,200 +381,39 @@ const InventoryPage: React.FC = () => {
     inv => inv.month === currentMonth && inv.year === currentYear
   );
 
+  // Check if current user has an active session
+  const currentUserActiveSession = inventories.find(
+    inv => inv.month === currentMonth && 
+           inv.year === currentYear && 
+           inv.status === 'Active' && 
+           inv.createdBy === user?.email
+  );
+
+  // Check if current user has a paused session
+  const currentUserPausedSession = inventories.find(
+    inv => inv.month === currentMonth && 
+           inv.year === currentYear && 
+           inv.status === 'Paused' && 
+           inv.createdBy === user?.email
+  );
+
+  // Get all active sessions for this month (for display)
+  const activeSessionsThisMonth = inventories.filter(
+    inv => inv.month === currentMonth && 
+           inv.year === currentYear && 
+           inv.status === 'Active'
+  );
+
   const existingInventory = inventories.find(
     inv => inv.month === currentMonth && inv.year === currentYear
   );
-
-  // Debug inventory matching
-  console.log('🔍 Inventory Matching Debug:', {
-    currentMonth,
-    currentYear,
-    monthName,
-    inventories: inventories.map(inv => ({
-      month: inv.month,
-      year: inv.year,
-      status: inv.status,
-      totalScans: inv.totalScans,
-      monthMatch: inv.month === currentMonth,
-      yearMatch: inv.year === currentYear,
-      fullMatch: inv.month === currentMonth && inv.year === currentYear
-    })),
-    hasExistingInventory,
-    existingInventory: existingInventory ? {
-      month: existingInventory.month,
-      year: existingInventory.year,
-      status: existingInventory.status,
-      totalScans: existingInventory.totalScans
-    } : null
-  });
-
-  // Add debugging here
-  useEffect(() => {
-    console.log('🔍 Inventory State:', {
-      currentMonth,
-      currentYear,
-      monthName,
-      inventories: inventories.map(inv => ({
-        month: inv.month,
-        year: inv.year,
-        status: inv.status,
-        totalScans: inv.totalScans
-      })),
-      hasExistingInventory,
-      existingInventory: existingInventory ? {
-        month: existingInventory.month,
-        year: existingInventory.year,
-        status: existingInventory.status,
-        totalScans: existingInventory.totalScans
-      } : null
-    });
-  }, [currentMonth, currentYear, monthName, inventories, hasExistingInventory, existingInventory]);
-
-  // Debug button rendering logic
-  useEffect(() => {
-    console.log('🎯 Main Button Debug:', {
-      isSessionActive,
-      hasExistingInventory,
-      existingInventory,
-      currentMonth,
-      currentYear,
-      inventories: inventories.length
-    });
-    
-    console.log('📋 Monthly Inventory Management Debug:', {
-      isLoadingInventories,
-      inventoriesCount: inventories.length,
-      hasExistingInventory,
-      existingInventory: existingInventory ? {
-        status: existingInventory.status,
-        totalScans: existingInventory.totalScans
-      } : null
-    });
-  }, [isSessionActive, hasExistingInventory, existingInventory, currentMonth, currentYear, inventories, isLoadingInventories]);
-
-  const handleScan = (code: string) => {
-    setCurrentScannedCode(code);
-    setShowScanner(false);
-    setShowManualInput(false);
-    setShowConfirmation(true);
-  };
-
-  const handleConfirmScan = async (code: string) => {
-    try {
-      const success = await addScannedCode(code);
-      if (success) {
-        showSuccess(
-          'Scan Confirmed',
-          `Barcode ${code} has been saved successfully`
-        );
-        setShowConfirmation(false);
-        setCurrentScannedCode('');
-      } else {
-        showError('Scan Failed', 'Failed to save the scanned barcode');
-      }
-    } catch (error) {
-      showError('Scan Error', 'An error occurred while saving the scan');
-    }
-  };
-
-  const handleCancelScan = () => {
-    setShowConfirmation(false);
-    setShowScanner(false);
-    setShowManualInput(false);
-    setCurrentScannedCode('');
-  };
-
-  const handleStopInventory = () => {
-    if (scannedCodes.length === 0) {
-      showWarning(
-        'No Scans',
-        'Please scan at least one barcode before stopping the session'
-      );
-      return;
-    }
-    setShowStopOptions(true);
-  };
-
-  const handleCompleteSession = async () => {
-    setShowStopOptions(false);
-
-    try {
-      showInfo(
-        'Processing Session',
-        'Finishing inventory session and saving to Google Sheets...'
-      );
-
-      const success = await finishInventorySession();
-      if (success) {
-        showSuccess(
-          'Session Complete',
-          'Inventory session has been finished successfully'
-        );
-        // Refresh inventories after completion
-        loadInventories();
-        navigate('/select-agency');
-      } else {
-        showError('Session Error', 'Failed to finish the inventory session');
-      }
-    } catch (error) {
-      console.error('Error stopping inventory:', error);
-      showError(
-        'Session Error',
-        'An error occurred while finishing the session'
-      );
-    }
-  };
-
-  const handlePauseSession = async () => {
-    setShowStopOptions(false);
-
-    try {
-      const success = await pauseInventorySession();
-      if (success) {
-        showSuccess(
-          'Session Paused',
-          'Your session has been paused. You can continue later or complete it when ready.'
-        );
-        // Refresh inventories after pausing
-        loadInventories();
-        navigate('/select-agency');
-      } else {
-        showError('Pause Error', 'Failed to pause the session');
-      }
-    } catch (error) {
-      console.error('Error pausing session:', error);
-      showError('Pause Error', 'An error occurred while pausing the session');
-    }
-  };
-
-  const handleContinueSession = () => {
-    continueSession();
-    setShowStopOptions(false);
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
-
-  const getSessionDuration = () => {
-    const now = new Date();
-    const diff = now.getTime() - sessionStartTime.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   if (!selectedAgency) {
     return null;
   }
 
   return (
-    <div className='min-h-screen bg-background relative overflow-hidden'>
+    <div className='min-h-screen bg-background relative overflow-hidden flex flex-col'>
       {/* Floating 3D shapes */}
       <div className='floating-shape w-28 h-28 top-16 right-16'></div>
       <div
@@ -530,8 +427,8 @@ const InventoryPage: React.FC = () => {
 
       {/* Header */}
       <Header
-        title={`${selectedAgency.name} - Inventory Session`}
-        subtitle={`${monthName} ${currentYear} - Started at ${sessionStartTime.toLocaleTimeString()}`}
+        title={`${selectedAgency.name} - Sesión de Inventario`}
+        subtitle={`${monthName} ${currentYear} - Iniciado a las ${new Date().toLocaleTimeString()}`}
         showBackButton={true}
         onBackClick={() => navigate('/select-agency')}
         showUserInfo={true}
@@ -564,11 +461,11 @@ const InventoryPage: React.FC = () => {
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
               <Calendar className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-              Monthly Inventory Details
+              Detalles del Inventario Mensual
             </h2>
             {sessionId && (
               <div className='text-xs sm:text-sm text-secondaryText bg-white/10 px-2 sm:px-3 py-1 rounded-lg'>
-                Session: {sessionId.slice(-8)}
+                Sesión: {sessionId.slice(-8)}
               </div>
             )}
           </div>
@@ -577,7 +474,7 @@ const InventoryPage: React.FC = () => {
               <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4'>
                 <Calendar className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
               </div>
-              <p className='text-xs sm:text-sm text-secondaryText mb-2'>Month & Year</p>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2'>Mes y Año</p>
               <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {monthName} {currentYear}
               </p>
@@ -588,10 +485,10 @@ const InventoryPage: React.FC = () => {
                 <User className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
               </div>
               <p className='text-xs sm:text-sm text-secondaryText mb-2'>
-                Inventory Creator
+                Creador del Inventario
               </p>
               <p className='text-sm sm:text-base lg:text-lg font-semibold text-white truncate px-2'>
-                {user?.name || user?.email || 'Unknown User'}
+                {user?.name || user?.email || 'Usuario Desconocido'}
               </p>
             </div>
 
@@ -599,7 +496,7 @@ const InventoryPage: React.FC = () => {
               <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4'>
                 <Clock className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
               </div>
-              <p className='text-xs sm:text-sm text-secondaryText mb-2'>Session Duration</p>
+              <p className='text-xs sm:text-sm text-secondaryText mb-2'>Duración de Sesión</p>
               <p className='text-lg sm:text-xl lg:text-2xl font-bold text-white'>
                 {getSessionDuration()}
               </p>
@@ -612,7 +509,7 @@ const InventoryPage: React.FC = () => {
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
               <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-              Monthly Inventory Management
+              Gestión de Inventarios Mensuales
             </h2>
             <button
               onClick={handleRefreshInventories}
@@ -622,7 +519,7 @@ const InventoryPage: React.FC = () => {
               <RefreshCw
                 className={`w-4 h-4 ${isLoadingInventories ? 'animate-spin' : ''}`}
               />
-              <span>Refresh</span>
+              <span>Actualizar</span>
             </button>
           </div>
 
@@ -630,14 +527,14 @@ const InventoryPage: React.FC = () => {
             <div className='p-8 text-center'>
               <LoadingSpinner />
               <p className='text-sm sm:text-base text-secondaryText mt-4'>
-                Loading inventories...
+                Cargando inventarios...
               </p>
             </div>
           ) : inventories.length === 0 ? (
             <div className='p-8 text-center'>
               <FileText className='w-16 h-16 text-secondaryText mx-auto mb-4 opacity-50' />
               <p className='text-sm sm:text-base text-secondaryText'>
-                No inventories found for {selectedAgency.name}
+                No se encontraron inventarios para {selectedAgency.name}
               </p>
             </div>
           ) : (
@@ -648,19 +545,19 @@ const InventoryPage: React.FC = () => {
                   <thead className='border-b border-white/10'>
                     <tr>
                       <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Month & Year
+                        Mes y Año
                       </th>
                       <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Status
+                        Estado
                       </th>
                       <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Created By
+                        Creado Por
                       </th>
                       <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Total Scans
+                        Total de Escaneos
                       </th>
                       <th className='px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-bold text-secondaryText uppercase tracking-wider'>
-                        Actions
+                        Acciones
                       </th>
                     </tr>
                   </thead>
@@ -705,10 +602,9 @@ const InventoryPage: React.FC = () => {
                           >
                             <span>
                               {inventory.status === 'Completed'
-                                ? 'View'
-                                : 'Continue'}
+                                ? 'Ver'
+                                : 'Continuar'}
                             </span>
-                            <ChevronRight className='w-3 h-3 lg:w-4 lg:h-4' />
                           </button>
                         </td>
                       </tr>
@@ -745,11 +641,11 @@ const InventoryPage: React.FC = () => {
                     
                     <div className='space-y-2 mb-3'>
                       <div className='flex justify-between text-xs'>
-                        <span className='text-secondaryText'>Created By:</span>
+                        <span className='text-secondaryText'>Creado Por:</span>
                         <span className='text-white'>{inventory.createdBy}</span>
                       </div>
                       <div className='flex justify-between text-xs'>
-                        <span className='text-secondaryText'>Total Scans:</span>
+                        <span className='text-secondaryText'>Total de Escaneos:</span>
                         <span className='font-mono text-white bg-white/10 px-2 py-1 rounded'>
                           {inventory.totalScans}
                         </span>
@@ -762,10 +658,9 @@ const InventoryPage: React.FC = () => {
                     >
                       <span>
                         {inventory.status === 'Completed'
-                          ? 'View'
-                          : 'Continue'}
+                          ? 'Ver'
+                          : 'Continuar'}
                       </span>
-                      <ChevronRight className='w-3 h-3' />
                     </button>
                   </div>
                 ))}
@@ -780,18 +675,18 @@ const InventoryPage: React.FC = () => {
             <Info className='w-5 h-5 sm:w-6 sm:h-6 text-green-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
               <h3 className='text-base sm:text-lg font-semibold text-green-400 mb-2 sm:mb-3'>
-                Session Management
+                Gestión de Sesión
               </h3>
               <p className='text-sm sm:text-base text-secondaryText mb-3'>
-                Your inventory session is automatically saved as you scan. You can
-                pause at any time and continue later, or complete the session when
-                finished. All data is synchronized with Google Sheets in real-time.
+                Tu sesión de inventario se guarda automáticamente mientras escaneas. Puedes
+                pausar en cualquier momento y continuar más tarde, o completar la sesión cuando
+                termines. Todos los datos se sincronizan con Google Sheets en tiempo real.
               </p>
               <div className='p-3 sm:p-4 glass-effect border border-green-500/20 rounded-xl'>
                 <p className='text-xs sm:text-sm text-green-300'>
-                  <strong>Tip:</strong> Use the "Pause Session" button if you need
-                  to take a break. Your progress will be saved and you can continue
-                  later from exactly where you left off.
+                  <strong>Consejo:</strong> Usa el botón "Pausar Sesión" si necesitas
+                  tomar un descanso. Tu progreso se guardará y podrás continuar
+                  más tarde exactamente desde donde lo dejaste.
                 </p>
               </div>
             </div>
@@ -805,12 +700,12 @@ const InventoryPage: React.FC = () => {
               <Clock className='w-5 h-5 sm:w-6 sm:h-6 text-yellow-400 mt-1 flex-shrink-0' />
               <div className='flex-1'>
                 <h3 className='text-base sm:text-lg font-semibold text-yellow-400 mb-2 sm:mb-3'>
-                  Paused Session Available
+                  Sesión Pausada Disponible
                 </h3>
                 <p className='text-sm sm:text-base text-secondaryText mb-3'>
-                  You have a paused inventory session for {monthName} {currentYear}
-                  with {existingInventory.totalScans} scans. You can continue this
-                  session or start a new one.
+                  Tienes una sesión de inventario pausada para {monthName} {currentYear}
+                  con {existingInventory.totalScans} escaneos. Puedes continuar esta
+                  sesión o iniciar una nueva.
                 </p>
                 <div className='flex flex-col sm:flex-row gap-2 sm:gap-3'>
                   <button
@@ -818,14 +713,14 @@ const InventoryPage: React.FC = () => {
                     className='btn-secondary text-sm py-2 px-4 flex items-center justify-center space-x-2'
                   >
                     <RotateCcw className='w-4 h-4' />
-                    <span>Continue Session</span>
+                    <span>Continuar Sesión</span>
                   </button>
                   <button
                     onClick={handleStartNewInventory}
                     className='btn-primary text-sm py-2 px-4 flex items-center justify-center space-x-2'
                   >
                     <Plus className='w-4 h-4' />
-                    <span>Start New</span>
+                    <span>Iniciar Nueva</span>
                   </button>
                 </div>
               </div>
@@ -839,35 +734,24 @@ const InventoryPage: React.FC = () => {
             <AlertTriangle className='w-5 h-5 sm:w-6 sm:h-6 text-orange-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
               <h3 className='text-base sm:text-lg font-semibold text-orange-400 mb-2 sm:mb-3'>
-                Important: Manual REPUVE Search Required
+                Importante: Búsqueda Manual en REPUVE Requerida
               </h3>
               <p className='text-sm sm:text-base text-secondaryText mb-3'>
-                After completing your inventory, you must manually search each
-                scanned barcode on the REPUVE website to extract complete vehicle
-                information (make, model, year, VIN, etc.).
+                Después de completar tu inventario, debes buscar manualmente cada
+                código de barras escaneado en el sitio web de REPUVE para extraer la información
+                completa del vehículo (marca, modelo, año, VIN, etc.).
               </p>
               <div className='p-3 sm:p-4 glass-effect border border-orange-500/20 rounded-xl'>
                 <p className='text-xs sm:text-sm text-orange-300 mb-3'>
-                  <strong>Step-by-step process:</strong>
+                  <strong>Proceso paso a paso:</strong>
                 </p>
                 <ol className='text-xs sm:text-sm text-orange-300 space-y-1 list-decimal list-inside'>
-                  <li>Complete your inventory session</li>
-                  <li>Go to the REPUVE website</li>
-                  <li>Search each barcode individually</li>
-                  <li>Extract and record vehicle details</li>
-                  <li>Update your records with complete information</li>
+                  <li>Completa tu sesión de inventario</li>
+                  <li>Ve al sitio web de REPUVE</li>
+                  <li>Busca cada código de barras individualmente</li>
+                  <li>Extrae y registra los detalles del vehículo</li>
+                  <li>Actualiza tus registros con información completa</li>
                 </ol>
-              </div>
-              <div className='mt-3 sm:mt-4'>
-                <a
-                  href='https://www2.repuve.gob.mx:8443/ciudadania/'
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='inline-flex items-center space-x-2 text-orange-400 hover:text-orange-300 transition-colors underline'
-                >
-                  <ExternalLink className='w-4 h-4' />
-                  <span>Open REPUVE Website</span>
-                </a>
               </div>
             </div>
           </div>
@@ -877,55 +761,71 @@ const InventoryPage: React.FC = () => {
         <div className='card mb-6'>
           <div className='text-center mb-6'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
-              Inventory Session Controls
+              Controles de Sesión de Inventario
             </h2>
             <p className='text-sm sm:text-base text-secondaryText'>
               {isSessionActive
-                ? 'Your inventory session is currently active. Scan barcodes or manage your session below.'
+                ? 'Tu sesión de inventario está activa actualmente. Escanea códigos de barras o gestiona tu sesión abajo.'
                 : hasExistingInventory && existingInventory?.status === 'Completed'
-                ? `Inventory for ${monthName} ${currentYear} has been completed. You cannot start a new one for the same month.`
-                : 'Start a new inventory session or continue an existing one.'}
+                ? `El inventario para ${monthName} ${currentYear} ha sido completado. No puedes iniciar uno nuevo para el mismo mes.`
+                : 'Inicia una nueva sesión de inventario o continúa una existente.'}
             </p>
           </div>
 
           {!isSessionActive ? (
             // Session not active - show start/continue options
             <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
-              {!hasExistingInventory && (
+              {/* Show active sessions count */}
+              {activeSessionsThisMonth.length > 0 && (
+                <div className='w-full text-center mb-4'>
+                  <div className='inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg'>
+                    <User className='w-4 h-4' />
+                    <span className='text-sm'>
+                      {activeSessionsThisMonth.length} usuario{activeSessionsThisMonth.length > 1 ? 's' : ''} activo{activeSessionsThisMonth.length > 1 ? 's' : ''} en este inventario
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Start new session button */}
+              {!currentUserActiveSession && (
                 <button
                   onClick={handleStartNewInventory}
                   className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
                 >
                   <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Start New Inventory Session</span>
+                  <span>Iniciar Nueva Sesión</span>
                 </button>
               )}
 
-              {hasExistingInventory && existingInventory?.status === 'Active' && (
+              {/* Continue user's active session */}
+              {currentUserActiveSession && (
                 <button
-                  onClick={() => handleContinueInventory(existingInventory)}
+                  onClick={() => handleContinueInventory(currentUserActiveSession)}
                   className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
                 >
                   <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Continue Inventory Session</span>
+                  <span>Continuar Mi Sesión Activa</span>
                 </button>
               )}
 
-              {hasExistingInventory && existingInventory?.status === 'Paused' && (
+              {/* Continue user's paused session */}
+              {currentUserPausedSession && (
                 <button
-                  onClick={() => handleContinueInventory(existingInventory)}
+                  onClick={() => handleContinueInventory(currentUserPausedSession)}
                   className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
                 >
                   <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Continue Paused Session</span>
+                  <span>Continuar Mi Sesión Pausada</span>
                 </button>
               )}
 
+              {/* Show if monthly inventory is completed */}
               {hasExistingInventory && existingInventory?.status === 'Completed' && (
                 <div className='text-center text-secondaryText py-4'>
                   <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
-                  <p>Inventory for {monthName} {currentYear} has been completed.</p>
-                  <p className='text-sm mt-1'>You can view the data but cannot add new scans.</p>
+                  <p>El inventario para {monthName} {currentYear} ha sido completado.</p>
+                  <p className='text-sm mt-1'>Puedes ver los datos pero no agregar nuevos escaneos.</p>
                 </div>
               )}
             </div>
@@ -937,7 +837,7 @@ const InventoryPage: React.FC = () => {
                 className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Scan Barcode</span>
+                <span>Escanear Código de Barras</span>
               </button>
 
               <button
@@ -945,7 +845,7 @@ const InventoryPage: React.FC = () => {
                 className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <FileText className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Manual Input</span>
+                <span>Entrada Manual</span>
               </button>
 
               <button
@@ -953,7 +853,7 @@ const InventoryPage: React.FC = () => {
                 className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <Pause className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Manage Session</span>
+                <span>Gestionar Sesión</span>
               </button>
             </div>
           )}
@@ -965,20 +865,20 @@ const InventoryPage: React.FC = () => {
             <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
               <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
                 <Barcode className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-                Scanned Codes ({scannedCodes.length})
+                Códigos Escaneados ({scannedCodes.length})
               </h2>
-                             <div className='flex items-center space-x-2 sm:space-x-3'>
-                 <span className='text-xs sm:text-sm text-secondaryText'>
-                   Total scans: {scannedCodes.length}
-                 </span>
-                 <button
-                   onClick={() => setShowResetConfirmation(true)}
-                   className='btn-secondary text-xs sm:text-sm py-2 px-3 flex items-center space-x-1 sm:space-x-2'
-                 >
-                   <RotateCcw className='w-4 h-4' />
-                   <span>Reset</span>
-                 </button>
-               </div>
+              <div className='flex items-center space-x-2 sm:space-x-3'>
+                <span className='text-xs sm:text-sm text-secondaryText'>
+                  Total de escaneos: {scannedCodes.length}
+                </span>
+                <button
+                  onClick={() => setShowResetConfirmation(true)}
+                  className='btn-secondary text-xs sm:text-sm py-2 px-3 flex items-center space-x-1 sm:space-x-2'
+                >
+                  <RotateCcw className='w-4 h-4' />
+                  <span>Reiniciar</span>
+                </button>
+              </div>
             </div>
 
             <div className='overflow-hidden'>
@@ -1034,18 +934,18 @@ const InventoryPage: React.FC = () => {
           <div className='card text-center'>
             <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
-              Ready to Start
+              Listo para Comenzar
             </h3>
             <p className='text-body text-secondaryText mb-8 max-w-md mx-auto'>
-              Use the Inventory Session Controls below to start or continue an inventory session for{' '}
+              Usa los Controles de Sesión de Inventario de arriba para iniciar o continuar una sesión de inventario para{' '}
               {monthName} {currentYear}
             </p>
             
             {hasExistingInventory && existingInventory?.status === 'Completed' && (
               <div className='text-center text-secondaryText py-4'>
                 <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
-                <p>Inventory for {monthName} {currentYear} has been completed.</p>
-                <p className='text-sm mt-1'>You can view the data but cannot add new scans.</p>
+                <p>El inventario para {monthName} {currentYear} ha sido completado.</p>
+                <p className='text-sm mt-1'>Puedes ver los datos pero no agregar nuevos escaneos.</p>
               </div>
             )}
           </div>
@@ -1056,10 +956,10 @@ const InventoryPage: React.FC = () => {
           <div className='card text-center'>
             <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
-              No codes scanned yet
+              Aún no se han escaneado códigos
             </h3>
             <p className='text-body text-secondaryText mb-8 max-w-md mx-auto'>
-              Start scanning barcodes to build your inventory list for{' '}
+              Comienza a escanear códigos de barras para construir tu lista de inventario para{' '}
               {monthName} {currentYear}
             </p>
           </div>
@@ -1095,10 +995,10 @@ const InventoryPage: React.FC = () => {
           <div className='card max-w-md w-full'>
             <div className='text-center mb-6'>
               <h3 className='text-xl font-bold text-white mb-2'>
-                Manage Session
+                Gestionar Sesión
               </h3>
               <p className='text-secondaryText'>
-                What would you like to do with your current session?
+                ¿Qué te gustaría hacer con tu sesión actual?
               </p>
             </div>
 
@@ -1108,7 +1008,7 @@ const InventoryPage: React.FC = () => {
                 className='w-full btn-primary text-lg py-4 px-6 flex items-center justify-center space-x-3'
               >
                 <CheckCircle className='w-6 h-6' />
-                <span>Complete & Finish Session</span>
+                <span>Completar y Finalizar Sesión</span>
               </button>
 
               <button
@@ -1116,7 +1016,7 @@ const InventoryPage: React.FC = () => {
                 className='w-full bg-yellow-600 hover:bg-yellow-700 text-white text-lg py-4 px-6 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-3'
               >
                 <Pause className='w-6 h-6' />
-                <span>Pause Session (Continue Later)</span>
+                <span>Pausar Sesión (Continuar Después)</span>
               </button>
 
               <button
@@ -1124,7 +1024,7 @@ const InventoryPage: React.FC = () => {
                 className='w-full btn-secondary text-lg py-4 px-6 flex items-center justify-center space-x-3'
               >
                 <RotateCcw className='w-6 h-6' />
-                <span>Continue Scanning</span>
+                <span>Continuar Escaneando</span>
               </button>
             </div>
           </div>
@@ -1138,10 +1038,10 @@ const InventoryPage: React.FC = () => {
             <div className='text-center mb-6'>
               <AlertTriangle className='w-16 h-16 text-yellow-500 mx-auto mb-4' />
               <h3 className='text-xl font-bold text-white mb-2'>
-                Reset Inventory Session
+                Reiniciar Sesión de Inventario
               </h3>
               <p className='text-secondaryText'>
-                Are you sure you want to reset the current inventory session? This will clear all scanned codes and cannot be undone.
+                ¿Estás seguro de que quieres reiniciar la sesión de inventario actual? Esto borrará todos los códigos escaneados y no se puede deshacer.
               </p>
             </div>
 
@@ -1154,7 +1054,7 @@ const InventoryPage: React.FC = () => {
                 className='w-full bg-red-600 hover:bg-red-700 text-white text-lg py-4 px-6 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-3'
               >
                 <RotateCcw className='w-6 h-6' />
-                <span>Yes, Reset Session</span>
+                <span>Sí, Reiniciar Sesión</span>
               </button>
 
               <button
@@ -1162,7 +1062,7 @@ const InventoryPage: React.FC = () => {
                 className='w-full btn-secondary text-lg py-4 px-6 flex items-center justify-center space-x-3'
               >
                 <X className='w-6 h-6' />
-                <span>Cancel</span>
+                <span>Cancelar</span>
               </button>
             </div>
           </div>
@@ -1170,9 +1070,7 @@ const InventoryPage: React.FC = () => {
       )}
 
       {/* Footer */}
-      <div className='max-w-max mx-auto px-8'>
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 };

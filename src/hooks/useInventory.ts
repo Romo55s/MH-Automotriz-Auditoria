@@ -19,7 +19,7 @@ import {
 export const useInventory = () => {
   const { selectedAgency } = useAppContext();
   const { user } = useAuth0();
-  const { showInfo } = useToast();
+  const { showInfo, showWarning } = useToast();
   const [scannedCodes, setScannedCodes] = useState<ScannedCode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -243,7 +243,7 @@ export const useInventory = () => {
       // Check if code was already scanned
       const isDuplicate = scannedCodes.some(code => code.code === barcode);
       if (isDuplicate) {
-        setError(`Barcode ${barcode} has already been scanned in this session`);
+        showWarning('Código ya escaneado', `El código ${barcode} ya fue escaneado en esta sesión.`);
         return false;
       }
 
@@ -287,9 +287,24 @@ export const useInventory = () => {
 
         return true;
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Failed to save scan';
-        setError(errorMessage);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to save scan';
+        
+        // Check if it's a duplicate barcode error
+        if (errorMessage.includes('has already been scanned')) {
+          // Extract the barcode from the error message
+          const barcodeMatch = errorMessage.match(/Barcode (\d+) has already been scanned/);
+          const barcode = barcodeMatch ? barcodeMatch[1] : 'este código';
+          
+          // Show a specific warning toast for duplicate barcode
+          showWarning(
+            'Código de Barras Duplicado',
+            `El código de barras ${barcode} ya ha sido escaneado en este inventario. Cada código solo puede ser escaneado una vez por mes.`
+          );
+        } else {
+          // For other errors, set the error state
+          setError(errorMessage);
+        }
+        
         return false;
       } finally {
         setIsLoading(false);
@@ -303,6 +318,7 @@ export const useInventory = () => {
       scannedCodes,
       sessionId,
       saveSessionToStorage,
+      showWarning,
     ]
   );
 

@@ -12,7 +12,7 @@ const Footer: React.FC<FooterProps> = ({ className = '' }) => {
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6'>
         <div className='text-center'>
           <p className='text-sm sm:text-base text-secondaryText'>
-            © 2024 Car Inventory App. Built with modern web technologies.
+            © 2024 Aplicación de Inventario de Autos. Construida con tecnologías web modernas.
           </p>
           <div className='mt-2 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm text-secondaryText'>
             <span>React + TypeScript</span>

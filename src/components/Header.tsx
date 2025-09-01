@@ -79,7 +79,7 @@ const Header: React.FC<HeaderProps> = ({
                   className='btn-secondary text-xs sm:text-sm px-3 sm:px-4 py-2 flex items-center justify-center hover:scale-105 transition-all duration-300'
                 >
                   <Building2 className='w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2' />
-                  Change Agency
+                  Cambiar Agencia
                 </button>
               )}
               
@@ -88,7 +88,7 @@ const Header: React.FC<HeaderProps> = ({
                 className='btn-secondary text-xs sm:text-sm px-3 sm:px-4 py-2 flex items-center justify-center hover:scale-105 transition-all duration-300'
               >
                 <LogOut className='w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2' />
-                Log out
+                Cerrar Sesión
               </button>
             </div>
           )}

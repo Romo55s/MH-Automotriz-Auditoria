@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 
 interface ProtectedRouteProps {
@@ -92,7 +92,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       <div className='min-h-screen bg-black flex items-center justify-center relative overflow-hidden'>
         <div className='text-center z-10 relative'>
           <div className='animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-6'></div>
-          <h2 className='text-xl text-gray-300'>Loading...</h2>
+          <h2 className='text-xl text-gray-300'>Cargando...</h2>
         </div>
       </div>
     );

@@ -18,14 +18,14 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
 
     // Basic validation
     if (!manualCode.trim()) {
-      setError('Please enter a barcode/QR code');
+      setError('Por favor ingresa un código de barras/QR');
       return;
     }
 
     // Validate 8-digit format
     const codePattern = /^\d{8}$/;
     if (!codePattern.test(manualCode.trim())) {
-      setError('Code must be exactly 8 digits (e.g., 12345678)');
+      setError('El código debe tener exactamente 8 dígitos (ej., 12345678)');
       return;
     }
 
@@ -48,7 +48,7 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
         {/* Header */}
         <div className='flex items-center justify-between p-4 sm:p-6 lg:p-8 border-b border-white/20'>
           <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading text-shadow'>
-            Manual Input
+            Entrada Manual
           </h2>
           <button
             onClick={handleCancel}
@@ -65,13 +65,13 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
             <div className='flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4'>
               <AlertCircle className='w-5 h-5 sm:w-6 sm:h-6 text-yellow-400' />
               <span className='text-sm sm:text-base font-semibold text-yellow-400'>
-                Manual Input Mode
+                Modo de Entrada Manual
               </span>
             </div>
             <p className='text-sm sm:text-base text-secondaryText'>
-              Use this option when the barcode scanner isn&apos;t working or the
-              barcode is damaged. Enter the 8-digit code exactly as it appears
-              on the vehicle or document.
+              Usa esta opción cuando el escáner de códigos de barras no funciona o el
+              código de barras está dañado. Ingresa el código de 8 dígitos exactamente como aparece
+              en el vehículo o documento.
             </p>
           </div>
 
@@ -79,7 +79,7 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
           <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
             <div>
               <label className='block text-sm sm:text-base font-semibold text-secondaryText mb-3 sm:mb-4'>
-                8-Digit Code
+                Código de 8 Dígitos
               </label>
               <div className='glass-effect border border-white/20 rounded-2xl p-4 sm:p-6'>
                 <div className='flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4'>
@@ -100,7 +100,7 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
                         handleSubmit(e);
                       }
                     }}
-                    placeholder='Enter 8-digit code (e.g., 12345678)...'
+                    placeholder='Ingresa código de 8 dígitos (ej., 12345678)...'
                     className='flex-1 bg-transparent border-none outline-none text-white placeholder-secondaryText text-base sm:text-lg font-mono'
                     autoFocus
                     maxLength={8}
@@ -109,7 +109,7 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
 
                 <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 text-xs sm:text-sm'>
                   <div className='text-secondaryText'>
-                    {manualCode.length}/8 digits
+                    {manualCode.length}/8 dígitos
                   </div>
                   {error && (
                     <div className='flex items-center space-x-2 text-red-400'>
@@ -128,13 +128,13 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
                 onClick={handleCancel}
                 className='flex-1 btn-secondary py-3 sm:py-4 px-4 sm:px-6 text-center text-sm sm:text-base'
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 type='submit'
                 className='flex-1 btn-primary py-3 sm:py-4 px-4 sm:px-6 text-center text-sm sm:text-base'
               >
-                Confirm Code
+                Confirmar Código
               </button>
             </div>
           </form>
