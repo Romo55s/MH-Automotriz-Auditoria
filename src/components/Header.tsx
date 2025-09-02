@@ -56,9 +56,16 @@ const Header: React.FC<HeaderProps> = ({
             )}
 
             <div className='min-w-0 flex-1'>
-              <h1 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading text-shadow truncate'>
-                {title}
-              </h1>
+              <div className='flex items-center space-x-2 sm:space-x-3'>
+                <img
+                  src="/MH Automotriz-White.svg"
+                  alt="MH Automotriz Logo"
+                  className='w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0'
+                />
+                <h1 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading text-shadow truncate'>
+                  {title}
+                </h1>
+              </div>
               {subtitle && (
                 <p className='text-sm sm:text-base text-secondaryText truncate'>{subtitle}</p>
               )}
@@ -69,7 +76,17 @@ const Header: React.FC<HeaderProps> = ({
           {showUserInfo && (
             <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6'>
               <div className='flex items-center justify-center sm:justify-start space-x-2 sm:space-x-3 text-secondaryText'>
-                <User className='w-4 h-4 sm:w-5 sm:h-5' />
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user?.name || 'User'}
+                    className='w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-white/20 object-cover'
+                  />
+                ) : (
+                  <div className='w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center'>
+                    <User className='w-3 h-3 sm:w-4 sm:h-4' />
+                  </div>
+                )}
                 <span className='text-sm sm:text-base truncate'>{user?.name || user?.email}</span>
               </div>
               

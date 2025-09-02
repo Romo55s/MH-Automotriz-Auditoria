@@ -12,11 +12,12 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Trash2,
   User,
   X
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useInventory } from '../hooks/useInventory';
@@ -25,16 +26,20 @@ import {
 } from '../services/api';
 import { MonthlyInventory } from '../types';
 import BarcodeScanner from './BarcodeScanner';
+import CompletionModal from './CompletionModal';
 import ConfirmationModal from './ConfirmationModal';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 import Footer from './Footer';
 import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
 import ManualInputModal from './ManualInputModal';
+import NewInventoryConfirmationModal from './NewInventoryConfirmationModal';
 
 const InventoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { agencyName } = useParams<{ agencyName?: string }>();
   const { user } = useAuth0();
-  const { selectedAgency } = useAppContext();
+  const { selectedAgency, setSelectedAgency } = useAppContext();
   const { showSuccess, showError, showWarning, showInfo } = useToast();
 
   // State for UI modals and displays
@@ -44,6 +49,16 @@ const InventoryPage: React.FC = () => {
   const [currentScannedCode, setCurrentScannedCode] = useState('');
   const [showStopOptions, setShowStopOptions] = useState(false);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [codeToDelete, setCodeToDelete] = useState<{code: string, index: number} | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showNewInventoryConfirmation, setShowNewInventoryConfirmation] = useState(false);
+  const [completedInventoryData, setCompletedInventoryData] = useState<{
+    totalScans: number;
+    agencyName: string;
+    monthName: string;
+    year: number;
+  } | null>(null);
 
   // State for monthly inventory management
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
@@ -61,6 +76,7 @@ const InventoryPage: React.FC = () => {
     monthName,
     sessionId,
     addScannedCode,
+    deleteScannedCode,
     finishInventorySession,
     pauseInventorySession,
     startSession,
@@ -68,6 +84,36 @@ const InventoryPage: React.FC = () => {
     clearError,
     reset,
   } = useInventory();
+
+  // Handle agency name from URL
+  useEffect(() => {
+    if (agencyName && !selectedAgency) {
+      // Find agency by name and set it
+      const agencies = [
+        { id: '1', name: 'Suzuki', googleSheetId: 'suzuki-sheet-id' },
+        { id: '2', name: 'Honda', googleSheetId: 'honda-sheet-id' },
+        { id: '3', name: 'Toyota', googleSheetId: 'toyota-sheet-id' },
+        { id: '4', name: 'Nissan', googleSheetId: 'nissan-sheet-id' },
+        { id: '5', name: 'Hyundai', googleSheetId: 'hyundai-sheet-id' },
+        { id: '6', name: 'Kia', googleSheetId: 'kia-sheet-id' },
+        { id: '7', name: 'Mazda', googleSheetId: 'mazda-sheet-id' },
+        { id: '8', name: 'Ford', googleSheetId: 'ford-sheet-id' },
+        { id: '9', name: 'Chevrolet', googleSheetId: 'chevrolet-sheet-id' },
+        { id: '10', name: 'Volkswagen', googleSheetId: 'volkswagen-sheet-id' },
+      ];
+      
+      const agency = agencies.find(a => 
+        a.name.toLowerCase() === agencyName.toLowerCase()
+      );
+      
+      if (agency) {
+        setSelectedAgency(agency);
+      } else {
+        // Agency not found, redirect to select-agency
+        navigate('/select-agency');
+      }
+    }
+  }, [agencyName, selectedAgency, setSelectedAgency, navigate]);
 
   // Load agency inventories
   const loadInventories = useCallback(async () => {
@@ -195,7 +241,8 @@ const InventoryPage: React.FC = () => {
           'La sesión de inventario ha sido finalizada exitosamente'
         );
         loadInventories();
-        navigate('/select-agency');
+        // Show completion modal instead of navigating away
+        handleShowCompletionModal(scannedCodes.length);
       } else {
         showError('Error de Sesión', 'Falló al finalizar la sesión de inventario');
       }
@@ -301,6 +348,60 @@ const InventoryPage: React.FC = () => {
 
   const handleRefreshInventories = () => {
     loadInventories();
+  };
+
+  const handleDeleteCode = (code: string, index: number) => {
+    setCodeToDelete({ code, index });
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleDeleteConfirmation = () => {
+    if (codeToDelete) {
+      deleteScannedCode(codeToDelete.index);
+      setShowDeleteConfirmation(false);
+      setCodeToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirmation(false);
+    setCodeToDelete(null);
+  };
+
+  const handleShowCompletionModal = (totalScans: number) => {
+    if (selectedAgency) {
+      setCompletedInventoryData({
+        totalScans,
+        agencyName: selectedAgency.name,
+        monthName,
+        year: currentYear,
+      });
+      setShowCompletionModal(true);
+    }
+  };
+
+  const handleCloseCompletionModal = () => {
+    setShowCompletionModal(false);
+    setCompletedInventoryData(null);
+  };
+
+  const handleStartNewInventoryFromCompletion = () => {
+    setShowCompletionModal(false);
+    setShowNewInventoryConfirmation(true);
+  };
+
+  const handleConfirmNewInventory = async () => {
+    setShowNewInventoryConfirmation(false);
+    await handleStartNewInventory();
+  };
+
+  const handleCancelNewInventory = () => {
+    setShowNewInventoryConfirmation(false);
+  };
+
+  const handleDownloadBarcodes = () => {
+    // TODO: Implement download functionality
+    showInfo('Descarga', 'Función de descarga será implementada próximamente');
   };
 
   const handleStartNewInventory = async () => {
@@ -596,16 +697,18 @@ const InventoryPage: React.FC = () => {
                           </span>
                         </td>
                         <td className='px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap'>
-                          <button
-                            onClick={() => handleContinueInventory(inventory)}
-                            className='btn-secondary text-xs lg:text-sm py-1 lg:py-2 px-2 lg:px-3 flex items-center space-x-1 lg:space-x-2'
-                          >
-                            <span>
-                              {inventory.status === 'Completed'
-                                ? 'Ver'
-                                : 'Continuar'}
+                          {inventory.status === 'Completed' ? (
+                            <span className='text-xs lg:text-sm text-green-400 font-semibold'>
+                              Completado
                             </span>
-                          </button>
+                          ) : (
+                            <button
+                              onClick={() => handleContinueInventory(inventory)}
+                              className='btn-secondary text-xs lg:text-sm py-1 lg:py-2 px-2 lg:px-3 flex items-center space-x-1 lg:space-x-2'
+                            >
+                              <span>Continuar</span>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -652,16 +755,20 @@ const InventoryPage: React.FC = () => {
                       </div>
                     </div>
                     
-                    <button
-                      onClick={() => handleContinueInventory(inventory)}
-                      className='w-full btn-secondary text-xs py-2 px-3 flex items-center justify-center space-x-1'
-                    >
-                      <span>
-                        {inventory.status === 'Completed'
-                          ? 'Ver'
-                          : 'Continuar'}
-                      </span>
-                    </button>
+                    {inventory.status === 'Completed' ? (
+                      <div className='w-full text-center py-2 px-3'>
+                        <span className='text-xs text-green-400 font-semibold'>
+                          Completado
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleContinueInventory(inventory)}
+                        className='w-full btn-secondary text-xs py-2 px-3 flex items-center justify-center space-x-1'
+                      >
+                        <span>Continuar</span>
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -893,9 +1000,18 @@ const InventoryPage: React.FC = () => {
                       <span className='text-xs sm:text-sm text-secondaryText'>
                         #{index + 1}
                       </span>
-                      <span className='text-xs text-secondaryText'>
-                        {formatTime(code.timestamp)}
-                      </span>
+                      <div className='flex items-center space-x-2'>
+                        <span className='text-xs text-secondaryText'>
+                          {formatTime(code.timestamp)}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteCode(code.code, index)}
+                          className='p-1 sm:p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-all duration-300'
+                          title='Eliminar código'
+                        >
+                          <Trash2 className='w-3 h-3 sm:w-4 sm:h-4' />
+                        </button>
+                      </div>
                     </div>
                     <div className='font-mono text-sm sm:text-base text-white break-all'>
                       {code.code}
@@ -915,9 +1031,18 @@ const InventoryPage: React.FC = () => {
                       <span className='text-xs text-secondaryText'>
                         #{index + 1}
                       </span>
-                      <span className='text-xs text-secondaryText'>
-                        {formatTime(code.timestamp)}
-                      </span>
+                      <div className='flex items-center space-x-2'>
+                        <span className='text-xs text-secondaryText'>
+                          {formatTime(code.timestamp)}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteCode(code.code, index)}
+                          className='p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-all duration-300'
+                          title='Eliminar código'
+                        >
+                          <Trash2 className='w-3 h-3' />
+                        </button>
+                      </div>
                     </div>
                     <div className='font-mono text-sm text-white break-all'>
                       {code.code}
@@ -1067,6 +1192,39 @@ const InventoryPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmation && codeToDelete && (
+        <DeleteConfirmationModal
+          scannedCode={codeToDelete.code}
+          onConfirm={handleDeleteConfirmation}
+          onCancel={handleDeleteCancel}
+        />
+      )}
+
+      {/* Completion Modal */}
+      {showCompletionModal && completedInventoryData && (
+        <CompletionModal
+          isOpen={showCompletionModal}
+          onClose={handleCloseCompletionModal}
+          onStartNewInventory={handleStartNewInventoryFromCompletion}
+          onDownloadBarcodes={handleDownloadBarcodes}
+          totalScans={completedInventoryData.totalScans}
+          agencyName={completedInventoryData.agencyName}
+          monthName={completedInventoryData.monthName}
+          year={completedInventoryData.year}
+        />
+      )}
+
+      {/* New Inventory Confirmation Modal */}
+      {showNewInventoryConfirmation && selectedAgency && (
+        <NewInventoryConfirmationModal
+          isOpen={showNewInventoryConfirmation}
+          onConfirm={handleConfirmNewInventory}
+          onCancel={handleCancelNewInventory}
+          agencyName={selectedAgency.name}
+        />
       )}
 
       {/* Footer */}

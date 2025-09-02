@@ -1,6 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { checkMonthlyInventory, getAgencyInventories } from '../services/api';
@@ -25,8 +25,9 @@ import {
 
 const MonthlyInventoryManager: React.FC = () => {
   const navigate = useNavigate();
+  const { agencyName } = useParams<{ agencyName?: string }>();
   const { user } = useAuth0();
-  const { selectedAgency } = useAppContext();
+  const { selectedAgency, setSelectedAgency } = useAppContext();
   const { showSuccess, showError, showInfo } = useToast();
 
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
@@ -44,6 +45,36 @@ const MonthlyInventoryManager: React.FC = () => {
     setCurrentMonth(month);
     setCurrentYear(year);
   }, []);
+
+  // Handle agency name from URL
+  useEffect(() => {
+    if (agencyName && !selectedAgency) {
+      // Find agency by name and set it
+      const agencies = [
+        { id: '1', name: 'Suzuki', googleSheetId: 'suzuki-sheet-id' },
+        { id: '2', name: 'Honda', googleSheetId: 'honda-sheet-id' },
+        { id: '3', name: 'Toyota', googleSheetId: 'toyota-sheet-id' },
+        { id: '4', name: 'Nissan', googleSheetId: 'nissan-sheet-id' },
+        { id: '5', name: 'Hyundai', googleSheetId: 'hyundai-sheet-id' },
+        { id: '6', name: 'Kia', googleSheetId: 'kia-sheet-id' },
+        { id: '7', name: 'Mazda', googleSheetId: 'mazda-sheet-id' },
+        { id: '8', name: 'Ford', googleSheetId: 'ford-sheet-id' },
+        { id: '9', name: 'Chevrolet', googleSheetId: 'chevrolet-sheet-id' },
+        { id: '10', name: 'Volkswagen', googleSheetId: 'volkswagen-sheet-id' },
+      ];
+      
+      const agency = agencies.find(a => 
+        a.name.toLowerCase() === agencyName.toLowerCase()
+      );
+      
+      if (agency) {
+        setSelectedAgency(agency);
+      } else {
+        // Agency not found, redirect to select-agency
+        navigate('/select-agency');
+      }
+    }
+  }, [agencyName, selectedAgency, setSelectedAgency, navigate]);
 
 
 
@@ -205,12 +236,12 @@ const MonthlyInventoryManager: React.FC = () => {
           )} ${currentYear} ya existe. Puedes continuarlo o completarlo primero.`
         );
         // Navigate to inventory page to continue
-        navigate('/inventory');
+        navigate(`/inventory/${selectedAgency.name.toLowerCase()}`);
         return;
       }
 
       // Navigate to inventory page to start new
-      navigate('/inventory');
+      navigate(`/inventory/${selectedAgency.name.toLowerCase()}`);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Falló al verificar el estado del inventario';
@@ -226,7 +257,7 @@ const MonthlyInventoryManager: React.FC = () => {
         inventory.year
       } con ${inventory.totalScans} escaneos existentes.`
     );
-    navigate('/inventory');
+    navigate(`/inventory/${selectedAgency.name.toLowerCase()}`);
   };
 
   const getStatusColor = (status: string) => {

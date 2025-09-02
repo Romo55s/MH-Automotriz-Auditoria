@@ -1,10 +1,10 @@
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import React, { useEffect } from 'react';
 import {
-  Route,
-  BrowserRouter as Router,
-  Routes,
-  useNavigate,
+    Route,
+    BrowserRouter as Router,
+    Routes,
+    useNavigate,
 } from 'react-router-dom';
 import AgencySelector from './components/AgencySelector';
 import Auth0ErrorBoundary from './components/Auth0ErrorBoundary';
@@ -101,7 +101,23 @@ const App: React.FC = () => {
                     }
                   />
                   <Route
+                    path='/inventory/:agencyName'
+                    element={
+                      <ProtectedRoute requireAuth={true}>
+                        <InventoryPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path='/monthly-inventories'
+                    element={
+                      <ProtectedRoute requireAuth={true}>
+                        <MonthlyInventoryManager />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path='/monthly-inventories/:agencyName'
                     element={
                       <ProtectedRoute requireAuth={true}>
                         <MonthlyInventoryManager />

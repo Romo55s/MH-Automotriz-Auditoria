@@ -3,17 +3,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import {
-    checkMonthlyInventory,
-    finishSession,
-    getMonthlyInventory,
-    saveScan,
+  checkMonthlyInventory,
+  finishSession,
+  getMonthlyInventory,
+  saveScan,
 } from '../services/api';
 import { ScannedCode } from '../types/index';
 import {
-    clearSession,
-    loadSession,
-    saveSession,
-    SessionData,
+  clearSession,
+  loadSession,
+  saveSession,
+  SessionData,
 } from '../utils/sessionManager';
 
 export const useInventory = () => {
@@ -428,6 +428,24 @@ export const useInventory = () => {
     setError(null);
   }, []);
 
+  // Delete a scanned code
+  const deleteScannedCode = useCallback((index: number) => {
+    if (index < 0 || index >= scannedCodes.length) {
+      showError('Error', 'Índice de código inválido');
+      return;
+    }
+
+    const updatedCodes = scannedCodes.filter((_, i) => i !== index);
+    setScannedCodes(updatedCodes);
+
+    // Update session storage
+    if (selectedAgency && currentMonth && currentYear) {
+      saveSessionToStorage(updatedCodes, isSessionActive, sessionId);
+    }
+
+    showInfo('Código Eliminado', 'El código de barras ha sido eliminado exitosamente');
+  }, [scannedCodes, selectedAgency, currentMonth, currentYear, isSessionActive, sessionId, saveSessionToStorage, showError, showInfo]);
+
   // Reset inventory state
   const reset = useCallback(() => {
     setScannedCodes([]);
@@ -454,6 +472,7 @@ export const useInventory = () => {
 
     // Actions
     addScannedCode,
+    deleteScannedCode,
     finishInventorySession,
     pauseInventorySession,
     startSession,

@@ -93,14 +93,14 @@ const AgencySelector: React.FC = () => {
 
             <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6'>
               <button
-                onClick={() => navigate('/inventory')}
+                onClick={() => navigate(`/inventory/${selectedAgency?.name.toLowerCase()}`)}
                 className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <Play className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Continuar al Inventario</span>
               </button>
               <button
-                onClick={() => navigate('/monthly-inventories')}
+                onClick={() => navigate(`/monthly-inventories/${selectedAgency?.name.toLowerCase()}`)}
                 className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <Calendar className='w-5 h-5 sm:w-6 sm:h-6' />
@@ -131,7 +131,7 @@ const AgencySelector: React.FC = () => {
     const agency = agencies.find(a => a.id === selectedAgencyId);
     if (agency) {
       setSelectedAgency(agency);
-      navigate('/inventory');
+      navigate(`/inventory/${agency.name.toLowerCase()}`);
     }
   };
 
@@ -141,7 +141,7 @@ const AgencySelector: React.FC = () => {
     const agency = agencies.find(a => a.id === selectedAgencyId);
     if (agency) {
       setSelectedAgency(agency);
-      navigate('/monthly-inventories');
+      navigate(`/monthly-inventories/${agency.name.toLowerCase()}`);
     }
   };
 
