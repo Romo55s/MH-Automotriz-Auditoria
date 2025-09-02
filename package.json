@@ -17,15 +17,25 @@
     "start": "react-scripts start",
     "dev": "react-scripts start",
     "build": "react-scripts build",
+    "build:prod": "GENERATE_SOURCEMAP=false npm run build",
+    "build:analyze": "npm run build && npx serve -s build",
     "test": "react-scripts test",
+    "test:coverage": "react-scripts test --coverage --watchAll=false",
     "eject": "react-scripts eject",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "prebuild": "npm run type-check",
+    "precommit": "npm run format:check && npm run type-check",
     "debug:build": "set \"GENERATE_SOURCEMAP=true\" && npm run build",
     "debug:start": "set \"GENERATE_SOURCEMAP=true\" && npm start",
     "debug:start:unix": "GENERATE_SOURCEMAP=true npm start",
-    "debug:build:unix": "GENERATE_SOURCEMAP=true npm run build"
+    "debug:build:unix": "GENERATE_SOURCEMAP=true npm run build",
+    "serve": "npx serve -s build -l 3000",
+    "serve:prod": "npx serve -s build -l 8080",
+    "deploy:preview": "npm run build:prod && npm run serve:prod",
+    "deploy:vercel": "npm run build:prod && vercel --prod",
+    "deploy:netlify": "npm run build:prod && netlify deploy --prod --dir=build"
   },
   "browserslist": {
     "production": [
@@ -46,6 +56,7 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
     "prettier": "^2.8.8",
+    "serve": "^14.2.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^4.9.5"
   }

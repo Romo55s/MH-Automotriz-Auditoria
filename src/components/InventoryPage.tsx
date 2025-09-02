@@ -1,7 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import {
   AlertTriangle,
-  Barcode,
   Calendar,
   Camera,
   CheckCircle,
@@ -12,7 +11,6 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Trash2,
   User,
   X
 } from 'lucide-react';
@@ -22,10 +20,12 @@ import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useInventory } from '../hooks/useInventory';
 import {
-  getAgencyInventories
+  getAgencyInventories,
+  getMonthlyInventory
 } from '../services/api';
 import { MonthlyInventory } from '../types';
 import BarcodeScanner from './BarcodeScanner';
+import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
 import CompletionModal from './CompletionModal';
 import ConfirmationModal from './ConfirmationModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
@@ -34,6 +34,8 @@ import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
 import ManualInputModal from './ManualInputModal';
 import NewInventoryConfirmationModal from './NewInventoryConfirmationModal';
+import ScannedCodesList from './ScannedCodesList';
+import SessionTerminatedModal from './SessionTerminatedModal';
 
 const InventoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,17 +55,27 @@ const InventoryPage: React.FC = () => {
   const [codeToDelete, setCodeToDelete] = useState<{code: string, index: number} | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showNewInventoryConfirmation, setShowNewInventoryConfirmation] = useState(false);
+  const [showSessionTerminatedModal, setShowSessionTerminatedModal] = useState(false);
   const [completedInventoryData, setCompletedInventoryData] = useState<{
     totalScans: number;
     agencyName: string;
     monthName: string;
     year: number;
   } | null>(null);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [selectedIndicesForBulkDelete, setSelectedIndicesForBulkDelete] = useState<number[]>([]);
+  const [selectedBarcodesForBulkDelete, setSelectedBarcodesForBulkDelete] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [sessionTerminationData, setSessionTerminationData] = useState<{
+    completedBy: string;
+    isCurrentUser?: boolean;
+  } | null>(null);
 
   // State for monthly inventory management
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
   const [isLoadingInventories, setIsLoadingInventories] = useState(false);
   const [inventoriesError, setInventoriesError] = useState<string | null>(null);
+  const [previousScanCount, setPreviousScanCount] = useState(0);
 
   // Get inventory functions from the hook
   const {
@@ -75,14 +87,23 @@ const InventoryPage: React.FC = () => {
     currentYear,
     monthName,
     sessionId,
+    isValidatingSession,
+    isSyncing,
+    lastSyncTime,
     addScannedCode,
     deleteScannedCode,
+    deleteMultipleScannedCodes,
     finishInventorySession,
     pauseInventorySession,
     startSession,
     continueSession,
     clearError,
     reset,
+    checkLimits,
+    deleteScannedEntryFromBackend,
+    downloadInventory,
+    checkForInventoryCompletion,
+    syncSessionData,
   } = useInventory();
 
   // Handle agency name from URL
@@ -140,9 +161,10 @@ const InventoryPage: React.FC = () => {
       
       // Transform backend data to match frontend interface
       const transformedInventories = inventories.map((inv: any, index: number) => {
+        // Convert month name to month number - backend sends English month names
         const monthNames = [
-          'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
         ];
         const monthNumber = (monthNames.indexOf(inv.month) + 1).toString().padStart(2, '0');
         
@@ -181,6 +203,36 @@ const InventoryPage: React.FC = () => {
     
     loadInventories();
   }, [selectedAgency, navigate, loadInventories]);
+
+  // Check for inventory completion on page load (which would terminate active sessions)
+  useEffect(() => {
+    const checkCompletion = async () => {
+      if (selectedAgency && isSessionActive) {
+        const result = await checkForInventoryCompletion();
+        if (result.wasCompleted) {
+          setSessionTerminationData({ 
+            completedBy: result.completedBy,
+            isCurrentUser: false
+          });
+          setShowSessionTerminatedModal(true);
+        }
+      }
+    };
+
+    checkCompletion();
+  }, [selectedAgency, isSessionActive]); // Removed checkForInventoryCompletion from dependencies
+
+  // Detect new barcodes added by other users
+  useEffect(() => {
+    if (isSessionActive && scannedCodes.length > previousScanCount && previousScanCount > 0) {
+      const newBarcodesCount = scannedCodes.length - previousScanCount;
+      showInfo(
+        'Nuevos Códigos Detectados',
+        `${newBarcodesCount} nuevo${newBarcodesCount > 1 ? 's' : ''} código${newBarcodesCount > 1 ? 's' : ''} agregado${newBarcodesCount > 1 ? 's' : ''} por otro${newBarcodesCount > 1 ? 's' : ''} usuario${newBarcodesCount > 1 ? 's' : ''}`
+      );
+    }
+    setPreviousScanCount(scannedCodes.length);
+  }, [scannedCodes.length, isSessionActive, previousScanCount, showInfo]);
 
   const handleScan = (code: string) => {
     setCurrentScannedCode(code);
@@ -234,15 +286,16 @@ const InventoryPage: React.FC = () => {
         'Finalizando sesión de inventario y guardando en Google Sheets...'
       );
 
-      const success = await finishInventorySession();
-      if (success) {
+      const result = await finishInventorySession();
+      if (result && result.success) {
         showSuccess(
           'Sesión Completada',
           'La sesión de inventario ha sido finalizada exitosamente'
         );
         loadInventories();
-        // Show completion modal instead of navigating away
-        handleShowCompletionModal(scannedCodes.length);
+        
+        // Show completion modal with download functionality for the user who completed the inventory
+        handleShowCompletionModal(result.totalScans);
       } else {
         showError('Error de Sesión', 'Falló al finalizar la sesión de inventario');
       }
@@ -306,8 +359,22 @@ const InventoryPage: React.FC = () => {
       'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
+    
+    // Handle edge cases
+    if (!month || month === '00' || month === '0') {
+      console.warn('Invalid month value:', month);
+      return 'Mes Inválido';
+    }
+    
     const monthIndex = parseInt(month) - 1;
-    return monthNames[monthIndex] || month;
+    
+    // Validate month index
+    if (monthIndex < 0 || monthIndex >= monthNames.length) {
+      console.warn('Month index out of range:', monthIndex, 'for month:', month);
+      return 'Mes Inválido';
+    }
+    
+    return monthNames[monthIndex];
   };
 
   const getStatusColor = (status: string) => {
@@ -355,6 +422,50 @@ const InventoryPage: React.FC = () => {
     setShowDeleteConfirmation(true);
   };
 
+  const handleDeleteCodeByIndex = (index: number) => {
+    const code = scannedCodes[index];
+    if (code) {
+      setCodeToDelete({ code: code.code, index });
+      setShowDeleteConfirmation(true);
+    }
+  };
+
+  const handleBulkDelete = (selectedIndices: number[]) => {
+    // Get the barcodes to delete
+    const barcodesToDelete = selectedIndices.map(index => scannedCodes[index].code);
+    
+    // Store the selected indices and barcodes, then show the modal
+    setSelectedIndicesForBulkDelete(selectedIndices);
+    setSelectedBarcodesForBulkDelete(barcodesToDelete);
+    setShowBulkDeleteModal(true);
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedBarcodesForBulkDelete.length === 0) return;
+    
+    setIsBulkDeleting(true);
+    
+    try {
+      // Use the stored barcodes for deletion
+      await deleteMultipleScannedCodes(selectedBarcodesForBulkDelete);
+      
+      // Close the modal and reset state
+      setShowBulkDeleteModal(false);
+      setSelectedIndicesForBulkDelete([]);
+      setSelectedBarcodesForBulkDelete([]);
+    } catch (error) {
+      console.error('Error in bulk delete:', error);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleBulkDeleteCancel = () => {
+    setShowBulkDeleteModal(false);
+    setSelectedIndicesForBulkDelete([]);
+    setSelectedBarcodesForBulkDelete([]);
+  };
+
   const handleDeleteConfirmation = () => {
     if (codeToDelete) {
       deleteScannedCode(codeToDelete.index);
@@ -368,15 +479,37 @@ const InventoryPage: React.FC = () => {
     setCodeToDelete(null);
   };
 
-  const handleShowCompletionModal = (totalScans: number) => {
+  const handleShowCompletionModal = async (localTotalScans: number) => {
     if (selectedAgency) {
-      setCompletedInventoryData({
-        totalScans,
-        agencyName: selectedAgency.name,
-        monthName,
-        year: currentYear,
-      });
-      setShowCompletionModal(true);
+      try {
+        // Fetch the actual monthly inventory data to get the correct total
+        const monthlyInventory = await getMonthlyInventory(
+          selectedAgency.name,
+          currentMonth,
+          currentYear
+        );
+        
+        // Use the total from the monthly inventory if available, otherwise use local total
+        const actualTotalScans = monthlyInventory?.totalScans || localTotalScans;
+        
+        setCompletedInventoryData({
+          totalScans: actualTotalScans,
+          agencyName: selectedAgency.name,
+          monthName,
+          year: currentYear,
+        });
+        setShowCompletionModal(true);
+      } catch (error) {
+        console.error('Error fetching monthly inventory for completion modal:', error);
+        // Fallback to local total if API call fails
+        setCompletedInventoryData({
+          totalScans: localTotalScans,
+          agencyName: selectedAgency.name,
+          monthName,
+          year: currentYear,
+        });
+        setShowCompletionModal(true);
+      }
     }
   };
 
@@ -399,9 +532,8 @@ const InventoryPage: React.FC = () => {
     setShowNewInventoryConfirmation(false);
   };
 
-  const handleDownloadBarcodes = () => {
-    // TODO: Implement download functionality
-    showInfo('Descarga', 'Función de descarga será implementada próximamente');
+  const handleDownloadCSV = async () => {
+    await downloadInventory('csv');
   };
 
   const handleStartNewInventory = async () => {
@@ -424,17 +556,17 @@ const InventoryPage: React.FC = () => {
         return;
       }
 
-      // Check if the monthly inventory is completed (no more sessions allowed)
-      const monthlyCompleted = inventories.some(
+      // Check if the monthly inventory limit is reached (2 completed inventories)
+      const completedCount = inventories.filter(
         inv => inv.month === currentMonth && 
                inv.year === currentYear && 
                inv.status === 'Completed'
-      );
+      ).length;
 
-      if (monthlyCompleted) {
+      if (completedCount >= 2) {
         showError(
-          'Inventario Completado',
-          `El inventario para ${monthName} ${currentYear} ya fue completado. No se pueden iniciar nuevas sesiones.`
+          'Límite de Inventarios Alcanzado',
+          `Ya se han completado 2 inventarios para ${monthName} ${currentYear}. El límite máximo es de 2 inventarios por mes.`
         );
         return;
       }
@@ -452,7 +584,7 @@ const InventoryPage: React.FC = () => {
     }
   };
 
-  const handleContinueInventory = (inventory: MonthlyInventory) => {
+  const handleContinueInventory = async (inventory: MonthlyInventory) => {
     if (inventory.status === 'Completed') {
       showInfo(
         'Inventario Completado',
@@ -466,7 +598,7 @@ const InventoryPage: React.FC = () => {
         'Continuando Inventario Pausado',
         `Continuando sesión de inventario pausada para ${monthName} ${currentYear} con ${inventory.totalScans} escaneos existentes.`
       );
-      continueSession();
+      await continueSession();
       return;
     }
 
@@ -474,7 +606,7 @@ const InventoryPage: React.FC = () => {
       'Continuando Inventario',
       `Continuando sesión de inventario para ${monthName} ${currentYear} con ${inventory.totalScans} escaneos existentes.`
     );
-    continueSession();
+    await continueSession();
   };
 
   // Check if there's existing inventory data for current month
@@ -503,6 +635,13 @@ const InventoryPage: React.FC = () => {
     inv => inv.month === currentMonth && 
            inv.year === currentYear && 
            inv.status === 'Active'
+  );
+
+  // Check if there are completed inventories for this month
+  const completedInventoriesThisMonth = inventories.filter(
+    inv => inv.month === currentMonth && 
+           inv.year === currentYear && 
+           inv.status === 'Completed'
   );
 
   const existingInventory = inventories.find(
@@ -870,38 +1009,84 @@ const InventoryPage: React.FC = () => {
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Controles de Sesión de Inventario
             </h2>
+            
+            {/* Sync Status Indicator */}
+            {isSessionActive && (
+              <div className='flex items-center justify-center gap-3 mb-4'>
+                <div className='flex items-center gap-2 text-sm text-secondaryText'>
+                  {isSyncing ? (
+                    <>
+                      <div className='w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin'></div>
+                      <span>Sincronizando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className='w-2 h-2 bg-green-400 rounded-full'></div>
+                      <span>
+                        Sincronizado {lastSyncTime ? `hace ${Math.floor((Date.now() - lastSyncTime.getTime()) / 1000)}s` : 'recientemente'}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={syncSessionData}
+                  disabled={isSyncing}
+                  className='text-xs px-3 py-1 bg-blue-500/20 text-blue-300 rounded-lg border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                >
+                  {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+                </button>
+              </div>
+            )}
             <p className='text-sm sm:text-base text-secondaryText'>
               {isSessionActive
                 ? 'Tu sesión de inventario está activa actualmente. Escanea códigos de barras o gestiona tu sesión abajo.'
-                : hasExistingInventory && existingInventory?.status === 'Completed'
-                ? `El inventario para ${monthName} ${currentYear} ha sido completado. No puedes iniciar uno nuevo para el mismo mes.`
-                : 'Inicia una nueva sesión de inventario o continúa una existente.'}
+                : completedInventoriesThisMonth.length >= 2
+                ? `Ya se han completado 2 inventarios para ${monthName} ${currentYear}. El límite máximo es de 2 inventarios por mes.`
+                : activeSessionsThisMonth.length > 0
+                ? 'Hay un inventario activo en curso. Puedes continuar trabajando en él.'
+                : 'Inicia una nueva sesión de inventario.'}
             </p>
           </div>
 
           {!isSessionActive ? (
             // Session not active - show start/continue options
-            <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
-              {/* Show active sessions count */}
+            <div className='flex flex-col items-center gap-4'>
+              {/* Main action button - shows different text/behavior based on active sessions */}
+              
+              {/* Show active sessions count - positioned below the button */}
               {activeSessionsThisMonth.length > 0 && (
-                <div className='w-full text-center mb-4'>
-                  <div className='inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg'>
-                    <User className='w-4 h-4' />
-                    <span className='text-sm'>
-                      {activeSessionsThisMonth.length} usuario{activeSessionsThisMonth.length > 1 ? 's' : ''} activo{activeSessionsThisMonth.length > 1 ? 's' : ''} en este inventario
-                    </span>
-                  </div>
+                <div className='flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg border border-blue-500/30'>
+                  <User className='w-4 h-4' />
+                  <span className='text-sm font-medium'>
+                    {activeSessionsThisMonth.length} usuario{activeSessionsThisMonth.length > 1 ? 's' : ''} activo{activeSessionsThisMonth.length > 1 ? 's' : ''} en este inventario
+                  </span>
                 </div>
               )}
-
-              {/* Start new session button */}
-              {!currentUserActiveSession && (
+              {!currentUserActiveSession && completedInventoriesThisMonth.length < 2 && (
                 <button
-                  onClick={handleStartNewInventory}
+                  onClick={() => {
+                    if (activeSessionsThisMonth.length > 0) {
+                      // Continue existing active session
+                      const activeSession = activeSessionsThisMonth[0];
+                      handleContinueInventory(activeSession);
+                    } else {
+                      // Start new session
+                      handleStartNewInventory();
+                    }
+                  }}
                   className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
                 >
-                  <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Iniciar Nueva Sesión</span>
+                  {activeSessionsThisMonth.length > 0 ? (
+                    <>
+                      <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                      <span>Continuar Sesión</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
+                      <span>Iniciar Nueva Sesión</span>
+                    </>
+                  )}
                 </button>
               )}
 
@@ -927,12 +1112,12 @@ const InventoryPage: React.FC = () => {
                 </button>
               )}
 
-              {/* Show if monthly inventory is completed */}
-              {hasExistingInventory && existingInventory?.status === 'Completed' && (
+              {/* Show if monthly inventory limit is reached */}
+              {completedInventoriesThisMonth.length >= 2 && (
                 <div className='text-center text-secondaryText py-4'>
                   <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
-                  <p>El inventario para {monthName} {currentYear} ha sido completado.</p>
-                  <p className='text-sm mt-1'>Puedes ver los datos pero no agregar nuevos escaneos.</p>
+                  <p>Ya se han completado 2 inventarios para {monthName} {currentYear}.</p>
+                  <p className='text-sm mt-1'>El límite máximo es de 2 inventarios por mes.</p>
                 </div>
               )}
             </div>
@@ -966,96 +1151,30 @@ const InventoryPage: React.FC = () => {
           )}
         </div>
 
-        {/* Scanned Codes Display */}
-        {scannedCodes.length > 0 && (
+        {/* Session Validation Loading */}
+        {isValidatingSession && (
           <div className='card mb-6'>
-            <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
-              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-                <Barcode className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-                Códigos Escaneados ({scannedCodes.length})
-              </h2>
-              <div className='flex items-center space-x-2 sm:space-x-3'>
-                <span className='text-xs sm:text-sm text-secondaryText'>
-                  Total de escaneos: {scannedCodes.length}
-                </span>
-                <button
-                  onClick={() => setShowResetConfirmation(true)}
-                  className='btn-secondary text-xs sm:text-sm py-2 px-3 flex items-center space-x-1 sm:space-x-2'
-                >
-                  <RotateCcw className='w-4 h-4' />
-                  <span>Reiniciar</span>
-                </button>
-              </div>
-            </div>
-
-            <div className='overflow-hidden'>
-              {/* Desktop Grid View */}
-              <div className='hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4'>
-                {scannedCodes.map((code, index) => (
-                  <div
-                    key={index}
-                    className='glass-effect rounded-xl p-3 sm:p-4 border border-white/20'
-                  >
-                    <div className='flex items-center justify-between mb-2'>
-                      <span className='text-xs sm:text-sm text-secondaryText'>
-                        #{index + 1}
-                      </span>
-                      <div className='flex items-center space-x-2'>
-                        <span className='text-xs text-secondaryText'>
-                          {formatTime(code.timestamp)}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteCode(code.code, index)}
-                          className='p-1 sm:p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-all duration-300'
-                          title='Eliminar código'
-                        >
-                          <Trash2 className='w-3 h-3 sm:w-4 sm:h-4' />
-                        </button>
-                      </div>
-                    </div>
-                    <div className='font-mono text-sm sm:text-base text-white break-all'>
-                      {code.code}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Mobile List View */}
-              <div className='sm:hidden space-y-2'>
-                {scannedCodes.map((code, index) => (
-                  <div
-                    key={index}
-                    className='glass-effect rounded-xl p-3 border border-white/20'
-                  >
-                    <div className='flex items-center justify-between mb-2'>
-                      <span className='text-xs text-secondaryText'>
-                        #{index + 1}
-                      </span>
-                      <div className='flex items-center space-x-2'>
-                        <span className='text-xs text-secondaryText'>
-                          {formatTime(code.timestamp)}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteCode(code.code, index)}
-                          className='p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-all duration-300'
-                          title='Eliminar código'
-                        >
-                          <Trash2 className='w-3 h-3' />
-                        </button>
-                      </div>
-                    </div>
-                    <div className='font-mono text-sm text-white break-all'>
-                      {code.code}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className='text-center py-8'>
+              <LoadingSpinner />
+              <p className='text-sm sm:text-base text-secondaryText mt-4'>
+                Validando sesión de inventario...
+              </p>
             </div>
           </div>
         )}
 
+        {/* Scanned Codes Display - Optimized for 300+ barcodes */}
+        {!isValidatingSession && scannedCodes.length > 0 && (
+          <ScannedCodesList
+            scannedCodes={scannedCodes}
+            onDeleteCode={handleDeleteCodeByIndex}
+            onDeleteSelected={handleBulkDelete}
+            isLoading={isLoading}
+          />
+        )}
+
         {/* Ready to Start Section - No Buttons, Just Info */}
-        {!isSessionActive && (
+        {!isSessionActive && completedInventoriesThisMonth.length < 2 && (
           <div className='card text-center'>
             <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
@@ -1065,19 +1184,11 @@ const InventoryPage: React.FC = () => {
               Usa los Controles de Sesión de Inventario de arriba para iniciar o continuar una sesión de inventario para{' '}
               {monthName} {currentYear}
             </p>
-            
-            {hasExistingInventory && existingInventory?.status === 'Completed' && (
-              <div className='text-center text-secondaryText py-4'>
-                <CheckCircle className='w-8 h-8 text-green-400 mx-auto mb-2' />
-                <p>El inventario para {monthName} {currentYear} ha sido completado.</p>
-                <p className='text-sm mt-1'>Puedes ver los datos pero no agregar nuevos escaneos.</p>
-              </div>
-            )}
           </div>
         )}
 
         {/* Empty State - Session Active but No Scans */}
-        {scannedCodes.length === 0 && isSessionActive && (
+        {!isValidatingSession && scannedCodes.length === 0 && isSessionActive && (
           <div className='card text-center'>
             <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
@@ -1209,7 +1320,7 @@ const InventoryPage: React.FC = () => {
           isOpen={showCompletionModal}
           onClose={handleCloseCompletionModal}
           onStartNewInventory={handleStartNewInventoryFromCompletion}
-          onDownloadBarcodes={handleDownloadBarcodes}
+          onDownloadCSV={handleDownloadCSV}
           totalScans={completedInventoryData.totalScans}
           agencyName={completedInventoryData.agencyName}
           monthName={completedInventoryData.monthName}
@@ -1226,6 +1337,33 @@ const InventoryPage: React.FC = () => {
           agencyName={selectedAgency.name}
         />
       )}
+
+      {/* Session Terminated Modal */}
+      {showSessionTerminatedModal && selectedAgency && sessionTerminationData && (
+        <SessionTerminatedModal
+          isOpen={showSessionTerminatedModal}
+          onClose={() => setShowSessionTerminatedModal(false)}
+          onStartNewInventory={() => {
+            setShowSessionTerminatedModal(false);
+            navigate(`/monthly-inventories/${selectedAgency.name.toLowerCase()}`);
+          }}
+          agencyName={selectedAgency.name}
+          monthName={monthName}
+          year={currentYear}
+          completedBy={sessionTerminationData.completedBy}
+          isCurrentUser={sessionTerminationData.isCurrentUser}
+        />
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      <BulkDeleteConfirmationModal
+        isOpen={showBulkDeleteModal}
+        onClose={handleBulkDeleteCancel}
+        onConfirm={handleBulkDeleteConfirm}
+        selectedCount={selectedIndicesForBulkDelete.length}
+        selectedBarcodes={selectedBarcodesForBulkDelete}
+        isLoading={isBulkDeleting}
+      />
 
       {/* Footer */}
       <Footer />

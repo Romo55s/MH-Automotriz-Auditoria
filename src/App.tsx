@@ -11,6 +11,7 @@ import Auth0ErrorBoundary from './components/Auth0ErrorBoundary';
 import InventoryPage from './components/InventoryPage';
 import Login from './components/Login';
 import MonthlyInventoryManager from './components/MonthlyInventoryManager';
+import ProductionErrorBoundary from './components/ProductionErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { auth0Config } from './config/auth0-config';
 import { AppProvider } from './context/AppContext';
@@ -58,79 +59,81 @@ const Auth0CallbackHandler: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Auth0ErrorBoundary>
-      <Auth0Provider
-        domain={auth0Config.domain}
-        clientId={auth0Config.clientId}
-        authorizationParams={{
-          redirect_uri: auth0Config.authorizationParams.redirect_uri,
-          audience: auth0Config.authorizationParams.audience,
-          scope: auth0Config.authorizationParams.scope,
-        }}
-        cacheLocation='localstorage'
-        useRefreshTokens={false}
-      >
-        <AppProvider>
-          <ToastProvider>
-            <Router>
-              <div className='App'>
-                <Routes>
-                  <Route path='/' element={<Auth0CallbackHandler />} />
-                  <Route
-                    path='/login'
-                    element={
-                      <ProtectedRoute requireAuth={false}>
-                        <Login />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path='/select-agency'
-                    element={
-                      <ProtectedRoute requireAuth={true}>
-                        <AgencySelector />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path='/inventory'
-                    element={
-                      <ProtectedRoute requireAuth={true}>
-                        <InventoryPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path='/inventory/:agencyName'
-                    element={
-                      <ProtectedRoute requireAuth={true}>
-                        <InventoryPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path='/monthly-inventories'
-                    element={
-                      <ProtectedRoute requireAuth={true}>
-                        <MonthlyInventoryManager />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path='/monthly-inventories/:agencyName'
-                    element={
-                      <ProtectedRoute requireAuth={true}>
-                        <MonthlyInventoryManager />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
-              </div>
-            </Router>
-          </ToastProvider>
-        </AppProvider>
-      </Auth0Provider>
-    </Auth0ErrorBoundary>
+    <ProductionErrorBoundary>
+      <Auth0ErrorBoundary>
+        <Auth0Provider
+          domain={auth0Config.domain}
+          clientId={auth0Config.clientId}
+          authorizationParams={{
+            redirect_uri: auth0Config.authorizationParams.redirect_uri,
+            audience: auth0Config.authorizationParams.audience,
+            scope: auth0Config.authorizationParams.scope,
+          }}
+          cacheLocation='localstorage'
+          useRefreshTokens={false}
+        >
+          <AppProvider>
+            <ToastProvider>
+              <Router>
+                <div className='App'>
+                  <Routes>
+                    <Route path='/' element={<Auth0CallbackHandler />} />
+                    <Route
+                      path='/login'
+                      element={
+                        <ProtectedRoute requireAuth={false}>
+                          <Login />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path='/select-agency'
+                      element={
+                        <ProtectedRoute requireAuth={true}>
+                          <AgencySelector />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path='/inventory'
+                      element={
+                        <ProtectedRoute requireAuth={true}>
+                          <InventoryPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path='/inventory/:agencyName'
+                      element={
+                        <ProtectedRoute requireAuth={true}>
+                          <InventoryPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path='/monthly-inventories'
+                      element={
+                        <ProtectedRoute requireAuth={true}>
+                          <MonthlyInventoryManager />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path='/monthly-inventories/:agencyName'
+                      element={
+                        <ProtectedRoute requireAuth={true}>
+                          <MonthlyInventoryManager />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </div>
+              </Router>
+            </ToastProvider>
+          </AppProvider>
+        </Auth0Provider>
+      </Auth0ErrorBoundary>
+    </ProductionErrorBoundary>
   );
 };
 

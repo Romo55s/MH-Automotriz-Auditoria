@@ -15,6 +15,7 @@ export interface ScannedCode {
   code: string;
   timestamp: Date;
   confirmed: boolean;
+  user: string;
 }
 
 export interface InventorySession {

@@ -10,17 +10,17 @@ import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
 
 import {
-    AlertCircle,
-    BarChart3,
-    Calendar,
-    CheckCircle,
-    ChevronRight,
-    Clock,
-    Database,
-    FileText,
-    Plus,
-    RefreshCw,
-    User,
+  AlertCircle,
+  BarChart3,
+  Calendar,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Database,
+  FileText,
+  Plus,
+  RefreshCw,
+  User,
 } from 'lucide-react';
 
 const MonthlyInventoryManager: React.FC = () => {
@@ -166,7 +166,22 @@ const MonthlyInventoryManager: React.FC = () => {
       'Noviembre',
       'Diciembre',
     ];
-    return monthNames[parseInt(month) - 1];
+    
+    // Handle edge cases
+    if (!month || month === '00' || month === '0') {
+      console.warn('Invalid month value:', month);
+      return 'Mes Inválido';
+    }
+    
+    const monthIndex = parseInt(month) - 1;
+    
+    // Validate month index
+    if (monthIndex < 0 || monthIndex >= monthNames.length) {
+      console.warn('Month index out of range:', monthIndex, 'for month:', month);
+      return 'Mes Inválido';
+    }
+    
+    return monthNames[monthIndex];
   };
 
   const parseDateSafely = (dateString: string | Date): Date => {
@@ -218,16 +233,18 @@ const MonthlyInventoryManager: React.FC = () => {
         currentYear
       );
 
-      if (response.exists && response.status === 'Completed') {
+      // Check if we've reached the 2-inventory limit
+      if (response.completedInventories >= 2) {
         showError(
-          'Inventario Existe',
-          `Un inventario para ${getMonthName(
+          'Límite de Inventarios Alcanzado',
+          `Ya se han completado 2 inventarios para ${getMonthName(
             currentMonth
-          )} ${currentYear} ya ha sido completado. No puedes iniciar uno nuevo para el mismo mes.`
+          )} ${currentYear}. El límite máximo es de 2 inventarios por mes.`
         );
         return;
       }
 
+      // Check if there's an active inventory that needs to be completed first
       if (response.exists && response.status === 'Active') {
         showInfo(
           'Continuar Existente',

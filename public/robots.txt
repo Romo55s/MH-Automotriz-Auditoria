@@ -1,0 +1,13 @@
+# Robots.txt for Car Inventory App
+# This is a private business application - restrict all crawling
+
+User-agent: *
+Disallow: /
+
+# Allow access to static assets only
+Allow: /static/
+Allow: /favicon.ico
+Allow: /manifest.json
+
+# Sitemap (if you have one)
+# Sitemap: https://your-domain.com/sitemap.xml

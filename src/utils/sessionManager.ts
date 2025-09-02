@@ -6,6 +6,7 @@ export interface SessionData {
     code: string;
     timestamp: string;
     confirmed: boolean;
+    user: string;
   }>;
   isSessionActive: boolean;
   sessionId: string;
