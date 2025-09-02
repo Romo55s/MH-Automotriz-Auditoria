@@ -3,23 +3,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import {
-  checkMonthlyInventory,
-  finishSession,
-  getMonthlyInventory,
-  saveScan,
+    checkMonthlyInventory,
+    finishSession,
+    getMonthlyInventory,
+    saveScan,
 } from '../services/api';
 import { ScannedCode } from '../types/index';
 import {
-  clearSession,
-  loadSession,
-  saveSession,
-  SessionData,
+    clearSession,
+    loadSession,
+    saveSession,
+    SessionData,
 } from '../utils/sessionManager';
 
 export const useInventory = () => {
   const { selectedAgency } = useAppContext();
   const { user } = useAuth0();
-  const { showInfo, showWarning } = useToast();
+  const { showInfo, showWarning, showError } = useToast();
   const [scannedCodes, setScannedCodes] = useState<ScannedCode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,10 +185,14 @@ export const useInventory = () => {
       );
 
       if (response.exists && response.status === 'Completed') {
-        setError(
-          `An inventory for ${getMonthName(
-            currentMonth
-          )} ${currentYear} has already been completed. You cannot start a new one for the same month.`
+        const errorMessage = `An inventory for ${getMonthName(
+          currentMonth
+        )} ${currentYear} has already been completed. You cannot start a new one for the same month.`;
+        
+        setError(errorMessage);
+        showError(
+          'Inventario Ya Completado',
+          `El inventario para ${getMonthName(currentMonth)} ${currentYear} ya ha sido completado. No puedes iniciar uno nuevo para el mismo mes.`
         );
         return false;
       }
@@ -300,6 +304,12 @@ export const useInventory = () => {
             'Código de Barras Duplicado',
             `El código de barras ${barcode} ya ha sido escaneado en este inventario. Cada código solo puede ser escaneado una vez por mes.`
           );
+        } else if (errorMessage.includes('already completed')) {
+          // Check if it's the monthly inventory already completed error
+          showError(
+            'Inventario Ya Completado',
+            'No se pueden agregar más escaneos porque el inventario mensual ya ha sido completado.'
+          );
         } else {
           // For other errors, set the error state
           setError(errorMessage);
@@ -387,7 +397,10 @@ export const useInventory = () => {
   const startSession = useCallback(async () => {
     // Check if monthly inventory already exists
     const canProceed = await checkExistingInventory();
-    if (!canProceed) return;
+    if (!canProceed) {
+      // Error toast is already shown in checkExistingInventory
+      return false;
+    }
 
     // Generate new session ID
     const newSessionId = `sess_${Date.now()}_${Math.random()
@@ -401,6 +414,7 @@ export const useInventory = () => {
 
     // Save to session storage
     saveSessionToStorage([], true, newSessionId);
+    return true;
   }, [checkExistingInventory, saveSessionToStorage]);
 
   // Continue existing session
