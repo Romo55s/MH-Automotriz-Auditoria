@@ -148,7 +148,7 @@ const AgencySelector: React.FC = () => {
   const selectedAgencyFromDropdown = agencies.find(a => a.id === selectedAgencyId);
 
   return (
-    <div className='min-h-screen bg-background relative overflow-hidden'>
+    <div className='min-h-screen bg-background relative overflow-hidden flex flex-col'>
       {/* Floating 3D shapes */}
       <div className='floating-shape w-32 h-32 top-20 right-20'></div>
       <div
@@ -160,7 +160,7 @@ const AgencySelector: React.FC = () => {
         style={{ animationDelay: '1s' }}
       ></div>
 
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>
+      <div className='flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>
         {/* Header */}
         <div className='mt-6 sm:mt-8 mb-6 sm:mb-section'>
           <Header
@@ -341,10 +341,10 @@ const AgencySelector: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <Footer />
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

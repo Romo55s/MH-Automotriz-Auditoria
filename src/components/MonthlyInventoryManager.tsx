@@ -281,7 +281,7 @@ const MonthlyInventoryManager: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-background relative overflow-hidden'>
+    <div className='min-h-screen bg-background relative overflow-hidden flex flex-col'>
       {/* Floating 3D shapes */}
       <div className='floating-shape w-28 h-28 top-16 right-16'></div>
       <div
@@ -303,7 +303,7 @@ const MonthlyInventoryManager: React.FC = () => {
         showChangeAgency={true}
       />
 
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
+      <div className='flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
         {/* Current Month Info */}
         <div className='card mb-6'>
           <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4'>
