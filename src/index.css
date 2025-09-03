@@ -86,3 +86,79 @@
     box-shadow: 0 0 20px rgba(246, 211, 101, 0.3);
   }
 }
+
+/* Extra narrow screen optimizations (438px and below) */
+@media (max-width: 438px) {
+  /* Reduce padding and margins for very narrow screens */
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  /* Make cards more compact */
+  .glass-effect {
+    padding: 0.75rem !important;
+  }
+  
+  /* Reduce text sizes for better fit */
+  .text-base {
+    font-size: 0.875rem;
+  }
+  
+  .text-lg {
+    font-size: 1rem;
+  }
+  
+  /* Make status badges smaller */
+  .px-3 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  .py-1\.5 {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  
+  /* Reduce icon sizes */
+  .w-10 {
+    width: 2rem;
+  }
+  
+  .h-10 {
+    height: 2rem;
+  }
+  
+  .w-5 {
+    width: 1rem;
+  }
+  
+  .h-5 {
+    height: 1rem;
+  }
+  
+  /* Make detail sections more compact */
+  .p-3 {
+    padding: 0.5rem;
+  }
+  
+  /* Reduce spacing between elements */
+  .space-y-3 > * + * {
+    margin-top: 0.5rem;
+  }
+  
+  .space-y-4 > * + * {
+    margin-top: 0.75rem;
+  }
+  
+  /* Make buttons more compact */
+  .py-3 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  
+  /* Reduce max width for text truncation */
+  .max-w-\[120px\] {
+    max-width: 100px;
+  }
+}

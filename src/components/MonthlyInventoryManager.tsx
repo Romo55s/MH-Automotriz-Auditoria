@@ -627,105 +627,107 @@ const MonthlyInventoryManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Mobile Card View - Design System Compliant */}
-              <div className='lg:hidden space-y-6 p-4 sm:p-6'>
+              {/* Mobile Card View - Optimized for Narrow Screens */}
+              <div className='lg:hidden space-y-4 p-3 sm:p-4'>
                 {inventories.map(inventory => (
                   <div
                     key={inventory.id}
-                    className='relative overflow-hidden glass-effect rounded-2xl p-6 border border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl'
+                    className='relative overflow-hidden glass-effect rounded-xl p-4 border border-white/30 transition-all duration-300'
                     style={{
                       background: 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 100%)',
                       backdropFilter: 'blur(20px)'
                     }}
                   >
-                    {/* Decorative Background Elements */}
-                    <div className='absolute -top-4 -right-4 w-20 h-20 bg-gradient-to-br from-yellow-400/20 to-orange-500/20 rounded-full blur-xl'></div>
-                    <div className='absolute -bottom-6 -left-6 w-16 h-16 bg-gradient-to-tr from-blue-400/20 to-purple-500/20 rounded-full blur-xl'></div>
+                    {/* Decorative Background Elements - Smaller for narrow screens */}
+                    <div className='absolute -top-2 -right-2 w-12 h-12 bg-gradient-to-br from-yellow-400/20 to-orange-500/20 rounded-full blur-xl'></div>
+                    <div className='absolute -bottom-3 -left-3 w-10 h-10 bg-gradient-to-tr from-blue-400/20 to-purple-500/20 rounded-full blur-xl'></div>
                     
-                    {/* Header Section */}
-                    <div className='relative z-10 flex items-center justify-between mb-6'>
-                      <div className='flex items-center space-x-4'>
-                        <div className='w-12 h-12 rounded-xl flex items-center justify-center border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                          <Calendar className='w-6 h-6 text-white' />
+                    {/* Header Section - Stacked for narrow screens */}
+                    <div className='relative z-10 mb-4'>
+                      <div className='flex items-center justify-between mb-3'>
+                        <div className='flex items-center space-x-3'>
+                          <div className='w-10 h-10 rounded-lg flex items-center justify-center border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                            <Calendar className='w-5 h-5 text-white' />
+                          </div>
+                          <div className='min-w-0 flex-1'>
+                            <h3 className='text-base font-bold text-white uppercase tracking-wider truncate'>
+                              {getMonthName(inventory.month)} {inventory.year}
+                            </h3>
+                            <p className='text-xs text-white'>
+                              Inventario Mensual
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className='text-lg font-bold text-white uppercase tracking-wider'>
-                            {getMonthName(inventory.month)} {inventory.year}
-                          </h3>
-                          <p className='text-sm text-secondaryText'>
-                            Inventario Mensual
-                          </p>
-                        </div>
-                      </div>
-                      <div className='flex flex-col items-end space-y-2'>
                         <span
-                          className={`inline-flex items-center px-4 py-2 rounded-full text-xs font-bold border transition-all duration-300 ${getStatusColor(
+                          className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 ${getStatusColor(
                             inventory.status
                           )}`}
                         >
                           {getStatusIcon(inventory.status)}
-                          <span className='ml-2'>
+                          <span className='ml-1.5'>
                             {getStatusText(inventory.status)}
                           </span>
                         </span>
-                        {inventory.status === 'Completed' && (
-                          <div className='text-center'>
-                            <span className='text-xs text-white px-3 py-1 rounded-full border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                              Inventario Completado
-                            </span>
-                          </div>
-                        )}
                       </div>
+                      
+                      {/* Completed Status - Full width for narrow screens */}
+                      {inventory.status === 'Completed' && (
+                        <div className='w-full text-center py-2 px-3 rounded-lg border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                          <span className='text-xs text-white font-medium'>
+                            Inventario Completado
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
-                    {/* Details Section */}
-                    <div className='relative z-10 space-y-4 mb-6'>
-                      <div className='grid grid-cols-1 gap-4'>
-                        <div className='flex items-center justify-between p-4 rounded-xl border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                          <div className='flex items-center space-x-3'>
-                            <User className='w-5 h-5 text-white' />
-                            <span className='text-sm font-medium text-white'>Creado Por:</span>
+                    {/* Details Section - Compact for narrow screens */}
+                    <div className='relative z-10 space-y-3 mb-4'>
+                      <div className='space-y-2'>
+                        <div className='flex items-center justify-between p-3 rounded-lg border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                          <div className='flex items-center space-x-2'>
+                            <User className='w-4 h-4 text-white' />
+                            <span className='text-xs font-medium text-white'>Creado Por:</span>
                           </div>
-                          <span className='text-sm font-semibold text-white truncate max-w-[150px]'>
+                          <span className='text-xs font-semibold text-white truncate max-w-[120px]'>
                             {inventory.createdBy}
                           </span>
                         </div>
                         
-                        <div className='flex items-center justify-between p-4 rounded-xl border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                          <div className='flex items-center space-x-3'>
-                            <Clock className='w-5 h-5 text-white' />
-                            <span className='text-sm font-medium text-white'>Creado:</span>
+                        <div className='flex items-center justify-between p-3 rounded-lg border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                          <div className='flex items-center space-x-2'>
+                            <Clock className='w-4 h-4 text-white' />
+                            <span className='text-xs font-medium text-white'>Creado:</span>
                           </div>
-                          <span className='text-sm font-semibold text-white text-right'>
+                          <span className='text-xs font-semibold text-white text-right'>
                             {formatDate(inventory.createdAt)}
                           </span>
                         </div>
                         
-                        <div className='flex items-center justify-between p-4 rounded-xl border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                          <div className='flex items-center space-x-3'>
-                            <BarChart3 className='w-5 h-5 text-white' />
-                            <span className='text-sm font-medium text-white'>Total de Escaneos:</span>
+                        <div className='flex items-center justify-between p-3 rounded-lg border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                          <div className='flex items-center space-x-2'>
+                            <BarChart3 className='w-4 h-4 text-white' />
+                            <span className='text-xs font-medium text-white'>Total de Escaneos:</span>
                           </div>
-                          <span className='font-mono text-lg font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent px-3 py-1 rounded-lg border border-white/30'>
+                          <span className='font-mono text-base font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent px-2 py-1 rounded border border-white/30'>
                             {inventory.totalScans}
                           </span>
                         </div>
                       </div>
                     </div>
                     
-                    {/* Action Section */}
+                    {/* Action Section - Only show for non-completed */}
                     <div className='relative z-10'>
                       {inventory.status !== 'Completed' && (
                         <button
                           onClick={() => handleContinueInventory(inventory)}
-                          className='w-full btn-secondary text-sm py-4 px-6 flex items-center justify-center space-x-3 rounded-xl border border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-[1.02] font-semibold'
+                          className='w-full btn-secondary text-xs py-3 px-4 flex items-center justify-center space-x-2 rounded-lg border border-white/30 hover:border-white/50 transition-all duration-300 font-semibold'
                           style={{
                             background: 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
                             backdropFilter: 'blur(20px)'
                           }}
                         >
                           <span>Continuar Inventario</span>
-                          <ChevronRight className='w-5 h-5' />
+                          <ChevronRight className='w-4 h-4' />
                         </button>
                       )}
                     </div>
