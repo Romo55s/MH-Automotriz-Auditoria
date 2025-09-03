@@ -1,19 +1,19 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import {
-    AlertTriangle,
-    BarChart3,
-    Calendar,
-    Camera,
-    CheckCircle,
-    Clock,
-    FileText,
-    Info,
-    Pause,
-    Plus,
-    RefreshCw,
-    RotateCcw,
-    User,
-    X
+  AlertTriangle,
+  BarChart3,
+  Calendar,
+  Camera,
+  CheckCircle,
+  Clock,
+  FileText,
+  Info,
+  Pause,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  User,
+  X
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -21,8 +21,8 @@ import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useInventory } from '../hooks/useInventory';
 import {
-    getAgencyInventories,
-    getMonthlyInventory
+  getAgencyInventories,
+  getMonthlyInventory
 } from '../services/api';
 import { MonthlyInventory } from '../types';
 import BarcodeScanner from './BarcodeScanner';

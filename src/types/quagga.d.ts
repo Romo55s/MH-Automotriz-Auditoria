@@ -1,16 +1,16 @@
-declare module 'quagga' {
+declare module '@ericblade/quagga2' {
   interface QuaggaConfig {
     inputStream: {
       name: string;
       type: string;
       target: HTMLElement | null;
       constraints: {
-        width: number;
-        height: number;
+        width: { min: number } | number;
+        height: { min: number } | number;
         facingMode: string;
-        aspectRatio: { min: number; max: number };
+        aspectRatio?: { min: number; max: number };
       };
-      singleChannel: boolean;
+      singleChannel?: boolean;
     };
     locator: {
       patchSize: string;
@@ -22,7 +22,7 @@ declare module 'quagga' {
       readers: string[];
     };
     locate: boolean;
-    src: null;
+    src?: null;
   }
 
   interface CodeResult {

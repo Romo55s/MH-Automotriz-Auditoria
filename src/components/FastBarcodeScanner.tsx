@@ -1,5 +1,5 @@
+import Quagga from '@ericblade/quagga2';
 import { Camera, Monitor, RotateCcw, ScanLine, Smartphone, X } from 'lucide-react';
-import Quagga from 'quagga';
 import React, { useEffect, useRef, useState } from 'react';
 
 interface FastBarcodeScannerProps {
@@ -128,48 +128,57 @@ Platform: ${navigator.platform}`;
         return;
       }
       
-      // QuaggaJS configuration for fast scanning
+      // Quagga2 configuration - simplified for better mobile compatibility
       const config = {
         inputStream: {
           name: "Live",
           type: "LiveStream",
           target: scannerRef.current,
           constraints: {
-            width: orientation === 'portrait' ? 640 : 800,
-            height: orientation === 'portrait' ? 480 : 600,
-            facingMode: "environment", // Use back camera
-            aspectRatio: { min: 1, max: 2 }
-          },
-          singleChannel: false // Use color camera for better performance
+            width: { min: 640 },
+            height: { min: 480 },
+            facingMode: "environment"
+          }
         },
         locator: {
           patchSize: "medium",
           halfSample: true
         },
-        numOfWorkers: 2, // Use multiple workers for faster processing
-        frequency: 10, // Check for barcodes 10 times per second
+        numOfWorkers: 1, // Reduce workers for mobile compatibility
+        frequency: 5, // Reduce frequency for mobile
         decoder: {
           readers: [
             "code_128_reader",
             "ean_reader",
-            "ean_8_reader",
             "code_39_reader",
-            "code_39_vin_reader",
-            "codabar_reader",
-            "upc_reader",
-            "upc_e_reader",
-            "i2of5_reader"
+            "upc_reader"
           ]
         },
-        locate: true,
-        src: null
+        locate: true
       };
       
       console.log('Quagga config:', config);
       console.log('Scanner target element:', scannerRef.current);
 
-      // Initialize Quagga with better error handling
-      Quagga.init(config, (err) => {
+      // Ensure the target element is ready and has dimensions
+      if (!scannerRef.current) {
+        setError('Error: El elemento del escáner no está disponible');
+        return;
+      }
+
+      // Wait for the element to be properly rendered
+      setTimeout(() => {
+        // Check if element has dimensions
+        const rect = scannerRef.current!.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+          setError('Error: El elemento del escáner no tiene dimensiones válidas. Intenta recargar la página.');
+          return;
+        }
+
+        console.log('Element dimensions:', rect);
+
+        // Initialize Quagga with better error handling
+        Quagga.init(config, (err) => {
         if (err) {
           console.error('Quagga initialization error:', err);
           console.error('Error details:', {
@@ -182,12 +191,12 @@ Platform: ${navigator.platform}`;
           
           // Also show detailed error in the UI for mobile debugging
           const detailedError = `DEBUG INFO:
-Error: ${err.name || 'Unknown'}
-Message: ${err.message || 'No message'}
-Code: ${err.code || 'No code'}
-Constraint: ${err.constraint || 'No constraint'}
-Browser: ${navigator.userAgent}
-Platform: ${navigator.platform}`;
+          Error: ${err.name || 'Unknown'}
+          Message: ${err.message || 'No message'}
+          Code: ${err.code || 'No code'}
+          Constraint: ${err.constraint || 'No constraint'}
+          Browser: ${navigator.userAgent}
+          Platform: ${navigator.platform}`;
           
           let errorMessage = 'Error al inicializar el escáner.';
           
@@ -209,34 +218,35 @@ Platform: ${navigator.platform}`;
           return;
         }
         
-        setIsInitialized(true);
-        isQuaggaInitialized.current = true;
-        startScanning();
-      });
+          setIsInitialized(true);
+          isQuaggaInitialized.current = true;
+          startScanning();
+        });
 
-      // Listen for successful barcode detection
-      Quagga.onDetected((result) => {
-        const code = result.codeResult.code;
-        
-        // Validate the scanned code (same validation as before)
-        const codePattern = /^\d{6,12}$/;
-        if (codePattern.test(code)) {
-          // Process the code (same logic as before)
-          let processedCode = code;
-          if (code.length < 8) {
-            processedCode = code.padStart(8, '0');
-          } else if (code.length > 8) {
-            processedCode = code.slice(-8);
-          }
+        // Listen for successful barcode detection
+        Quagga.onDetected((result) => {
+          const code = result.codeResult.code;
           
-          onScan(processedCode);
-          stopScanning();
-        } else {
-          setError(
-            `Código escaneado: "${code}"\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente`
-          );
-        }
-      });
+          // Validate the scanned code (same validation as before)
+          const codePattern = /^\d{6,12}$/;
+          if (codePattern.test(code)) {
+            // Process the code (same logic as before)
+            let processedCode = code;
+            if (code.length < 8) {
+              processedCode = code.padStart(8, '0');
+            } else if (code.length > 8) {
+              processedCode = code.slice(-8);
+            }
+            
+            onScan(processedCode);
+            stopScanning();
+          } else {
+            setError(
+              `Código escaneado: "${code}"\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente`
+            );
+          }
+        });
+      }, 100); // Wait 100ms for element to be ready
 
     } catch (err) {
       console.error('Scanner setup error:', err);
