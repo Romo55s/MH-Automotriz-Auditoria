@@ -1,5 +1,5 @@
 import { BrowserMultiFormatReader, Result } from '@zxing/library';
-import { Camera, Flashlight, FlashlightOff, Monitor, RotateCcw, ScanLine, Smartphone, X } from 'lucide-react';
+import { Camera, Flashlight, FlashlightOff, Focus, Monitor, RotateCcw, ScanLine, Smartphone, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 interface BarcodeScannerProps {
@@ -16,6 +16,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
+  const [isFocusing, setIsFocusing] = useState(false);
+  const [focusCapabilities, setFocusCapabilities] = useState<string[]>([]);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -90,6 +92,15 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
       // Store stream reference for flash control
       streamRef.current = stream;
 
+      // Check camera capabilities
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const capabilities = videoTrack.getCapabilities() as any;
+        const focusModes = capabilities.focusMode || [];
+        setFocusCapabilities(focusModes);
+        console.log('Available focus modes:', focusModes);
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -136,25 +147,37 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         videoRef.current,
         (result: Result | null, err: any) => {
           if (result) {
-            const scannedCode = result.getText();
+            const scannedCode = result.getText().trim();
 
-            // Validate that the scanned code is exactly 8 digits
-            const codePattern = /^\d{8}$/;
+            // More flexible validation - allow 6-12 digits for car barcodes
+            const codePattern = /^\d{6,12}$/;
             if (codePattern.test(scannedCode)) {
-              onScan(scannedCode);
+              // If it's not exactly 8 digits, pad or truncate as needed
+              let processedCode = scannedCode;
+              if (scannedCode.length < 8) {
+                // Pad with leading zeros
+                processedCode = scannedCode.padStart(8, '0');
+              } else if (scannedCode.length > 8) {
+                // Take the last 8 digits
+                processedCode = scannedCode.slice(-8);
+              }
+              
+              onScan(processedCode);
               stopScanning();
             } else {
-              // Show error for invalid code format
+              // Show more helpful error for invalid code format
               setError(
-                `Formato de código inválido: "${scannedCode}". Se esperaba un número de 8 dígitos (ej., 12345678). Por favor escanea un código de barras válido o usa entrada manual.`
+                `Código escaneado: "${scannedCode}"\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta usar el enfoque manual si el código se ve borroso`
               );
               // Don't stop scanning, let user try again
             }
           }
           if (err && err.name !== 'NotFoundException') {
-            // setDebugInfo(`Scan error: ${err.message || err.name}`); // Removed debugInfo
+            // Only show significant errors, not the frequent "looking for barcode" messages
+            if (err.name === 'ChecksumException' || err.name === 'FormatException') {
+              setError('Código de barras dañado o ilegible. Intenta escanear desde un ángulo diferente o usa entrada manual.');
+            }
           }
-          // Remove the frequent "Looking for barcode" messages to reduce spam
         }
       );
 
@@ -203,15 +226,23 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const getVideoConstraints = () => {
     if (orientation === 'portrait') {
       return {
-        width: { ideal: 480, max: 640 },
-        height: { ideal: 640, max: 800 },
-        facingMode: 'environment' // Use back camera on mobile
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        facingMode: 'environment', // Use back camera on mobile
+        focusMode: 'continuous', // Auto-focus for better barcode reading
+        exposureMode: 'continuous', // Auto-exposure
+        whiteBalanceMode: 'continuous', // Auto white balance
+        frameRate: { ideal: 30, max: 60 } // Higher frame rate for better scanning
       };
     } else {
       return {
-        width: { ideal: 640, max: 800 },
-        height: { ideal: 480, max: 600 },
-        facingMode: 'environment'
+        width: { ideal: 1920, max: 2560 },
+        height: { ideal: 1080, max: 1440 },
+        facingMode: 'environment',
+        focusMode: 'continuous',
+        exposureMode: 'continuous',
+        whiteBalanceMode: 'continuous',
+        frameRate: { ideal: 30, max: 60 }
       };
     }
   };
@@ -250,6 +281,77 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
     }
   };
 
+  const manualFocus = async () => {
+    if (!streamRef.current || isFocusing) return;
+
+    try {
+      setIsFocusing(true);
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      if (!videoTrack) {
+        setIsFocusing(false);
+        setError('No se pudo acceder al control de la cámara');
+        return;
+      }
+
+      const capabilities = videoTrack.getCapabilities() as any;
+      const settings = videoTrack.getSettings() as any;
+      
+      // Check what focus capabilities are available
+      console.log('Camera capabilities:', capabilities);
+      console.log('Camera settings:', settings);
+
+      if (capabilities.focusMode && capabilities.focusMode.includes('manual')) {
+        // Try manual focus
+        await videoTrack.applyConstraints({
+          advanced: [{ focusMode: 'manual' }] as any
+        });
+        
+        // Reset to continuous focus after a short delay
+        setTimeout(async () => {
+          try {
+            await videoTrack.applyConstraints({
+              advanced: [{ focusMode: 'continuous' }] as any
+            });
+          } catch (err) {
+            console.log('Error resetting focus:', err);
+          }
+          setIsFocusing(false);
+        }, 1500);
+      } else if (capabilities.focusMode && capabilities.focusMode.includes('single-shot')) {
+        // Try single-shot focus as alternative
+        await videoTrack.applyConstraints({
+          advanced: [{ focusMode: 'single-shot' }] as any
+        });
+        
+        setTimeout(async () => {
+          try {
+            await videoTrack.applyConstraints({
+              advanced: [{ focusMode: 'continuous' }] as any
+            });
+          } catch (err) {
+            console.log('Error resetting focus:', err);
+          }
+          setIsFocusing(false);
+        }, 1500);
+      } else {
+        // No manual focus available - try to trigger autofocus by changing other settings
+        const currentSettings = videoTrack.getSettings();
+        await videoTrack.applyConstraints({
+          width: currentSettings.width,
+          height: currentSettings.height,
+          frameRate: currentSettings.frameRate
+        });
+        
+        setIsFocusing(false);
+        setError('Enfoque manual no disponible. Tu dispositivo usa enfoque automático continuo.');
+      }
+    } catch (err) {
+      setIsFocusing(false);
+      console.error('Focus error:', err);
+      setError('No se pudo controlar el enfoque. Intenta acercar o alejar el teléfono del código.');
+    }
+  };
+
   return (
     <div className={`fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
       <div className={`glass-effect rounded-3xl w-full overflow-hidden border border-white/30 shadow-2xl ${
@@ -280,6 +382,27 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
               </div>
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0">
+              {/* Manual Focus Button */}
+              <button
+                onClick={manualFocus}
+                disabled={isFocusing || focusCapabilities.length === 0}
+                className={`glass-effect rounded-xl transition-all duration-300 hover:scale-105 border border-white/20 hover:border-white/40 ${
+                  isFocusing ? 'bg-blue-500/20 border-blue-400/50' : 
+                  focusCapabilities.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                } ${isFullscreen ? 'p-2' : 'p-2 sm:p-3'}`}
+                title={
+                  focusCapabilities.length === 0 
+                    ? 'Enfoque manual no disponible en este dispositivo' 
+                    : isFocusing 
+                      ? 'Enfocando...' 
+                      : 'Enfoque manual'
+                }
+              >
+                <Focus className={`${
+                  isFocusing ? 'text-blue-300 animate-pulse' : 
+                  focusCapabilities.length === 0 ? 'text-gray-400' : 'text-white'
+                } ${isFullscreen ? 'w-5 h-5' : 'w-5 h-5 sm:w-6 sm:h-6'}`} />
+              </button>
               {/* Flash Toggle */}
               <button
                 onClick={toggleFlash}
@@ -391,23 +514,28 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 <div className="absolute inset-0">
                   {/* Scanning frame - absolutely centered */}
                   <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                    <div className={`border-2 border-white rounded-xl relative ${
+                    <div className={`border-2 border-white rounded-xl relative shadow-lg ${
                       orientation === 'portrait'
-                        ? 'w-32 h-40 sm:w-40 sm:h-48 md:w-48 md:h-56'
-                        : 'w-40 h-32 sm:w-56 sm:h-40 md:w-64 md:h-48'
+                        ? 'w-40 h-48 sm:w-48 sm:h-56 md:w-56 md:h-64'
+                        : 'w-48 h-40 sm:w-64 sm:h-48 md:w-72 md:h-56'
                     }`}>
-                      {/* Corner markers */}
-                      <div className="absolute -top-2 -left-2 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 border-l-2 border-t-2 border-white"></div>
-                      <div className="absolute -top-2 -right-2 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 border-r-2 border-t-2 border-white"></div>
-                      <div className="absolute -bottom-2 -left-2 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 border-l-2 border-b-2 border-white"></div>
-                      <div className="absolute -bottom-2 -right-2 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 border-r-2 border-b-2 border-white"></div>
+                      {/* Corner markers - larger and more visible */}
+                      <div className="absolute -top-3 -left-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-l-4 border-t-4 border-white rounded-tl-lg"></div>
+                      <div className="absolute -top-3 -right-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-r-4 border-t-4 border-white rounded-tr-lg"></div>
+                      <div className="absolute -bottom-3 -left-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-l-4 border-b-4 border-white rounded-bl-lg"></div>
+                      <div className="absolute -bottom-3 -right-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-r-4 border-b-4 border-white rounded-br-lg"></div>
                       
-                      {/* Scanning line animation */}
-                      <div className={`absolute bg-gradient-to-r from-transparent via-white/60 to-transparent animate-pulse ${
+                      {/* Scanning line animation - more prominent */}
+                      <div className={`absolute bg-gradient-to-r from-transparent via-white to-transparent animate-pulse shadow-lg ${
                         orientation === 'portrait'
-                          ? 'w-32 h-0.5 sm:w-40 sm:h-1 md:w-48 md:h-1 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
-                          : 'w-40 h-0.5 sm:w-56 sm:h-1 md:w-64 md:h-1 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
+                          ? 'w-40 h-1 sm:w-48 sm:h-1.5 md:w-56 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
+                          : 'w-48 h-1 sm:w-64 sm:h-1.5 md:w-72 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
                       }`}></div>
+                      
+                      {/* Center crosshair for better alignment */}
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                        <div className="w-1 h-1 bg-white rounded-full animate-pulse"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -450,11 +578,11 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
               <div className={`glass-effect border border-white/30 rounded-xl bg-white/5 ${
                 isFullscreen ? 'mb-4 p-4' : 'mb-4 p-4 sm:p-5'
               }`}>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                     <p className={`text-white ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-                      <strong>Formato Esperado:</strong> Código numérico de 8 dígitos (ej., 12345678)
+                      <strong>Formato Esperado:</strong> Código numérico de 6-12 dígitos (ej., 12345678)
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -469,6 +597,34 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                       <strong>Orientación:</strong> Funciona en vertical y horizontal
                     </p>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                      <strong>Para vehículos:</strong> Busca el código en el parabrisas, puerta o motor
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                      <strong>Consejo:</strong> Mantén el teléfono estable y a 15-30cm del código
+                    </p>
+                  </div>
+                  {focusCapabilities.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                        <strong>Enfoque:</strong> Usa el botón de enfoque si el código se ve borroso
+                      </p>
+                    </div>
+                  )}
+                  {focusCapabilities.length === 0 && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <p className={`text-white/60 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                        <strong>Nota:</strong> Tu dispositivo usa enfoque automático continuo
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
               
