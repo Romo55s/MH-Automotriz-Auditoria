@@ -11,6 +11,7 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   const scannerRef = useRef<HTMLDivElement>(null);
   const isQuaggaInitialized = useRef(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const initAttempts = useRef(0);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -18,7 +19,6 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    initializeScanner();
     detectOrientation();
     
     // Listen for orientation changes
@@ -58,6 +58,22 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
     };
   }, []);
 
+  // Separate effect to initialize scanner when element is ready
+  useEffect(() => {
+    if (scannerRef.current) {
+      // Use requestAnimationFrame to ensure DOM is fully rendered
+      const initTimer = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          initializeScanner();
+        });
+      });
+      
+      return () => {
+        cancelAnimationFrame(initTimer);
+      };
+    }
+  }, [scannerRef.current]);
+
   const detectOrientation = () => {
     const isPortrait = window.innerHeight > window.innerWidth;
     setOrientation(isPortrait ? 'portrait' : 'landscape');
@@ -89,13 +105,14 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           // Get camera access and store the stream
-          // Use more flexible constraints for mobile Safari
+          // Use more flexible constraints for mobile Safari with proper aspect ratio
           const constraints = {
             video: {
               facingMode: "environment",
-              width: { ideal: 640, max: 1280 },
-              height: { ideal: 480, max: 720 },
-              frameRate: { ideal: 30, max: 60 }
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: { ideal: 30, max: 60 },
+              aspectRatio: { ideal: 16/9 } // Standard mobile aspect ratio
             }
           };
           
@@ -128,24 +145,25 @@ Platform: ${navigator.platform}`;
         return;
       }
       
-      // Quagga2 configuration - simplified for better mobile compatibility
+      // Quagga2 configuration - optimized for mobile video quality
       const config = {
         inputStream: {
           name: "Live",
           type: "LiveStream",
           target: scannerRef.current,
           constraints: {
-            width: { min: 640 },
-            height: { min: 480 },
-            facingMode: "environment"
+            width: { min: 1280, ideal: 1920 },
+            height: { min: 720, ideal: 1080 },
+            facingMode: "environment",
+            aspectRatio: { min: 1.5, max: 2.0 }
           }
         },
         locator: {
-          patchSize: "medium",
-          halfSample: true
+          patchSize: "large", // Larger patch for better mobile detection
+          halfSample: false // Disable half sampling for better quality
         },
-        numOfWorkers: 1, // Reduce workers for mobile compatibility
-        frequency: 5, // Reduce frequency for mobile
+        numOfWorkers: 2, // Slightly more workers for better performance
+        frequency: 10, // Higher frequency for better responsiveness
         decoder: {
           readers: [
             "code_128_reader",
@@ -166,19 +184,26 @@ Platform: ${navigator.platform}`;
         return;
       }
 
-      // Wait for the element to be properly rendered
-      setTimeout(() => {
-        // Check if element has dimensions
-        const rect = scannerRef.current!.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
-          setError('Error: El elemento del escáner no tiene dimensiones válidas. Intenta recargar la página.');
+      // Check if element has dimensions
+      const rect = scannerRef.current!.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        initAttempts.current++;
+        if (initAttempts.current < 10) {
+          console.log(`Element not ready, retrying in 100ms... (attempt ${initAttempts.current})`);
+          setTimeout(() => {
+            initializeScanner();
+          }, 100);
+          return;
+        } else {
+          setError('Error: El elemento del escáner no se pudo inicializar después de varios intentos. Intenta recargar la página.');
           return;
         }
+      }
 
-        console.log('Element dimensions:', rect);
+      console.log('Element dimensions:', rect);
 
-        // Initialize Quagga with better error handling
-        Quagga.init(config, (err) => {
+      // Initialize Quagga with better error handling
+      Quagga.init(config, (err) => {
         if (err) {
           console.error('Quagga initialization error:', err);
           console.error('Error details:', {
@@ -220,6 +245,7 @@ Platform: ${navigator.platform}`;
         
           setIsInitialized(true);
           isQuaggaInitialized.current = true;
+          initAttempts.current = 0; // Reset counter on success
           startScanning();
         });
 
@@ -246,7 +272,6 @@ Platform: ${navigator.platform}`;
             );
           }
         });
-      }, 100); // Wait 100ms for element to be ready
 
     } catch (err) {
       console.error('Scanner setup error:', err);
@@ -308,11 +333,38 @@ Platform: ${navigator.platform}`;
   };
 
   return (
-    <div className={`fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
+    <>
+      {/* Global styles for Quagga video elements */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          #scanner-container video,
+          #scanner-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            border-radius: 12px !important;
+          }
+          
+          #scanner-container .drawingBuffer {
+            display: none !important;
+          }
+          
+          /* Ensure proper aspect ratio on mobile */
+          @media (max-width: 768px) {
+            #scanner-container video {
+              aspect-ratio: 16/9 !important;
+            }
+          }
+        `
+      }} />
+      
+      <div className={`fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
       <div className={`glass-effect rounded-3xl w-full overflow-hidden border border-white/30 shadow-2xl ${
         isFullscreen 
           ? 'max-w-none max-h-none h-full rounded-none' 
-          : 'max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl max-h-[95vh] sm:max-h-[90vh]'
+          : orientation === 'portrait'
+            ? 'max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl max-h-[95vh] sm:max-h-[90vh]'
+            : 'max-w-4xl max-h-[80vh] sm:max-h-[75vh]'
       }`}>
         {/* Header */}
         <div className={`relative bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-white/30 ${
@@ -374,19 +426,23 @@ Platform: ${navigator.platform}`;
             <div className="relative glass-effect rounded-2xl overflow-hidden border border-white/20 shadow-lg">
               {/* QuaggaJS Scanner */}
               <div 
+                id="scanner-container"
                 ref={scannerRef}
                 className={`w-full ${
                   orientation === 'portrait' 
                     ? isFullscreen 
-                      ? 'h-[50vh]' 
-                      : 'h-48 sm:h-64 md:h-80'
+                      ? 'h-[60vh]' 
+                      : 'h-64 sm:h-80 md:h-96'
                     : isFullscreen
-                      ? 'h-[40vh]'
-                      : 'h-40 sm:h-56 md:h-72'
+                      ? 'h-[50vh]'
+                      : 'h-48 sm:h-64 md:h-80'
                 }`}
                 style={{ 
                   position: 'relative',
-                  backgroundColor: '#000'
+                  backgroundColor: '#000',
+                  overflow: 'hidden',
+                  borderRadius: '12px',
+                  aspectRatio: orientation === 'portrait' ? '4/3' : '16/9'
                 }}
               />
 
@@ -397,8 +453,8 @@ Platform: ${navigator.platform}`;
                   <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                     <div className={`border-2 border-green-400 rounded-xl relative shadow-lg ${
                       orientation === 'portrait'
-                        ? 'w-40 h-48 sm:w-48 sm:h-56 md:w-56 md:h-64'
-                        : 'w-48 h-40 sm:w-64 sm:h-48 md:w-72 md:h-56'
+                        ? 'w-56 h-60 sm:w-64 sm:h-72 md:w-72 md:h-80'
+                        : 'w-64 h-48 sm:w-80 sm:h-56 md:w-96 md:h-64'
                     }`}>
                       {/* Corner markers */}
                       <div className="absolute -top-3 -left-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-l-4 border-t-4 border-green-400 rounded-tl-lg"></div>
@@ -409,8 +465,8 @@ Platform: ${navigator.platform}`;
                       {/* Scanning line animation */}
                       <div className={`absolute bg-gradient-to-r from-transparent via-green-400 to-transparent animate-pulse shadow-lg ${
                         orientation === 'portrait'
-                          ? 'w-40 h-1 sm:w-48 sm:h-1.5 md:w-56 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
-                          : 'w-48 h-1 sm:w-64 sm:h-1.5 md:w-72 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
+                          ? 'w-64 h-1 sm:w-72 sm:h-1.5 md:w-80 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
+                          : 'w-64 h-1 sm:w-80 sm:h-1.5 md:w-96 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
                       }`}></div>
                     </div>
                   </div>
@@ -558,37 +614,40 @@ Platform: ${navigator.platform}`;
           </div>
         </div>
 
-        {/* Footer */}
-        <div className={`border-t border-white/30 bg-white/5 ${
-          isFullscreen ? 'px-4 py-4' : 'px-4 sm:px-6 py-4 sm:py-5'
-        }`}>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <button
-              onClick={retryScanning}
-              className={`flex-1 bg-white/10 hover:bg-white/20 border border-white/30 hover:border-white/50 text-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 ${
-                isFullscreen 
-                  ? 'py-3 px-4 text-sm' 
-                  : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
-              }`}
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Reintentar</span>
-            </button>
-                         <button 
-               onClick={handleClose} 
-               className={`flex-1 bg-white text-black hover:bg-transparent hover:text-white border border-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 font-semibold ${
-                 isFullscreen 
-                   ? 'py-3 px-4 text-sm' 
-                   : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
-               }`}
-             >
-               <X className="w-4 h-4" />
-               <span>Cancelar</span>
-             </button>
+        {/* Footer - Hidden in landscape orientation */}
+        {orientation === 'portrait' && (
+          <div className={`border-t border-white/30 bg-white/5 ${
+            isFullscreen ? 'px-4 py-4' : 'px-4 sm:px-6 py-4 sm:py-5'
+          }`}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button
+                onClick={retryScanning}
+                className={`flex-1 bg-white/10 hover:bg-white/20 border border-white/30 hover:border-white/50 text-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 ${
+                  isFullscreen 
+                    ? 'py-3 px-4 text-sm' 
+                    : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
+                }`}
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reintentar</span>
+              </button>
+              <button 
+                onClick={handleClose} 
+                className={`flex-1 bg-white text-black hover:bg-transparent hover:text-white border border-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 font-semibold ${
+                  isFullscreen 
+                    ? 'py-3 px-4 text-sm' 
+                    : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
+                }`}
+              >
+                <X className="w-4 h-4" />
+                <span>Cancelar</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
+    </>
   );
 };
 

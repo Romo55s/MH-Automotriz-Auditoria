@@ -25,7 +25,6 @@ import {
   getMonthlyInventory
 } from '../services/api';
 import { MonthlyInventory } from '../types';
-import BarcodeScanner from './BarcodeScanner';
 import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
 import CompletionModal from './CompletionModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -48,7 +47,6 @@ const InventoryPage: React.FC = () => {
 
   // State for UI modals and displays
   const [showScanner, setShowScanner] = useState(false);
-  const [useFastScanner, setUseFastScanner] = useState(true); // Toggle between old and new scanner
   const [showManualInput, setShowManualInput] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [currentScannedCode, setCurrentScannedCode] = useState('');
@@ -1193,31 +1191,13 @@ const InventoryPage: React.FC = () => {
           ) : (
             // Session is active - show scanning and management options
             <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
-              <div className="flex flex-col items-center space-y-2">
-                <button
-                  onClick={() => setShowScanner(true)}
-                  className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-                >
-                  <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Escanear Código de Barras</span>
-                </button>
-                
-                {/* Scanner Type Toggle */}
-                <div className="flex items-center space-x-2 bg-white/10 rounded-lg px-3 py-1 border border-white/20">
-                  <span className="text-white text-xs">Escáner:</span>
-                  <button
-                    onClick={() => setUseFastScanner(!useFastScanner)}
-                    className={`text-xs px-2 py-1 rounded transition-all duration-200 ${
-                      useFastScanner 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-gray-500 text-gray-200 hover:bg-gray-400'
-                    }`}
-                    title={useFastScanner ? 'Usando QuaggaJS (Rápido)' : 'Usando ZXing (Lento)'}
-                  >
-                    {useFastScanner ? '⚡ Rápido' : '🐌 Lento'}
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={() => setShowScanner(true)}
+                className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Escanear Código de Barras</span>
+              </button>
 
               <button
                 onClick={() => setShowManualInput(true)}
@@ -1291,17 +1271,10 @@ const InventoryPage: React.FC = () => {
 
       {/* Modals */}
       {showScanner && (
-        useFastScanner ? (
-          <FastBarcodeScanner
-            onScan={handleScan}
-            onClose={() => setShowScanner(false)}
-          />
-        ) : (
-          <BarcodeScanner
-            onScan={handleScan}
-            onClose={() => setShowScanner(false)}
-          />
-        )
+        <FastBarcodeScanner
+          onScan={handleScan}
+          onClose={() => setShowScanner(false)}
+        />
       )}
 
       {showConfirmation && (
