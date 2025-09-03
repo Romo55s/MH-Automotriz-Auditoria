@@ -142,16 +142,6 @@ const MonthlyInventoryManager: React.FC = () => {
       const errorMessage =
         err instanceof Error ? err.message : 'Falló al cargar inventarios';
       
-      // Log detailed error information for debugging
-      console.error('Error loading inventories:', {
-        error: err,
-        errorMessage,
-        selectedAgency: selectedAgency?.name,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href
-      });
-      
       setError(errorMessage);
       showError('Error de Carga', `Error al cargar inventarios: ${errorMessage}`);
     } finally {

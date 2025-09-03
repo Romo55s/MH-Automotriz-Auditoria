@@ -1,5 +1,10 @@
 // API service for backend communication
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+
+// Log the API base URL being used (only in development)
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔧 API_BASE_URL configured as:', API_BASE_URL);
+}
 
 // Production environment detection
 const isProduction = process.env.NODE_ENV === 'production';
@@ -30,16 +35,15 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
         errorDetails = response.statusText;
       }
 
-      // Log detailed errors for debugging (both dev and production)
-      console.error(`🚨 API Error ${response.status}:`, {
-        status: response.status,
-        statusText: response.statusText,
-        details: errorDetails,
-        url,
-        body: options.body,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent
-      });
+      // Log detailed errors for debugging (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`🚨 API Error ${response.status}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          details: errorDetails,
+          url
+        });
+      }
 
       throw new Error(
         `API Error: ${response.status} ${response.statusText}${
@@ -50,13 +54,10 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
     return await response.json();
   } catch (error) {
-    // Log detailed errors for debugging (both dev and production)
-    console.error('API Request failed:', {
-      error: error,
-      url,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent
-    });
+    // Log errors only in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('🚨 API Request failed:', error);
+    }
     throw error;
   }
 };
@@ -71,9 +72,6 @@ export const saveScan = async (data: {
   month: string;
   year: number;
 }) => {
-  // Log the data being sent for debugging
-  console.log('🔍 Frontend sending data to saveScan:', data);
-
   return apiRequest('/inventory/save-scan', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -106,20 +104,7 @@ export const getMonthlyInventory = async (
 
 // Get all monthly inventories for an agency
 export const getAgencyInventories = async (agency: string) => {
-  console.log('🔍 Frontend calling getAgencyInventories for agency:', agency);
-  try {
-    const result = await apiRequest(`/inventory/agency-inventories/${agency}`);
-    console.log('✅ getAgencyInventories response:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ getAgencyInventories failed:', {
-      agency,
-      error,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent
-    });
-    throw error;
-  }
+  return apiRequest(`/inventory/agency-inventories/${agency}`);
 };
 
 // Check if monthly inventory exists

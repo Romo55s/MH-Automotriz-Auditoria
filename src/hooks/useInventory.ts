@@ -91,15 +91,10 @@ export const useInventory = () => {
         }
       }
     } catch (error) {
-      console.error('Error syncing session data:', {
-        error: error,
-        selectedAgency: selectedAgency?.name,
-        currentMonth,
-        currentYear,
-        isSessionActive,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent
-      });
+      // Only log in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error syncing session data:', error);
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -504,19 +499,6 @@ export const useInventory = () => {
         return true;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to save scan';
-        
-        // Log detailed error information
-        console.error('Error saving scan:', {
-          error: err,
-          errorMessage,
-          barcode,
-          selectedAgency: selectedAgency?.name,
-          user: user?.email || user?.name,
-          currentMonth,
-          currentYear,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent
-        });
         
         // Check if it's a duplicate barcode error
         if (errorMessage.includes('has already been scanned')) {
