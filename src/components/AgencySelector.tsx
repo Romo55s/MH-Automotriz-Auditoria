@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Building2, Calendar, ChevronDown, Play } from 'lucide-react';
+import { AlertTriangle, Building2, Calendar, ChevronDown, Play } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { agencies } from '../data/agencies';
+import { clearAllSessions, getSessionInfo } from '../utils/sessionManager';
 import Footer from './Footer';
 import Header from './Header';
 
 const AgencySelector: React.FC = () => {
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showSessionConflictModal, setShowSessionConflictModal] = useState(false);
+  const [conflictAgency, setConflictAgency] = useState<string>('');
+  const [pendingAgency, setPendingAgency] = useState<any>(null);
 
   const { selectedAgency, setSelectedAgency } = useAppContext();
   const navigate = useNavigate();
@@ -110,7 +114,19 @@ const AgencySelector: React.FC = () => {
 
             <div className='text-center'>
               <button
-                onClick={() => setSelectedAgency(null)}
+                onClick={() => {
+                  // Check for active sessions before clearing agency
+                  const sessions = getSessionInfo();
+                  const activeSessions = sessions.filter(session => session.data.isSessionActive);
+                  
+                  if (activeSessions.length > 0) {
+                    setConflictAgency(activeSessions[0].data.agency);
+                    setPendingAgency({ agency: null, action: 'clear' });
+                    setShowSessionConflictModal(true);
+                  } else {
+                    setSelectedAgency(null);
+                  }
+                }}
                 className='text-sm text-secondaryText hover:text-white transition-colors underline'
               >
                 Seleccionar Diferente Agencia
@@ -125,13 +141,72 @@ const AgencySelector: React.FC = () => {
     );
   }
 
+  // Check for active sessions in other agencies
+  const checkForActiveSessions = (targetAgency: any) => {
+    const sessions = getSessionInfo();
+    const activeSessions = sessions.filter(session => 
+      session.data.isSessionActive && 
+      session.data.agency !== targetAgency.name
+    );
+    
+    return activeSessions;
+  };
+
+  const handleAgencySwitch = (agency: any, action: 'inventory' | 'monthly' | 'clear') => {
+    const activeSessions = checkForActiveSessions(agency);
+    
+    if (activeSessions.length > 0) {
+      // Show conflict modal
+      setConflictAgency(activeSessions[0].data.agency);
+      setPendingAgency({ agency, action });
+      setShowSessionConflictModal(true);
+    } else {
+      // No conflict, proceed normally
+      proceedWithAgencySwitch(agency, action);
+    }
+  };
+
+  const proceedWithAgencySwitch = (agency: any, action: 'inventory' | 'monthly' | 'clear') => {
+    if (action === 'clear') {
+      setSelectedAgency(null);
+    } else {
+      setSelectedAgency(agency);
+      
+      if (action === 'inventory') {
+        navigate(`/inventory/${agency.name.toLowerCase()}`);
+      } else {
+        navigate(`/monthly-inventories/${agency.name.toLowerCase()}`);
+      }
+    }
+  };
+
+  const handleConfirmAgencySwitch = () => {
+    if (pendingAgency) {
+      // Clear all existing sessions
+      clearAllSessions();
+      
+      // Proceed with the new agency
+      proceedWithAgencySwitch(pendingAgency.agency, pendingAgency.action);
+      
+      // Close modal
+      setShowSessionConflictModal(false);
+      setPendingAgency(null);
+      setConflictAgency('');
+    }
+  };
+
+  const handleCancelAgencySwitch = () => {
+    setShowSessionConflictModal(false);
+    setPendingAgency(null);
+    setConflictAgency('');
+  };
+
   const handleStartInventory = () => {
     if (!selectedAgencyId) return;
 
     const agency = agencies.find(a => a.id === selectedAgencyId);
     if (agency) {
-      setSelectedAgency(agency);
-      navigate(`/inventory/${agency.name.toLowerCase()}`);
+      handleAgencySwitch(agency, 'inventory');
     }
   };
 
@@ -140,8 +215,7 @@ const AgencySelector: React.FC = () => {
 
     const agency = agencies.find(a => a.id === selectedAgencyId);
     if (agency) {
-      setSelectedAgency(agency);
-      navigate(`/monthly-inventories/${agency.name.toLowerCase()}`);
+      handleAgencySwitch(agency, 'monthly');
     }
   };
 
@@ -345,6 +419,74 @@ const AgencySelector: React.FC = () => {
 
       {/* Footer */}
       <Footer />
+
+      {/* Session Conflict Modal */}
+      {showSessionConflictModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-effect rounded-3xl w-full max-w-md overflow-hidden border border-white/30 shadow-2xl">
+            {/* Header */}
+            <div className="relative bg-gradient-to-r from-orange-600/20 to-red-600/20 border-b border-white/30 p-6">
+              <div className="flex items-center space-x-3">
+                <div className="glass-effect rounded-full flex items-center justify-center glow border-2 border-orange-400/20 w-12 h-12">
+                  <AlertTriangle className="w-6 h-6 text-orange-300" />
+                </div>
+                <div>
+                  <h2 className="font-bold uppercase tracking-hero leading-heading text-shadow text-xl text-white">
+                    Conflicto de Sesión
+                  </h2>
+                  <p className="text-white/70 text-sm">
+                    Sesión activa detectada
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="bg-orange-500/10 border border-orange-400/30 rounded-xl p-4">
+                  <p className="text-white text-sm">
+                    <strong>Tienes una sesión activa en:</strong> <span className="text-orange-300">{conflictAgency}</span>
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  <p className="text-white/80 text-sm">
+                    {pendingAgency?.action === 'clear' 
+                      ? 'Al deseleccionar la agencia, se perderá el progreso de la sesión actual.'
+                      : `Al cambiar a <strong className="text-white">${pendingAgency?.agency.name}</strong>, se perderá el progreso de la sesión actual.`
+                    }
+                  </p>
+                  
+                  <div className="bg-red-500/10 border border-red-400/30 rounded-xl p-4">
+                    <p className="text-red-200 text-xs">
+                      <strong>⚠️ Advertencia:</strong> Los códigos escaneados en la sesión actual se perderán si no han sido guardados en el servidor.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-white/30 bg-white/5 px-6 py-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleCancelAgencySwitch}
+                  className="flex-1 bg-white/10 hover:bg-white/20 border border-white/30 hover:border-white/50 text-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-semibold"
+                >
+                  <span>Cancelar</span>
+                </button>
+                <button
+                  onClick={handleConfirmAgencySwitch}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-semibold"
+                >
+                  <span>Continuar de Todos Modos</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
