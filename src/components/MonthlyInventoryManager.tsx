@@ -141,7 +141,7 @@ const MonthlyInventoryManager: React.FC = () => {
       const errorMessage =
         err instanceof Error ? err.message : 'Falló al cargar inventarios';
       setError(errorMessage);
-      showError('Error de Carga', errorMessage);
+      showError('Error de Carga -> ', errorMessage);
     } finally {
       setIsLoading(false);
     }
