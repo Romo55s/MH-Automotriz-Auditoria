@@ -683,7 +683,26 @@ const InventoryPage: React.FC = () => {
             <div className='flex items-center justify-between'>
               <div className='flex items-center space-x-3'>
                 <X className='w-5 h-5 text-red-400' />
-                <span className='text-red-400 font-medium'>{error}</span>
+                <div className='flex flex-col'>
+                  <span className='text-red-400 font-medium'>{error}</span>
+                  {/* Show detailed error info for debugging */}
+                  <details className='mt-2'>
+                    <summary className='text-red-300 text-sm cursor-pointer hover:text-red-200'>
+                      Ver detalles del error
+                    </summary>
+                    <div className='mt-2 p-3 bg-red-900/20 rounded border border-red-500/30'>
+                      <pre className='text-red-200 text-xs whitespace-pre-wrap break-words'>
+                        {JSON.stringify({
+                          error: error,
+                          timestamp: new Date().toISOString(),
+                          userAgent: navigator.userAgent,
+                          url: window.location.href,
+                          agency: selectedAgency?.name || 'No agency selected'
+                        }, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                </div>
               </div>
               <button
                 onClick={clearError}

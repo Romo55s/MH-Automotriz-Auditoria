@@ -30,16 +30,16 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
         errorDetails = response.statusText;
       }
 
-      // Only log detailed errors in development
-      if (!isProduction) {
-        console.error(`🚨 API Error ${response.status}:`, {
-          status: response.status,
-          statusText: response.statusText,
-          details: errorDetails,
-          url,
-          body: options.body,
-        });
-      }
+      // Log detailed errors for debugging (both dev and production)
+      console.error(`🚨 API Error ${response.status}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        details: errorDetails,
+        url,
+        body: options.body,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      });
 
       throw new Error(
         `API Error: ${response.status} ${response.statusText}${
@@ -50,10 +50,13 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
     return await response.json();
   } catch (error) {
-    // Only log detailed errors in development
-    if (!isProduction) {
-      console.error('API Request failed:', error);
-    }
+    // Log detailed errors for debugging (both dev and production)
+    console.error('API Request failed:', {
+      error: error,
+      url,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent
+    });
     throw error;
   }
 };

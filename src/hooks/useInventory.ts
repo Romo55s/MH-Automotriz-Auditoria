@@ -3,23 +3,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import {
-  checkInventoryCompletion,
-  checkInventoryLimits,
-  checkMonthlyInventory,
-  deleteMultipleScannedEntries,
-  deleteScannedEntry,
-  downloadInventoryCSV,
-  downloadInventoryExcel,
-  finishSession,
-  getMonthlyInventory,
-  saveScan,
+    checkInventoryCompletion,
+    checkInventoryLimits,
+    checkMonthlyInventory,
+    deleteMultipleScannedEntries,
+    deleteScannedEntry,
+    downloadInventoryCSV,
+    downloadInventoryExcel,
+    finishSession,
+    getMonthlyInventory,
+    saveScan,
 } from '../services/api';
 import { ScannedCode } from '../types/index';
 import {
-  clearSession,
-  loadSession,
-  saveSession,
-  SessionData,
+    clearSession,
+    loadSession,
+    saveSession,
+    SessionData,
 } from '../utils/sessionManager';
 
 export const useInventory = () => {
@@ -91,7 +91,15 @@ export const useInventory = () => {
         }
       }
     } catch (error) {
-      console.error('Error syncing session data:', error);
+      console.error('Error syncing session data:', {
+        error: error,
+        selectedAgency: selectedAgency?.name,
+        currentMonth,
+        currentYear,
+        isSessionActive,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      });
     } finally {
       setIsSyncing(false);
     }
@@ -496,6 +504,19 @@ export const useInventory = () => {
         return true;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to save scan';
+        
+        // Log detailed error information
+        console.error('Error saving scan:', {
+          error: err,
+          errorMessage,
+          barcode,
+          selectedAgency: selectedAgency?.name,
+          user: user?.email || user?.name,
+          currentMonth,
+          currentYear,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        });
         
         // Check if it's a duplicate barcode error
         if (errorMessage.includes('has already been scanned')) {
