@@ -1,4 +1,4 @@
-import { Barcode, CheckSquare, ChevronLeft, ChevronRight, Search, Square, Trash2 } from 'lucide-react';
+import { Barcode, CheckSquare, ChevronLeft, ChevronRight, Clock, Search, Square, Trash2, User } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScannedCode } from '../types';
 
@@ -103,17 +103,17 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
 
   if (isLoading) {
     return (
-      <div className='card'>
+      <div className='card' style={{ background: 'rgba(0,0,0,0.6)' }}>
         <div className='text-center py-8'>
-          <div className='w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4'></div>
-          <p className='text-secondaryText'>Cargando códigos escaneados...</p>
+          <div className='w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4'></div>
+          <p className='text-white'>Cargando códigos escaneados...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className='card'>
+    <div className='card' style={{ background: 'rgba(0,0,0,0.6)' }}>
       {/* Header */}
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6'>
         <div>
@@ -122,14 +122,14 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
             CÓDIGOS ESCANEADOS ({scannedCodes.length})
           </h2>
           {searchTerm && (
-            <p className='text-sm text-secondaryText'>
+            <p className='text-sm text-white'>
               Mostrando {filteredAndPaginatedCodes.totalFiltered} de {scannedCodes.length} códigos
             </p>
           )}
         </div>
         
         <div className='flex items-center gap-2'>
-          <span className='text-sm text-secondaryText'>
+          <span className='text-sm text-white'>
             Total de escaneos: {scannedCodes.length}
           </span>
         </div>
@@ -139,29 +139,31 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
       <div className='flex flex-col sm:flex-row gap-4 mb-6'>
         {/* Search */}
         <div className='relative flex-1'>
-          <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondaryText' />
+          <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white' />
           <input
             type='text'
             placeholder='Buscar código de barras...'
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
-            className='w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500'
+            className='w-full pl-10 pr-4 py-3 rounded-xl text-white placeholder-white/60 focus:outline-none border border-white/30 transition-all duration-300'
+            style={{ background: 'rgba(0,0,0,0.4)' }}
           />
         </div>
 
         {/* Bulk Actions */}
         {selectedIndices.size > 0 && (
           <div className='flex items-center gap-2'>
-                         <button
-               onClick={handleBulkDelete}
-               className='px-4 py-2 bg-white/10 text-white border border-gray-600 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2'
-             >
+            <button
+              onClick={handleBulkDelete}
+              className='px-4 py-3 text-white border border-white/30 rounded-xl hover:border-white/50 transition-all duration-300 flex items-center gap-2 font-semibold'
+              style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)' }}
+            >
               <Trash2 className='w-4 h-4' />
               Eliminar ({selectedIndices.size})
             </button>
             <button
               onClick={clearSelection}
-              className='px-3 py-2 text-secondaryText hover:text-white transition-colors'
+              className='px-3 py-3 text-white hover:text-white/80 transition-colors'
             >
               Cancelar
             </button>
@@ -174,7 +176,7 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
         <div className='flex items-center gap-4 mb-4'>
           <button
             onClick={selectedIndices.size === filteredAndPaginatedCodes.codes.length ? clearSelection : selectAll}
-            className='flex items-center gap-2 text-sm text-secondaryText hover:text-white transition-colors'
+            className='flex items-center gap-2 text-sm text-white hover:text-white/80 transition-colors'
           >
             {selectedIndices.size === filteredAndPaginatedCodes.codes.length ? (
               <CheckSquare className='w-4 h-4' />
@@ -189,7 +191,7 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
       {/* Codes Grid */}
       {filteredAndPaginatedCodes.codes.length === 0 ? (
         <div className='text-center py-8'>
-          <p className='text-secondaryText'>
+          <p className='text-white'>
             {searchTerm ? 'No se encontraron códigos que coincidan con la búsqueda' : 'No hay códigos escaneados'}
           </p>
         </div>
@@ -205,52 +207,73 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
               const isSelected = selectedIndices.has(globalIndex);
               
               return (
-                                 <div
-                   key={`${code.code}-${code.timestamp.getTime()}`}
-                   className={`relative p-4 bg-gray-800/50 border rounded-lg transition-all duration-200 ${
-                     isSelected 
-                       ? 'border-white bg-white/10' 
-                       : 'border-gray-600 hover:border-gray-500'
-                   }`}
-                 >
+                <div
+                  key={`${code.code}-${code.timestamp.getTime()}`}
+                  className={`relative overflow-hidden rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
+                    isSelected 
+                      ? 'border-white/50' 
+                      : 'border-white/30 hover:border-white/50'
+                  }`}
+                  style={{
+                    background: isSelected 
+                      ? 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 100%)'
+                      : 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)'
+                  }}
+                >
+                  {/* Decorative Background Elements */}
+                  <div className='absolute -top-4 -right-4 w-16 h-16 bg-gradient-to-br from-yellow-400/20 to-orange-500/20 rounded-full blur-xl'></div>
+                  <div className='absolute -bottom-6 -left-6 w-12 h-12 bg-gradient-to-tr from-blue-400/20 to-purple-500/20 rounded-full blur-xl'></div>
+                  
                   {/* Selection Checkbox */}
                   <button
                     onClick={() => toggleSelection(index)}
-                    className='absolute top-2 left-2 text-secondaryText hover:text-white transition-colors'
+                    className='absolute top-3 left-3 text-white hover:text-white/80 transition-colors z-10'
                   >
-                                         {isSelected ? (
-                       <CheckSquare className='w-4 h-4 text-white' />
-                     ) : (
-                       <Square className='w-4 h-4' />
-                     )}
+                    {isSelected ? (
+                      <CheckSquare className='w-5 h-5 text-white' />
+                    ) : (
+                      <Square className='w-5 h-5' />
+                    )}
                   </button>
 
                   {/* Delete Button */}
                   <button
                     onClick={() => onDeleteCode(globalIndex)}
-                    className='absolute top-2 right-2 text-red-400 hover:text-red-300 transition-colors'
+                    className='absolute top-3 right-3 text-red-400 hover:text-red-300 transition-colors z-10'
                   >
-                    <Trash2 className='w-4 h-4' />
+                    <Trash2 className='w-5 h-5' />
                   </button>
 
-                                     {/* Code Content */}
-                   <div className='pt-6'>
-                     <div className='flex items-center gap-2 mb-2'>
-                       <Barcode className='w-4 h-4 text-gray-400' />
-                       <div className='text-xs text-secondaryText'>
-                         #{globalIndex + 1}
-                       </div>
-                     </div>
-                     <div className='text-lg font-mono text-white mb-2 break-all'>
-                       {code.code}
-                     </div>
-                     <div className='text-xs text-secondaryText mb-1'>
-                       {formatTime(code.timestamp)}
-                     </div>
-                     <div className='text-xs text-gray-400'>
-                       {code.user}
-                     </div>
-                   </div>
+                  {/* Code Content */}
+                  <div className='relative z-10 pt-8'>
+                    <div className='flex items-center gap-3 mb-4'>
+                      <div className='w-10 h-10 rounded-lg flex items-center justify-center border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                        <Barcode className='w-5 h-5 text-white' />
+                      </div>
+                      <div className='text-sm text-white font-medium'>
+                        #{globalIndex + 1}
+                      </div>
+                    </div>
+                    
+                    <div className='text-lg font-mono text-white mb-4 break-all bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent'>
+                      {code.code}
+                    </div>
+                    
+                    <div className='space-y-2'>
+                      <div className='flex items-center gap-2'>
+                        <Clock className='w-4 h-4 text-white' />
+                        <span className='text-sm text-white'>
+                          {formatTime(code.timestamp)}
+                        </span>
+                      </div>
+                      <div className='flex items-center gap-2'>
+                        <User className='w-4 h-4 text-white' />
+                        <span className='text-sm text-white truncate'>
+                          {code.user}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -259,7 +282,7 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
           {/* Pagination */}
           {filteredAndPaginatedCodes.totalPages > 1 && (
             <div className='flex items-center justify-between'>
-              <div className='text-sm text-secondaryText'>
+              <div className='text-sm text-white'>
                 Página {currentPage} de {filteredAndPaginatedCodes.totalPages}
               </div>
               
@@ -267,7 +290,8 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className='p-2 bg-gray-800 border border-gray-600 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors'
+                  className='p-3 border border-white/30 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed hover:border-white/50 transition-all duration-300'
+                  style={{ background: 'rgba(0,0,0,0.4)' }}
                 >
                   <ChevronLeft className='w-4 h-4' />
                 </button>
@@ -285,11 +309,16 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                        className={`px-4 py-2 text-sm rounded-xl transition-all duration-300 ${
                           currentPage === pageNum
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-800 text-secondaryText hover:text-white'
+                            ? 'text-white border border-white/50'
+                            : 'text-white border border-white/30 hover:border-white/50'
                         }`}
+                        style={{
+                          background: currentPage === pageNum 
+                            ? 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 100%)'
+                            : 'rgba(0,0,0,0.4)'
+                        }}
                       >
                         {pageNum}
                       </button>
@@ -300,7 +329,8 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(filteredAndPaginatedCodes.totalPages, prev + 1))}
                   disabled={currentPage === filteredAndPaginatedCodes.totalPages}
-                  className='p-2 bg-gray-800 border border-gray-600 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors'
+                  className='p-3 border border-white/30 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed hover:border-white/50 transition-all duration-300'
+                  style={{ background: 'rgba(0,0,0,0.4)' }}
                 >
                   <ChevronRight className='w-4 h-4' />
                 </button>
