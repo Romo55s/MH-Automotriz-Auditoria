@@ -10,6 +10,7 @@ interface FastBarcodeScannerProps {
 const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose }) => {
   const scannerRef = useRef<HTMLDivElement>(null);
   const isQuaggaInitialized = useRef(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -43,15 +44,13 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         isQuaggaInitialized.current = false;
       }
       
-      // Also try to stop any remaining media streams
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: true })
-          .then(stream => {
-            stream.getTracks().forEach(track => track.stop());
-          })
-          .catch(() => {
-            // Ignore errors during cleanup
-          });
+      // Stop the media stream
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => {
+          track.stop();
+          console.log('Stopped track in cleanup:', track.label);
+        });
+        mediaStreamRef.current = null;
       }
       
       window.removeEventListener('orientationchange', handleOrientationChange);
@@ -68,22 +67,46 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
     try {
       setError('');
       
-      // First, check if we have camera permissions
+      // Debug information
+      console.log('Initializing scanner...');
+      console.log('Browser info:', {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        mediaDevices: !!navigator.mediaDevices,
+        getUserMedia: !!navigator.mediaDevices?.getUserMedia
+      });
+      
+      // First, check if we have camera permissions and get the stream
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
-          // Test camera access first
-          const testStream = await navigator.mediaDevices.getUserMedia({
+          // Get camera access and store the stream
+          const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
               width: { ideal: 640 },
               height: { ideal: 480 }
             }
           });
-          // Stop the test stream immediately
-          testStream.getTracks().forEach(track => track.stop());
+          mediaStreamRef.current = stream;
         } catch (permErr) {
           console.error('Camera permission error:', permErr);
-          setError('Permisos de cámara denegados. Por favor permite el acceso a la cámara en la configuración del navegador.');
+          console.error('Permission error details:', {
+            name: permErr.name,
+            message: permErr.message,
+            code: permErr.code,
+            constraint: permErr.constraint
+          });
+          
+          // Show detailed permission error for mobile debugging
+          const detailedPermError = `DEBUG INFO:
+Permission Error: ${permErr.name || 'Unknown'}
+Message: ${permErr.message || 'No message'}
+Code: ${permErr.code || 'No code'}
+Constraint: ${permErr.constraint || 'No constraint'}
+Browser: ${navigator.userAgent}
+Platform: ${navigator.platform}`;
+          
+          setError(`Error de permisos: ${permErr.name || 'Unknown'} - ${permErr.message || 'No message'}\n\n${detailedPermError}`);
           return;
         }
       } else {
@@ -127,11 +150,31 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         locate: true,
         src: null
       };
+      
+      console.log('Quagga config:', config);
+      console.log('Scanner target element:', scannerRef.current);
 
       // Initialize Quagga with better error handling
       Quagga.init(config, (err) => {
         if (err) {
           console.error('Quagga initialization error:', err);
+          console.error('Error details:', {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+            code: err.code,
+            constraint: err.constraint
+          });
+          
+          // Also show detailed error in the UI for mobile debugging
+          const detailedError = `DEBUG INFO:
+Error: ${err.name || 'Unknown'}
+Message: ${err.message || 'No message'}
+Code: ${err.code || 'No code'}
+Constraint: ${err.constraint || 'No constraint'}
+Browser: ${navigator.userAgent}
+Platform: ${navigator.platform}`;
+          
           let errorMessage = 'Error al inicializar el escáner.';
           
           if (err.name === 'NotAllowedError') {
@@ -142,9 +185,13 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
             errorMessage = 'La cámara está siendo usada por otra aplicación. Cierra otras apps que usen la cámara.';
           } else if (err.name === 'OverconstrainedError') {
             errorMessage = 'Configuración de cámara no soportada. Intenta con otra cámara.';
+          } else {
+            // Show the actual error for debugging
+            errorMessage = `Error: ${err.name || 'Unknown'} - ${err.message || 'No message'}`;
           }
           
-          setError(errorMessage);
+          // Show detailed error for mobile debugging
+          setError(`${errorMessage}\n\n${detailedError}`);
           return;
         }
         
@@ -203,6 +250,16 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
       }
       isQuaggaInitialized.current = false;
     }
+    
+    // Stop the media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('Stopped track in stopScanning:', track.label);
+      });
+      mediaStreamRef.current = null;
+    }
+    
     setIsScanning(false);
     setIsInitialized(false);
   };
