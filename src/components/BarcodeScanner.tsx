@@ -299,52 +299,102 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
       // Check what focus capabilities are available
       console.log('Camera capabilities:', capabilities);
       console.log('Camera settings:', settings);
+      console.log('Browser:', navigator.userAgent);
 
+      // Try multiple focus strategies for Chrome compatibility
+      let focusSuccess = false;
+
+      // Strategy 1: Try manual focus
       if (capabilities.focusMode && capabilities.focusMode.includes('manual')) {
-        // Try manual focus
-        await videoTrack.applyConstraints({
-          advanced: [{ focusMode: 'manual' }] as any
-        });
-        
-        // Reset to continuous focus after a short delay
-        setTimeout(async () => {
-          try {
-            await videoTrack.applyConstraints({
-              advanced: [{ focusMode: 'continuous' }] as any
-            });
-          } catch (err) {
-            console.log('Error resetting focus:', err);
-          }
-          setIsFocusing(false);
-        }, 1500);
-      } else if (capabilities.focusMode && capabilities.focusMode.includes('single-shot')) {
-        // Try single-shot focus as alternative
-        await videoTrack.applyConstraints({
-          advanced: [{ focusMode: 'single-shot' }] as any
-        });
-        
-        setTimeout(async () => {
-          try {
-            await videoTrack.applyConstraints({
-              advanced: [{ focusMode: 'continuous' }] as any
-            });
-          } catch (err) {
-            console.log('Error resetting focus:', err);
-          }
-          setIsFocusing(false);
-        }, 1500);
-      } else {
-        // No manual focus available - try to trigger autofocus by changing other settings
-        const currentSettings = videoTrack.getSettings();
-        await videoTrack.applyConstraints({
-          width: currentSettings.width,
-          height: currentSettings.height,
-          frameRate: currentSettings.frameRate
-        });
-        
-        setIsFocusing(false);
-        setError('Enfoque manual no disponible. Tu dispositivo usa enfoque automático continuo.');
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ focusMode: 'manual' }] as any
+          });
+          focusSuccess = true;
+          console.log('Manual focus applied successfully');
+        } catch (err) {
+          console.log('Manual focus failed:', err);
+        }
       }
+
+      // Strategy 2: Try single-shot focus
+      if (!focusSuccess && capabilities.focusMode && capabilities.focusMode.includes('single-shot')) {
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ focusMode: 'single-shot' }] as any
+          });
+          focusSuccess = true;
+          console.log('Single-shot focus applied successfully');
+        } catch (err) {
+          console.log('Single-shot focus failed:', err);
+        }
+      }
+
+      // Strategy 3: Chrome-specific workaround - change resolution to trigger refocus
+      if (!focusSuccess) {
+        try {
+          const currentSettings = videoTrack.getSettings();
+          const newWidth = currentSettings.width === 1920 ? 1280 : 1920;
+          const newHeight = currentSettings.height === 1080 ? 720 : 1080;
+          
+          await videoTrack.applyConstraints({
+            width: newWidth,
+            height: newHeight,
+            frameRate: { ideal: 30 }
+          });
+          
+          // Wait a bit then restore original resolution
+          setTimeout(async () => {
+            try {
+              await videoTrack.applyConstraints({
+                width: currentSettings.width,
+                height: currentSettings.height,
+                frameRate: currentSettings.frameRate
+              });
+            } catch (err) {
+              console.log('Error restoring resolution:', err);
+            }
+          }, 500);
+          
+          focusSuccess = true;
+          console.log('Resolution change focus trigger applied');
+        } catch (err) {
+          console.log('Resolution change focus failed:', err);
+        }
+      }
+
+      // Strategy 4: Try changing exposure to trigger refocus
+      if (!focusSuccess && capabilities.exposureMode) {
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ exposureMode: 'manual' }] as any
+          });
+          
+          setTimeout(async () => {
+            try {
+              await videoTrack.applyConstraints({
+                advanced: [{ exposureMode: 'continuous' }] as any
+              });
+            } catch (err) {
+              console.log('Error resetting exposure:', err);
+            }
+          }, 300);
+          
+          focusSuccess = true;
+          console.log('Exposure change focus trigger applied');
+        } catch (err) {
+          console.log('Exposure change focus failed:', err);
+        }
+      }
+
+      // Reset focus after delay
+      setTimeout(() => {
+        setIsFocusing(false);
+        if (!focusSuccess) {
+          setError('Enfoque manual no disponible en Chrome. Usa el enfoque automático o intenta acercar/alejar el teléfono.');
+        }
+      }, 1500);
+
     } catch (err) {
       setIsFocusing(false);
       console.error('Focus error:', err);
@@ -489,7 +539,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             <div className="relative glass-effect rounded-2xl overflow-hidden border border-white/20 shadow-lg flex items-center justify-center">
               <video
                 ref={videoRef}
-                className={`w-full h-full object-cover ${
+                className={`w-full h-full object-cover cursor-pointer ${
                   orientation === 'portrait' 
                     ? isFullscreen 
                       ? 'h-[50vh]' 
@@ -507,6 +557,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 playsInline
                 muted
                 autoPlay={false}
+                onClick={manualFocus}
+                title="Toca para enfocar"
               />
 
               {/* Scanning Overlay - Perfectly Centered */}
@@ -619,12 +671,18 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                   )}
                   {focusCapabilities.length === 0 && (
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                      <p className={`text-white/60 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                        <strong>Nota:</strong> Tu dispositivo usa enfoque automático continuo
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                        <strong>Enfoque:</strong> Toca la pantalla de la cámara para enfocar
                       </p>
                     </div>
                   )}
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                      <strong>Chrome:</strong> Si el enfoque no funciona, acerca/aleja el teléfono
+                    </p>
+                  </div>
                 </div>
               </div>
               
