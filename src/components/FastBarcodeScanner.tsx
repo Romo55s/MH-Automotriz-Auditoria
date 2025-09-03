@@ -9,6 +9,7 @@ interface FastBarcodeScannerProps {
 
 const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose }) => {
   const scannerRef = useRef<HTMLDivElement>(null);
+  const isQuaggaInitialized = useRef(false);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -28,7 +29,31 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
     window.addEventListener('resize', handleOrientationChange);
     
     return () => {
-      stopScanning();
+      // Comprehensive cleanup
+      if (Quagga && isQuaggaInitialized.current) {
+        try {
+          Quagga.stop();
+          // Remove all detection listeners
+          if (typeof Quagga.offDetected === 'function') {
+            Quagga.offDetected(() => {});
+          }
+        } catch (err) {
+          console.log('Quagga cleanup error:', err);
+        }
+        isQuaggaInitialized.current = false;
+      }
+      
+      // Also try to stop any remaining media streams
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            stream.getTracks().forEach(track => track.stop());
+          })
+          .catch(() => {
+            // Ignore errors during cleanup
+          });
+      }
+      
       window.removeEventListener('orientationchange', handleOrientationChange);
       window.removeEventListener('resize', handleOrientationChange);
     };
@@ -42,6 +67,29 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   const initializeScanner = async () => {
     try {
       setError('');
+      
+      // First, check if we have camera permissions
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          // Test camera access first
+          const testStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "environment",
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            }
+          });
+          // Stop the test stream immediately
+          testStream.getTracks().forEach(track => track.stop());
+        } catch (permErr) {
+          console.error('Camera permission error:', permErr);
+          setError('Permisos de cámara denegados. Por favor permite el acceso a la cámara en la configuración del navegador.');
+          return;
+        }
+      } else {
+        setError('Tu navegador no soporta acceso a la cámara. Por favor usa un navegador moderno.');
+        return;
+      }
       
       // QuaggaJS configuration for fast scanning
       const config = {
@@ -80,14 +128,28 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         src: null
       };
 
-      await Quagga.init(config, (err) => {
+      // Initialize Quagga with better error handling
+      Quagga.init(config, (err) => {
         if (err) {
           console.error('Quagga initialization error:', err);
-          setError('Error al inicializar el escáner. Verifica los permisos de la cámara.');
+          let errorMessage = 'Error al inicializar el escáner.';
+          
+          if (err.name === 'NotAllowedError') {
+            errorMessage = 'Permisos de cámara denegados. Por favor permite el acceso a la cámara.';
+          } else if (err.name === 'NotFoundError') {
+            errorMessage = 'Cámara no encontrada. Verifica que tu dispositivo tenga una cámara.';
+          } else if (err.name === 'NotReadableError') {
+            errorMessage = 'La cámara está siendo usada por otra aplicación. Cierra otras apps que usen la cámara.';
+          } else if (err.name === 'OverconstrainedError') {
+            errorMessage = 'Configuración de cámara no soportada. Intenta con otra cámara.';
+          }
+          
+          setError(errorMessage);
           return;
         }
         
         setIsInitialized(true);
+        isQuaggaInitialized.current = true;
         startScanning();
       });
 
@@ -129,10 +191,20 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   };
 
   const stopScanning = () => {
-    if (Quagga) {
-      Quagga.stop();
+    if (Quagga && isQuaggaInitialized.current) {
+      try {
+        Quagga.stop();
+        // Clear all event listeners to prevent memory leaks
+        if (typeof Quagga.offDetected === 'function') {
+          Quagga.offDetected(() => {});
+        }
+      } catch (err) {
+        console.log('Quagga stop error:', err);
+      }
+      isQuaggaInitialized.current = false;
     }
     setIsScanning(false);
+    setIsInitialized(false);
   };
 
   const retryScanning = () => {
@@ -146,6 +218,12 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
+  };
+
+  const handleClose = () => {
+    // Ensure proper cleanup before closing
+    stopScanning();
+    onClose();
   };
 
   return (
@@ -172,9 +250,13 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                 }`}>
                   Escáner Rápido (QuaggaJS)
                 </h2>
-                <p className={`text-white/70 truncate ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-                  {isScanning ? 'Escaneando...' : 'Inicializando...'}
-                </p>
+                                 <p className={`text-white/70 truncate ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
+                   {isScanning 
+                     ? 'Escaneando...' 
+                     : isInitialized 
+                       ? 'Listo para escanear' 
+                       : 'Inicializando...'}
+                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0">
@@ -192,14 +274,14 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                   <Smartphone className={`text-white ${isFullscreen ? 'w-5 h-5' : 'w-5 h-5 sm:w-6 sm:h-6'}`} />
                 )}
               </button>
-              <button
-                onClick={onClose}
-                className={`glass-effect rounded-xl transition-all duration-300 hover:scale-105 border border-white/20 hover:border-white/40 ${
-                  isFullscreen ? 'p-2' : 'p-2 sm:p-3'
-                }`}
-              >
-                <X className={`text-white ${isFullscreen ? 'w-5 h-5' : 'w-5 h-5 sm:w-6 sm:h-6'}`} />
-              </button>
+                             <button
+                 onClick={handleClose}
+                 className={`glass-effect rounded-xl transition-all duration-300 hover:scale-105 border border-white/20 hover:border-white/40 ${
+                   isFullscreen ? 'p-2' : 'p-2 sm:p-3'
+                 }`}
+               >
+                 <X className={`text-white ${isFullscreen ? 'w-5 h-5' : 'w-5 h-5 sm:w-6 sm:h-6'}`} />
+               </button>
             </div>
           </div>
         </div>
@@ -254,15 +336,25 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                 </div>
               )}
 
-              {/* Status indicator */}
-              <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
-                <div className="flex items-center space-x-2">
-                  <div className={`w-2 h-2 rounded-full ${isScanning ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
-                  <span className="text-white text-xs font-medium">
-                    {isScanning ? 'Escaneando' : 'Inicializando'}
-                  </span>
-                </div>
-              </div>
+                             {/* Status indicator */}
+               <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
+                 <div className="flex items-center space-x-2">
+                   <div className={`w-2 h-2 rounded-full ${
+                     isScanning 
+                       ? 'bg-green-400 animate-pulse' 
+                       : isInitialized 
+                         ? 'bg-blue-400' 
+                         : 'bg-yellow-400 animate-pulse'
+                   }`}></div>
+                   <span className="text-white text-xs font-medium">
+                     {isScanning 
+                       ? 'Escaneando' 
+                       : isInitialized 
+                         ? 'Listo' 
+                         : 'Inicializando...'}
+                   </span>
+                 </div>
+               </div>
             </div>
 
             {/* Instructions */}
@@ -301,18 +393,45 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                 </div>
               </div>
               
-              {isScanning && (
-                <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-400/50 rounded-xl p-3 sm:p-4">
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <p className={`text-green-300 font-semibold ${
-                      isFullscreen ? 'text-sm' : 'text-sm sm:text-base'
-                    }`}>
-                      Escaneando a alta velocidad...
-                    </p>
-                  </div>
-                </div>
-              )}
+                             {/* Status Messages */}
+               {!isInitialized && (
+                 <div className="bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border border-yellow-400/50 rounded-xl p-3 sm:p-4">
+                   <div className="flex items-center justify-center space-x-2">
+                     <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                     <p className={`text-yellow-300 font-semibold ${
+                       isFullscreen ? 'text-sm' : 'text-sm sm:text-base'
+                     }`}>
+                       Configurando cámara y permisos...
+                     </p>
+                   </div>
+                 </div>
+               )}
+               
+               {isInitialized && !isScanning && (
+                 <div className="bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-400/50 rounded-xl p-3 sm:p-4">
+                   <div className="flex items-center justify-center space-x-2">
+                     <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                     <p className={`text-blue-300 font-semibold ${
+                       isFullscreen ? 'text-sm' : 'text-sm sm:text-base'
+                     }`}>
+                       ✅ Listo para escanear - Apunta al código de barras
+                     </p>
+                   </div>
+                 </div>
+               )}
+               
+               {isScanning && (
+                 <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-400/50 rounded-xl p-3 sm:p-4">
+                   <div className="flex items-center justify-center space-x-2">
+                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                     <p className={`text-green-300 font-semibold ${
+                       isFullscreen ? 'text-sm' : 'text-sm sm:text-base'
+                     }`}>
+                       🔍 Escaneando a alta velocidad...
+                     </p>
+                   </div>
+                 </div>
+               )}
             </div>
 
             {/* Error Display */}
@@ -374,17 +493,17 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
               <RotateCcw className="w-4 h-4" />
               <span>Reintentar</span>
             </button>
-            <button 
-              onClick={onClose} 
-              className={`flex-1 bg-white text-black hover:bg-transparent hover:text-white border border-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 font-semibold ${
-                isFullscreen 
-                  ? 'py-3 px-4 text-sm' 
-                  : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
-              }`}
-            >
-              <X className="w-4 h-4" />
-              <span>Cancelar</span>
-            </button>
+                         <button 
+               onClick={handleClose} 
+               className={`flex-1 bg-white text-black hover:bg-transparent hover:text-white border border-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 font-semibold ${
+                 isFullscreen 
+                   ? 'py-3 px-4 text-sm' 
+                   : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
+               }`}
+             >
+               <X className="w-4 h-4" />
+               <span>Cancelar</span>
+             </button>
           </div>
         </div>
       </div>
