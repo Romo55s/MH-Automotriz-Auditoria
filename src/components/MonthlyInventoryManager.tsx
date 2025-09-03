@@ -21,6 +21,7 @@ import {
   Plus,
   RefreshCw,
   User,
+  X,
 } from 'lucide-react';
 
 const MonthlyInventoryManager: React.FC = () => {
@@ -140,8 +141,19 @@ const MonthlyInventoryManager: React.FC = () => {
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Falló al cargar inventarios';
+      
+      // Log detailed error information for debugging
+      console.error('Error loading inventories:', {
+        error: err,
+        errorMessage,
+        selectedAgency: selectedAgency?.name,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      });
+      
       setError(errorMessage);
-      showError('Error de Carga -> ', errorMessage);
+      showError('Error de Carga', `Error al cargar inventarios: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -456,15 +468,34 @@ const MonthlyInventoryManager: React.FC = () => {
         {error && (
           <div className='card border-red-500/20 bg-red-500/10 mb-6'>
             <div className='flex items-center justify-between'>
-              <div className='flex items-center space-x-3'>
+              <div className='flex items-center space-x-3 flex-1'>
                 <AlertCircle className='w-5 h-5 text-red-400' />
-                <span className='text-sm sm:text-base text-red-400 font-medium'>{error}</span>
+                <div className='flex flex-col flex-1'>
+                  <span className='text-sm sm:text-base text-red-400 font-medium'>{error}</span>
+                  {/* Show detailed error info for debugging */}
+                  <details className='mt-2'>
+                    <summary className='text-red-300 text-xs cursor-pointer hover:text-red-200'>
+                      Ver detalles del error
+                    </summary>
+                    <div className='mt-2 p-3 bg-red-900/20 rounded border border-red-500/30'>
+                      <pre className='text-red-200 text-xs whitespace-pre-wrap break-words'>
+                        {JSON.stringify({
+                          error: error,
+                          timestamp: new Date().toISOString(),
+                          userAgent: navigator.userAgent,
+                          url: window.location.href,
+                          agency: selectedAgency?.name || 'No agency selected'
+                        }, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                </div>
               </div>
               <button
                 onClick={() => setError(null)}
-                className='text-red-400 hover:text-red-300 transition-colors'
+                className='text-red-400 hover:text-red-300 transition-colors ml-3'
               >
-                <AlertCircle className='w-4 h-4' />
+                <X className='w-4 h-4' />
               </button>
             </div>
           </div>

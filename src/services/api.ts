@@ -106,7 +106,20 @@ export const getMonthlyInventory = async (
 
 // Get all monthly inventories for an agency
 export const getAgencyInventories = async (agency: string) => {
-  return apiRequest(`/inventory/agency-inventories/${agency}`);
+  console.log('🔍 Frontend calling getAgencyInventories for agency:', agency);
+  try {
+    const result = await apiRequest(`/inventory/agency-inventories/${agency}`);
+    console.log('✅ getAgencyInventories response:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ getAgencyInventories failed:', {
+      agency,
+      error,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent
+    });
+    throw error;
+  }
 };
 
 // Check if monthly inventory exists

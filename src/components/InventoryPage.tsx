@@ -189,6 +189,17 @@ const InventoryPage: React.FC = () => {
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load inventories';
+      
+      // Log detailed error information for debugging
+      console.error('Error loading inventories in InventoryPage:', {
+        error: err,
+        errorMessage,
+        selectedAgency: selectedAgency?.name,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      });
+      
       setInventoriesError(errorMessage);
     } finally {
       setIsLoadingInventories(false);
