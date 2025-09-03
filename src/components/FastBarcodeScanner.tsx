@@ -73,20 +73,34 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         userAgent: navigator.userAgent,
         platform: navigator.platform,
         mediaDevices: !!navigator.mediaDevices,
-        getUserMedia: !!navigator.mediaDevices?.getUserMedia
+        getUserMedia: !!navigator.mediaDevices?.getUserMedia,
+        isSecureContext: window.isSecureContext,
+        protocol: window.location.protocol,
+        host: window.location.host
       });
+      
+      // Check if we're in a secure context (HTTPS)
+      if (!window.isSecureContext) {
+        setError('Este sitio debe ser accedido a través de HTTPS para usar la cámara. Por favor usa https:// en lugar de http://');
+        return;
+      }
       
       // First, check if we have camera permissions and get the stream
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           // Get camera access and store the stream
-          const stream = await navigator.mediaDevices.getUserMedia({
+          // Use more flexible constraints for mobile Safari
+          const constraints = {
             video: {
               facingMode: "environment",
-              width: { ideal: 640 },
-              height: { ideal: 480 }
+              width: { ideal: 640, max: 1280 },
+              height: { ideal: 480, max: 720 },
+              frameRate: { ideal: 30, max: 60 }
             }
-          });
+          };
+          
+          console.log('Requesting camera with constraints:', constraints);
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
           mediaStreamRef.current = stream;
         } catch (permErr) {
           console.error('Camera permission error:', permErr);
