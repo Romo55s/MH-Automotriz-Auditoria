@@ -328,27 +328,28 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
           patchSize: (isSafariIOS || isExternalCamera) ? "medium" : "large", // Smaller patch for Safari iOS and external cameras
           halfSample: (isSafariIOS || isExternalCamera) ? true : false // Enable half sampling for Safari iOS and external cameras
         },
-        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 2, // Disable workers for Safari iOS and external cameras
-        frequency: (isSafariIOS || isExternalCamera) ? 5 : 10, // Lower frequency for Safari iOS and external cameras
+        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 4, // More workers for better VIN detection
+        frequency: (isSafariIOS || isExternalCamera) ? 5 : 15, // Higher frequency for better VIN detection
         decoder: {
           readers: isSafariIOS 
             ? [
                 // Minimal readers for Safari iOS to avoid constructor issues
                 "code_128_reader",
                 "ean_reader",
-                "code_39_reader"
+                "code_39_reader",
+                "code_39_vin_reader"
               ]
             : [
+                "code_39_vin_reader",  // Prioritize VIN reader for vehicle barcodes
+                "code_39_reader",
                 "code_128_reader",
                 "ean_reader",
                 "ean_8_reader",
-                "code_39_reader",
-                "code_39_vin_reader",
                 "codabar_reader",
                 "upc_reader",
                 "upc_e_reader",
-                "i2of5_reader"
-                // qr_reader removed due to Safari iOS compatibility issues
+                "i2of5_reader",
+                "qr_reader",
               ]
         },
         locate: true
@@ -472,10 +473,12 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
             }
           }
           
-          // Validate the scanned code
-          const codePattern = /^\d{6,12}$/;
-          if (codePattern.test(code)) {
-            // Process the code
+          // Validate the scanned code - support both numeric codes and VIN codes
+          const numericPattern = /^\d{6,12}$/;
+          const vinPattern = /^[A-HJ-NPR-Z0-9]{6,17}$/; // VIN pattern (alphanumeric, 6-17 chars)
+          
+          if (numericPattern.test(code)) {
+            // Process numeric code (original logic)
             let processedCode = code;
             if (code.length < 8) {
               processedCode = code.padStart(8, '0');
@@ -485,9 +488,47 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
             
             onScan(processedCode);
             stopScanning();
+          } else if (vinPattern.test(code)) {
+            // Process VIN code - use as is or extract numeric part
+            if (format === 'code_39_vin_reader' || format === 'code_39') {
+              // For VIN codes, try to extract numeric part if it exists
+              const numericMatch = code.match(/\d{6,12}/);
+              if (numericMatch) {
+                const numericCode = numericMatch[0];
+                let processedCode = numericCode;
+                if (numericCode.length < 8) {
+                  processedCode = numericCode.padStart(8, '0');
+                } else if (numericCode.length > 8) {
+                  processedCode = numericCode.slice(-8);
+                }
+                onScan(processedCode);
+                stopScanning();
+              } else {
+                // Use the full VIN code if no numeric part found
+                onScan(code);
+                stopScanning();
+              }
+            } else {
+              // For other formats, try to extract numeric part
+              const numericMatch = code.match(/\d{6,12}/);
+              if (numericMatch) {
+                const numericCode = numericMatch[0];
+                let processedCode = numericCode;
+                if (numericCode.length < 8) {
+                  processedCode = numericCode.padStart(8, '0');
+                } else if (numericCode.length > 8) {
+                  processedCode = numericCode.slice(-8);
+                }
+                onScan(processedCode);
+                stopScanning();
+              } else {
+                onScan(code);
+                stopScanning();
+              }
+            }
           } else {
             setError(
-              `Código escaneado: "${code}"\n\nFormato: ${format}\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente`
+              `Código escaneado: "${code}"\n\nFormato: ${format}\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos o un VIN válido.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente\n• Para códigos VIN, asegúrate de que el código esté completo`
             );
           }
         });
