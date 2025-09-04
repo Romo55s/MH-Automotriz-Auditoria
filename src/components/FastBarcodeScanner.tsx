@@ -2,6 +2,16 @@ import Quagga from '@ericblade/quagga2';
 import { Camera, Monitor, RotateCcw, ScanLine, Smartphone, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
+// Extend MediaTrackCapabilities to include torch
+interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+// Extend MediaTrackConstraints to include torch
+interface ExtendedMediaTrackConstraints extends MediaTrackConstraints {
+  advanced?: Array<MediaTrackConstraintSet & { torch?: boolean }>;
+}
+
 interface FastBarcodeScannerProps {
   onScan: (result: string) => void;
   onClose: () => void;
@@ -19,6 +29,8 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   const [isInitialized, setIsInitialized] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
+  const [flashEnabled, setFlashEnabled] = useState<boolean>(false);
+  const [flashSupported, setFlashSupported] = useState<boolean>(false);
 
   useEffect(() => {
     detectOrientation();
@@ -88,38 +100,25 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
 
   const getAvailableCameras = async () => {
     try {
-      console.log('📷 Getting available cameras...');
-      
       // First, try to get user media to trigger permission request
       try {
-        console.log('📷 Requesting camera permission first...');
         const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
         tempStream.getTracks().forEach(track => track.stop());
-        console.log('✅ Camera permission granted');
       } catch (permError) {
-        console.warn('⚠️ Camera permission denied or not available:', permError);
+        // Permission denied or not available
       }
       
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       
-      console.log('📷 Found cameras:', videoDevices.map(device => ({
-        deviceId: device.deviceId,
-        label: device.label || `Camera ${device.deviceId.substring(0, 8)}...`,
-        groupId: device.groupId
-      })));
-      
       // Check if we have valid cameras (with proper deviceId)
       const validCameras = videoDevices.filter(device => device.deviceId && device.deviceId !== '');
       
       if (validCameras.length === 0 && videoDevices.length > 0) {
-        console.warn('⚠️ No valid cameras found, but devices detected. This might be an external camera app.');
-        console.log('📷 Using fallback mode for external camera apps...');
-        
         // Create a fallback camera entry for external apps
         const fallbackCamera = {
           deviceId: 'fallback-camera',
-          label: 'External Camera (Camo Studio/Other)',
+          label: 'External Camera App',
           groupId: 'fallback-group',
           kind: 'videoinput' as MediaDeviceKind,
           toJSON: () => ({})
@@ -127,29 +126,72 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         
         setAvailableCameras([fallbackCamera]);
         setSelectedCamera('fallback-camera');
-        console.log('📷 Using fallback camera for external app');
         return;
       }
       
-      setAvailableCameras(validCameras.length > 0 ? validCameras : videoDevices);
+      // Process cameras
+      const cameras = validCameras.length > 0 ? validCameras : videoDevices;
+      const processedCameras = cameras.map(camera => ({
+        ...camera,
+        label: camera.label || `Camera ${camera.deviceId.substring(0, 8)}...`,
+        isExternal: camera.label.toLowerCase().includes('camo') ||
+                   camera.label.toLowerCase().includes('obs') ||
+                   camera.label.toLowerCase().includes('virtual') ||
+                   camera.label.toLowerCase().includes('studio') ||
+                   camera.label.toLowerCase().includes('external')
+      }));
+      
+      setAvailableCameras(processedCameras);
       
       // Auto-select the first camera if none is selected
-      const camerasToUse = validCameras.length > 0 ? validCameras : videoDevices;
-      if (camerasToUse.length > 0 && !selectedCamera) {
-        setSelectedCamera(camerasToUse[0].deviceId);
-        console.log('📷 Auto-selected camera:', camerasToUse[0].label || camerasToUse[0].deviceId);
+      if (processedCameras.length > 0 && !selectedCamera) {
+        setSelectedCamera(processedCameras[0].deviceId);
       }
     } catch (error) {
-      console.error('❌ Error getting cameras:', error);
+      console.error('Error getting cameras:', error);
     }
   };
 
   const handleCameraChange = (cameraId: string) => {
-    console.log('📷 Camera changed to:', cameraId);
+    // Stop current scanner completely
+    stopScanning();
+    
+    // Update selected camera
     setSelectedCamera(cameraId);
-    // Stop current scanner and restart with new camera
-    if (isQuaggaInitialized.current) {
-      stopScanning();
+    
+    // Clear any existing error
+    setError('');
+    
+    // Reinitialize scanner with new camera after a short delay
+    setTimeout(() => {
+      initializeScanner();
+    }, 1000);
+  };
+
+  const toggleFlash = async () => {
+    if (!mediaStreamRef.current) {
+      return;
+    }
+
+    try {
+      const videoTrack = mediaStreamRef.current.getVideoTracks()[0];
+      if (!videoTrack) {
+        return;
+      }
+
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+
+      if (capabilities.torch) {
+        const newFlashState = !flashEnabled;
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: newFlashState }]
+        } as ExtendedMediaTrackConstraints);
+        setFlashEnabled(newFlashState);
+      } else {
+        setFlashSupported(false);
+      }
+    } catch (error) {
+      setFlashSupported(false);
     }
   };
 
@@ -157,17 +199,6 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
     try {
       setError('');
       
-      // Debug information
-      console.log('🔍 Starting scanner initialization...');
-      console.log('🌐 Browser info:', {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        mediaDevices: !!navigator.mediaDevices,
-        getUserMedia: !!navigator.mediaDevices?.getUserMedia,
-        isSecureContext: window.isSecureContext,
-        protocol: window.location.protocol,
-        host: window.location.host
-      });
       
       // Check if we're in a secure context (HTTPS)
       if (!window.isSecureContext) {
@@ -175,63 +206,104 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         return;
       }
       
+      // Detect if using external camera app
+      const isExternalCamera = selectedCamera === 'fallback-camera' || 
+        (availableCameras.find(cam => cam.deviceId === selectedCamera) as any)?.isExternal;
+
       // First, check if we have camera permissions and get the stream
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           // Get camera access and store the stream
-          // Use more flexible constraints for mobile Safari with proper aspect ratio
+          // Use more flexible constraints for external camera apps like Camo Studio
           const constraints = {
             video: selectedCamera === 'fallback-camera' 
               ? {
-                  // Fallback constraints for external camera apps
-                  width: { ideal: 1280, max: 1920 },
-                  height: { ideal: 720, max: 1080 },
-                  frameRate: { ideal: 30, max: 60 },
-                  aspectRatio: { ideal: 16/9 }
+                  // Very flexible constraints for external camera apps
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
+                  frameRate: { ideal: 30 }
                 }
-              : {
-                  deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
-                  facingMode: selectedCamera ? undefined : "environment",
-                  width: { ideal: 1280, max: 1920 },
-                  height: { ideal: 720, max: 1080 },
-                  frameRate: { ideal: 30, max: 60 },
-                  aspectRatio: { ideal: 16/9 } // Standard mobile aspect ratio
-                }
+              : isExternalCamera
+                ? {
+                    // Flexible constraints for detected external cameras
+                    deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
+                  }
+                : {
+                    // Standard constraints for regular cameras
+                    deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
+                    facingMode: selectedCamera ? undefined : "environment",
+                    width: { ideal: 1280, max: 1920 },
+                    height: { ideal: 720, max: 1080 },
+                    frameRate: { ideal: 30, max: 60 },
+                    aspectRatio: { ideal: 16/9 }
+                  }
           };
           
-          console.log('📷 Camera constraints:', constraints);
-          console.log('📷 Using fallback mode:', selectedCamera === 'fallback-camera');
-          
-          console.log('Requesting camera with constraints:', constraints);
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
           mediaStreamRef.current = stream;
+          
+          // Check flash/torch capabilities
+          const videoTrack = stream.getVideoTracks()[0];
+          if (videoTrack) {
+            const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+            setFlashSupported(!!capabilities.torch);
+          }
         } catch (permErr) {
-          console.error('Camera permission error:', permErr);
-          console.error('Permission error details:', {
-            name: permErr.name,
-            message: permErr.message,
-            code: permErr.code,
-            constraint: permErr.constraint
-          });
-          
-          // Show detailed permission error for mobile debugging
-          const detailedPermError = `DEBUG INFO:
-Permission Error: ${permErr.name || 'Unknown'}
-Message: ${permErr.message || 'No message'}
-Code: ${permErr.code || 'No code'}
-Constraint: ${permErr.constraint || 'No constraint'}
-Browser: ${navigator.userAgent}
-Platform: ${navigator.platform}`;
-          
-          setError(`Error de permisos: ${permErr.name || 'Unknown'} - ${permErr.message || 'No message'}\n\n${detailedPermError}`);
-          return;
+          // Try fallback with minimal constraints
+          if (permErr.name === 'OverconstrainedError' || permErr.name === 'NotReadableError') {
+            try {
+              const fallbackConstraints = {
+                video: {
+                  width: { ideal: 640 },
+                  height: { ideal: 480 },
+                  frameRate: { ideal: 15 }
+                }
+              };
+              
+              const fallbackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+              mediaStreamRef.current = fallbackStream;
+              
+              // Check flash/torch capabilities
+              const videoTrack = fallbackStream.getVideoTracks()[0];
+              if (videoTrack) {
+                const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+                setFlashSupported(!!capabilities.torch);
+              }
+            } catch (fallbackErr) {
+              // Try with absolute minimal constraints
+              try {
+                const minimalConstraints = { video: true };
+                const minimalStream = await navigator.mediaDevices.getUserMedia(minimalConstraints);
+                mediaStreamRef.current = minimalStream;
+                
+                // Check flash/torch capabilities
+                const videoTrack = minimalStream.getVideoTracks()[0];
+                if (videoTrack) {
+                  const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
+                  setFlashSupported(!!capabilities.torch);
+                }
+              } catch (minimalErr) {
+                setError(`Error de cámara: ${permErr.name} - ${permErr.message}`);
+                return;
+              }
+            }
+          } else {
+            setError(`Error de permisos: ${permErr.name} - ${permErr.message}`);
+            return;
+          }
         }
       } else {
         setError('Tu navegador no soporta acceso a la cámara. Por favor usa un navegador moderno.');
         return;
       }
       
-      // Quagga2 configuration - optimized for mobile video quality
+      // Detect Safari iOS for special configuration
+      const isSafariIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
+
+      // Quagga2 configuration - optimized for mobile video quality and Safari iOS compatibility
       const config = {
         inputStream: {
           name: "Live",
@@ -253,24 +325,35 @@ Platform: ${navigator.platform}`;
               }
         },
         locator: {
-          patchSize: "large", // Larger patch for better mobile detection
-          halfSample: false // Disable half sampling for better quality
+          patchSize: (isSafariIOS || isExternalCamera) ? "medium" : "large", // Smaller patch for Safari iOS and external cameras
+          halfSample: (isSafariIOS || isExternalCamera) ? true : false // Enable half sampling for Safari iOS and external cameras
         },
-        numOfWorkers: 2, // Slightly more workers for better performance
-        frequency: 10, // Higher frequency for better responsiveness
+        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 2, // Disable workers for Safari iOS and external cameras
+        frequency: (isSafariIOS || isExternalCamera) ? 5 : 10, // Lower frequency for Safari iOS and external cameras
         decoder: {
-          readers: [
-            "code_128_reader",
-            "ean_reader",
-            "code_39_reader",
-            "upc_reader"
-          ]
+          readers: isSafariIOS 
+            ? [
+                // Minimal readers for Safari iOS to avoid constructor issues
+                "code_128_reader",
+                "ean_reader",
+                "code_39_reader"
+              ]
+            : [
+                "code_128_reader",
+                "ean_reader",
+                "ean_8_reader",
+                "code_39_reader",
+                "code_39_vin_reader",
+                "codabar_reader",
+                "upc_reader",
+                "upc_e_reader",
+                "i2of5_reader"
+                // qr_reader removed due to Safari iOS compatibility issues
+              ]
         },
         locate: true
       };
       
-      console.log('Quagga config:', config);
-      console.log('Scanner target element:', scannerRef.current);
 
       // Ensure the target element is ready and has dimensions
       if (!scannerRef.current) {
@@ -283,7 +366,6 @@ Platform: ${navigator.platform}`;
       if (rect.width === 0 || rect.height === 0) {
         initAttempts.current++;
         if (initAttempts.current < 10) {
-          console.log(`Element not ready, retrying in 100ms... (attempt ${initAttempts.current})`);
           setTimeout(() => {
             initializeScanner();
           }, 100);
@@ -294,63 +376,106 @@ Platform: ${navigator.platform}`;
         }
       }
 
-      console.log('Element dimensions:', rect);
-
-      // Initialize Quagga with better error handling
-      Quagga.init(config, (err) => {
-        if (err) {
-          console.error('Quagga initialization error:', err);
-          console.error('Error details:', {
-            name: err.name,
-            message: err.message,
-            stack: err.stack,
-            code: err.code,
-            constraint: err.constraint
-          });
-          
-          // Also show detailed error in the UI for mobile debugging
-          const detailedError = `DEBUG INFO:
-          Error: ${err.name || 'Unknown'}
-          Message: ${err.message || 'No message'}
-          Code: ${err.code || 'No code'}
-          Constraint: ${err.constraint || 'No constraint'}
-          Browser: ${navigator.userAgent}
-          Platform: ${navigator.platform}`;
-          
-          let errorMessage = 'Error al inicializar el escáner.';
-          
-          if (err.name === 'NotAllowedError') {
-            errorMessage = 'Permisos de cámara denegados. Por favor permite el acceso a la cámara.';
-          } else if (err.name === 'NotFoundError') {
-            errorMessage = 'Cámara no encontrada. Verifica que tu dispositivo tenga una cámara.';
-          } else if (err.name === 'NotReadableError') {
-            errorMessage = 'La cámara está siendo usada por otra aplicación. Cierra otras apps que usen la cámara.';
-          } else if (err.name === 'OverconstrainedError') {
-            errorMessage = 'Configuración de cámara no soportada. Intenta con otra cámara.';
-          } else {
-            // Show the actual error for debugging
-            errorMessage = `Error: ${err.name || 'Unknown'} - ${err.message || 'No message'}`;
+      // Initialize Quagga with Safari iOS compatibility
+      const initQuagga = () => {
+        Quagga.init(config, (err) => {
+          if (err) {
+            // Special handling for Safari iOS constructor errors
+            if (isSafariIOS && (err.message.includes('is not a constructor') || err.message.includes('Ut[e]'))) {
+              // Try with ultra-minimal config for Safari iOS
+              const fallbackConfig = {
+                inputStream: {
+                  name: "Live",
+                  type: "LiveStream",
+                  target: scannerRef.current,
+                  constraints: {
+                    width: { min: 640 },
+                    height: { min: 480 },
+                    facingMode: "environment"
+                  }
+                },
+                locator: {
+                  patchSize: "small",
+                  halfSample: true
+                },
+                numOfWorkers: 0,
+                frequency: 1,
+                decoder: {
+                  readers: ["code_128_reader"]
+                },
+                locate: true
+              };
+              
+              Quagga.init(fallbackConfig, (err2) => {
+                if (err2) {
+                  setError(`Error de Escaneo en Safari iOS\n\nError: ${err2.name} - ${err2.message}\n\nSafari iOS tiene limitaciones conocidas con Quagga2.\n\nSugerencias:\n• Usa Chrome o Firefox en iOS\n• Asegúrate de tener buena iluminación\n• Intenta reiniciar el escáner`);
+                } else {
+                  setIsInitialized(true);
+                  isQuaggaInitialized.current = true;
+                  startScanning();
+                }
+              });
+              return;
+            }
+            
+            let errorMessage = 'Error al inicializar el escáner.';
+            
+            if (err.name === 'NotAllowedError') {
+              errorMessage = 'Permisos de cámara denegados. Por favor permite el acceso a la cámara.';
+            } else if (err.name === 'NotFoundError') {
+              errorMessage = 'Cámara no encontrada. Verifica que tu dispositivo tenga una cámara.';
+            } else if (err.name === 'NotReadableError') {
+              errorMessage = 'La cámara está siendo usada por otra aplicación. Cierra otras apps que usen la cámara.';
+            } else if (err.name === 'OverconstrainedError') {
+              errorMessage = 'Configuración de cámara no soportada. Intenta con otra cámara.';
+            } else if (err.name === 'SecurityError') {
+              errorMessage = 'Error de seguridad. Asegúrate de acceder desde HTTPS.';
+            } else if (err.name === 'TypeError') {
+              errorMessage = 'Error de tipo. Esto puede ser un problema de compatibilidad del navegador.';
+            } else {
+              errorMessage = `Error: ${err.name || 'Unknown'} - ${err.message || 'No message'}`;
+            }
+            
+            setError(errorMessage);
+            return;
           }
           
-          // Show detailed error for mobile debugging
-          setError(`${errorMessage}\n\n${detailedError}`);
-          return;
-        }
-        
           setIsInitialized(true);
           isQuaggaInitialized.current = true;
           initAttempts.current = 0; // Reset counter on success
           startScanning();
         });
+      };
+      
+      // Initialize Quagga
+      initQuagga();
 
         // Listen for successful barcode detection
         Quagga.onDetected((result) => {
           const code = result.codeResult.code;
+          const format = result.codeResult.format;
           
-          // Validate the scanned code (same validation as before)
+          // Handle QR codes differently
+          if (format === 'qr_reader' || format === 'qr') {
+            // For QR codes, try to extract numeric parts
+            const numericMatch = code.match(/\d{6,12}/);
+            if (numericMatch) {
+              const numericCode = numericMatch[0];
+              onScan(numericCode);
+              stopScanning();
+              return;
+            } else {
+              setError(
+                `QR Code detectado: "${code}"\n\nNo se pudo extraer un código numérico válido del QR.\n\nConsejos:\n• Verifica que el QR contenga un código numérico de 6-12 dígitos\n• Intenta escanear el código de barras lineal en su lugar`
+              );
+              return;
+            }
+          }
+          
+          // Validate the scanned code
           const codePattern = /^\d{6,12}$/;
           if (codePattern.test(code)) {
-            // Process the code (same logic as before)
+            // Process the code
             let processedCode = code;
             if (code.length < 8) {
               processedCode = code.padStart(8, '0');
@@ -362,7 +487,7 @@ Platform: ${navigator.platform}`;
             stopScanning();
           } else {
             setError(
-              `Código escaneado: "${code}"\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente`
+              `Código escaneado: "${code}"\n\nFormato: ${format}\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 6-12 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente`
             );
           }
         });
@@ -389,7 +514,7 @@ Platform: ${navigator.platform}`;
           Quagga.offDetected(() => {});
         }
       } catch (err) {
-        console.log('Quagga stop error:', err);
+        // Quagga stop error
       }
       isQuaggaInitialized.current = false;
     }
@@ -398,9 +523,13 @@ Platform: ${navigator.platform}`;
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log('Stopped track in stopScanning:', track.label);
       });
       mediaStreamRef.current = null;
+    }
+    
+    // Clear the scanner container
+    if (scannerRef.current) {
+      scannerRef.current.innerHTML = '';
     }
     
     setIsScanning(false);
@@ -414,6 +543,20 @@ Platform: ${navigator.platform}`;
     } else {
       initializeScanner();
     }
+  };
+
+  const resetCamera = async () => {
+    // Stop current scanner
+    stopScanning();
+    
+    // Wait a bit for cleanup
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Clear any existing error
+    setError('');
+    
+    // Reinitialize
+    initializeScanner();
   };
 
   const toggleFullscreen = () => {
@@ -577,7 +720,7 @@ Platform: ${navigator.platform}`;
                   >
                     {availableCameras.map((camera) => (
                       <option key={camera.deviceId} value={camera.deviceId} className="bg-gray-800 text-white">
-                        {camera.label || `Camera ${camera.deviceId.substring(0, 8)}...`}
+                        {(camera as any).isExternal ? `📱 ${camera.label}` : camera.label || `Camera ${camera.deviceId.substring(0, 8)}...`}
                       </option>
                     ))}
                   </select>
@@ -585,11 +728,34 @@ Platform: ${navigator.platform}`;
               )}
 
               {/* External Camera App Notice */}
-              {selectedCamera === 'fallback-camera' && (
+              {(selectedCamera === 'fallback-camera' || (availableCameras.find(cam => cam.deviceId === selectedCamera) as any)?.isExternal) && (
                 <div className="absolute top-12 right-3 bg-blue-500/80 backdrop-blur-sm rounded-lg px-2 py-1">
                   <span className="text-white text-xs">
-                    📱 External Camera App Detected
+                    📱 {selectedCamera === 'fallback-camera' ? 'External Camera App' : 'External Camera (Camo Studio/Other)'}
                   </span>
+                </div>
+              )}
+
+              {/* Flash Toggle Button */}
+              {flashSupported && (
+                <div className="absolute top-3 left-1/2 transform -translate-x-1/2">
+                  <button
+                    onClick={toggleFlash}
+                    className={`glass-effect rounded-xl transition-all duration-300 hover:scale-105 border border-white/20 hover:border-white/40 p-2 ${
+                      flashEnabled ? 'bg-yellow-500/20 border-yellow-400/50' : 'bg-black/50'
+                    }`}
+                    title={flashEnabled ? 'Apagar flash' : 'Encender flash'}
+                  >
+                    {flashEnabled ? (
+                      <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
               )}
 
@@ -740,7 +906,7 @@ Platform: ${navigator.platform}`;
             isFullscreen ? 'px-4 py-4' : 'px-4 sm:px-6 py-4 sm:py-5'
           }`}>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <button
+                            <button 
                 onClick={retryScanning}
                 className={`flex-1 bg-white/10 hover:bg-white/20 border border-white/30 hover:border-white/50 text-white rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 ${
                   isFullscreen 
@@ -750,6 +916,17 @@ Platform: ${navigator.platform}`;
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Reintentar</span>
+              </button>
+              <button 
+                onClick={resetCamera}
+                className={`flex-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/50 hover:border-blue-400/70 text-blue-200 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 ${
+                  isFullscreen 
+                    ? 'py-3 px-4 text-sm' 
+                    : 'py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Reiniciar Cámara</span>
               </button>
               <button 
                 onClick={handleClose} 
