@@ -17,6 +17,8 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<string>('');
 
   useEffect(() => {
     detectOrientation();
@@ -58,9 +60,14 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
     };
   }, []);
 
+  // Get available cameras on mount
+  useEffect(() => {
+    getAvailableCameras();
+  }, []);
+
   // Separate effect to initialize scanner when element is ready
   useEffect(() => {
-    if (scannerRef.current) {
+    if (scannerRef.current && selectedCamera) {
       // Use requestAnimationFrame to ensure DOM is fully rendered
       const initTimer = requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -72,11 +79,78 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         cancelAnimationFrame(initTimer);
       };
     }
-  }, [scannerRef.current]);
+  }, [scannerRef.current, selectedCamera]);
 
   const detectOrientation = () => {
     const isPortrait = window.innerHeight > window.innerWidth;
     setOrientation(isPortrait ? 'portrait' : 'landscape');
+  };
+
+  const getAvailableCameras = async () => {
+    try {
+      console.log('📷 Getting available cameras...');
+      
+      // First, try to get user media to trigger permission request
+      try {
+        console.log('📷 Requesting camera permission first...');
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        tempStream.getTracks().forEach(track => track.stop());
+        console.log('✅ Camera permission granted');
+      } catch (permError) {
+        console.warn('⚠️ Camera permission denied or not available:', permError);
+      }
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      
+      console.log('📷 Found cameras:', videoDevices.map(device => ({
+        deviceId: device.deviceId,
+        label: device.label || `Camera ${device.deviceId.substring(0, 8)}...`,
+        groupId: device.groupId
+      })));
+      
+      // Check if we have valid cameras (with proper deviceId)
+      const validCameras = videoDevices.filter(device => device.deviceId && device.deviceId !== '');
+      
+      if (validCameras.length === 0 && videoDevices.length > 0) {
+        console.warn('⚠️ No valid cameras found, but devices detected. This might be an external camera app.');
+        console.log('📷 Using fallback mode for external camera apps...');
+        
+        // Create a fallback camera entry for external apps
+        const fallbackCamera = {
+          deviceId: 'fallback-camera',
+          label: 'External Camera (Camo Studio/Other)',
+          groupId: 'fallback-group',
+          kind: 'videoinput' as MediaDeviceKind,
+          toJSON: () => ({})
+        };
+        
+        setAvailableCameras([fallbackCamera]);
+        setSelectedCamera('fallback-camera');
+        console.log('📷 Using fallback camera for external app');
+        return;
+      }
+      
+      setAvailableCameras(validCameras.length > 0 ? validCameras : videoDevices);
+      
+      // Auto-select the first camera if none is selected
+      const camerasToUse = validCameras.length > 0 ? validCameras : videoDevices;
+      if (camerasToUse.length > 0 && !selectedCamera) {
+        setSelectedCamera(camerasToUse[0].deviceId);
+        console.log('📷 Auto-selected camera:', camerasToUse[0].label || camerasToUse[0].deviceId);
+      }
+    } catch (error) {
+      console.error('❌ Error getting cameras:', error);
+    }
+  };
+
+  const handleCameraChange = (cameraId: string) => {
+    console.log('📷 Camera changed to:', cameraId);
+    setSelectedCamera(cameraId);
+    // Stop current scanner and restart with new camera
+    if (isQuaggaInitialized.current) {
+      stopScanning();
+    }
   };
 
   const initializeScanner = async () => {
@@ -84,8 +158,8 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
       setError('');
       
       // Debug information
-      console.log('Initializing scanner...');
-      console.log('Browser info:', {
+      console.log('🔍 Starting scanner initialization...');
+      console.log('🌐 Browser info:', {
         userAgent: navigator.userAgent,
         platform: navigator.platform,
         mediaDevices: !!navigator.mediaDevices,
@@ -107,14 +181,26 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
           // Get camera access and store the stream
           // Use more flexible constraints for mobile Safari with proper aspect ratio
           const constraints = {
-            video: {
-              facingMode: "environment",
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
-              frameRate: { ideal: 30, max: 60 },
-              aspectRatio: { ideal: 16/9 } // Standard mobile aspect ratio
-            }
+            video: selectedCamera === 'fallback-camera' 
+              ? {
+                  // Fallback constraints for external camera apps
+                  width: { ideal: 1280, max: 1920 },
+                  height: { ideal: 720, max: 1080 },
+                  frameRate: { ideal: 30, max: 60 },
+                  aspectRatio: { ideal: 16/9 }
+                }
+              : {
+                  deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
+                  facingMode: selectedCamera ? undefined : "environment",
+                  width: { ideal: 1280, max: 1920 },
+                  height: { ideal: 720, max: 1080 },
+                  frameRate: { ideal: 30, max: 60 },
+                  aspectRatio: { ideal: 16/9 } // Standard mobile aspect ratio
+                }
           };
+          
+          console.log('📷 Camera constraints:', constraints);
+          console.log('📷 Using fallback mode:', selectedCamera === 'fallback-camera');
           
           console.log('Requesting camera with constraints:', constraints);
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -151,12 +237,20 @@ Platform: ${navigator.platform}`;
           name: "Live",
           type: "LiveStream",
           target: scannerRef.current,
-          constraints: {
-            width: { min: 1280, ideal: 1920 },
-            height: { min: 720, ideal: 1080 },
-            facingMode: "environment",
-            aspectRatio: { min: 1.5, max: 2.0 }
-          }
+          constraints: selectedCamera === 'fallback-camera'
+            ? {
+                // Fallback constraints for external camera apps
+                width: { min: 1280 },
+                height: { min: 720 },
+                facingMode: "environment",
+                aspectRatio: { min: 1.5, max: 2.0 }
+              }
+            : {
+                width: { min: 1280 },
+                height: { min: 720 },
+                facingMode: selectedCamera ? "environment" : "environment",
+                aspectRatio: { min: 1.5, max: 2.0 }
+              }
         },
         locator: {
           patchSize: "large", // Larger patch for better mobile detection
@@ -473,25 +567,51 @@ Platform: ${navigator.platform}`;
                 </div>
               )}
 
-                             {/* Status indicator */}
-               <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
-                 <div className="flex items-center space-x-2">
-                   <div className={`w-2 h-2 rounded-full ${
-                     isScanning 
-                       ? 'bg-green-400 animate-pulse' 
-                       : isInitialized 
-                         ? 'bg-blue-400' 
-                         : 'bg-yellow-400 animate-pulse'
-                   }`}></div>
-                   <span className="text-white text-xs font-medium">
-                     {isScanning 
-                       ? 'Escaneando' 
-                       : isInitialized 
-                         ? 'Listo' 
-                         : 'Inicializando...'}
-                   </span>
-                 </div>
-               </div>
+              {/* Camera Selector */}
+              {availableCameras.length > 1 && (
+                <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
+                  <select
+                    value={selectedCamera}
+                    onChange={(e) => handleCameraChange(e.target.value)}
+                    className="bg-transparent text-white text-xs border-none outline-none cursor-pointer"
+                  >
+                    {availableCameras.map((camera) => (
+                      <option key={camera.deviceId} value={camera.deviceId} className="bg-gray-800 text-white">
+                        {camera.label || `Camera ${camera.deviceId.substring(0, 8)}...`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* External Camera App Notice */}
+              {selectedCamera === 'fallback-camera' && (
+                <div className="absolute top-12 right-3 bg-blue-500/80 backdrop-blur-sm rounded-lg px-2 py-1">
+                  <span className="text-white text-xs">
+                    📱 External Camera App Detected
+                  </span>
+                </div>
+              )}
+
+              {/* Status indicator */}
+              <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isScanning 
+                      ? 'bg-green-400 animate-pulse' 
+                      : isInitialized 
+                        ? 'bg-blue-400' 
+                        : 'bg-yellow-400 animate-pulse'
+                  }`}></div>
+                  <span className="text-white text-xs font-medium">
+                    {isScanning 
+                      ? 'Escaneando' 
+                      : isInitialized 
+                        ? 'Listo' 
+                        : 'Inicializando...'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Instructions */}
