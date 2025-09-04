@@ -31,6 +31,8 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [flashEnabled, setFlashEnabled] = useState<boolean>(false);
   const [flashSupported, setFlashSupported] = useState<boolean>(false);
+  const [lastScannedCode, setLastScannedCode] = useState<string>('');
+  const [lastScanTime, setLastScanTime] = useState<number>(0);
 
   useEffect(() => {
     detectOrientation();
@@ -325,11 +327,11 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
               }
         },
         locator: {
-          patchSize: (isSafariIOS || isExternalCamera) ? "medium" : "large", // Smaller patch for Safari iOS and external cameras
+          patchSize: (isSafariIOS || isExternalCamera) ? "small" : "medium", // Use small patch for better iPhone performance
           halfSample: (isSafariIOS || isExternalCamera) ? true : false // Enable half sampling for Safari iOS and external cameras
         },
-        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 4, // More workers for better VIN detection
-        frequency: (isSafariIOS || isExternalCamera) ? 5 : 15, // Higher frequency for better VIN detection
+        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 2, // Reduced workers for better iPhone stability
+        frequency: (isSafariIOS || isExternalCamera) ? 10 : 50, // Optimized frequency based on forum insights
         decoder: {
           readers: isSafariIOS 
             ? [
@@ -349,10 +351,16 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                 "upc_reader",
                 "upc_e_reader",
                 "i2of5_reader",
-                "qr_reader",
+                "qr_reader"
               ]
         },
-        locate: true
+        locate: true,
+        debug: {
+          drawBoundingBox: false,
+          showFrequency: true, // Shows the detected frequency of the barcode
+          drawScanline: true, // Draws the red line for better visual feedback
+          showPattern: false
+        }
       };
       
 
@@ -396,15 +404,26 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                   }
                 },
                 locator: {
-                  patchSize: "small",
+                  patchSize: "small", // Use small patch for better iPhone performance
                   halfSample: true
                 },
                 numOfWorkers: 0,
-                frequency: 1,
+                frequency: 10, // Optimized frequency for iPhone
                 decoder: {
-                  readers: ["code_128_reader"]
+                  readers: [
+                    "code_128_reader",
+                    "code_39_reader",
+                    "code_39_vin_reader",
+                    "ean_reader"
+                  ]
                 },
-                locate: true
+                locate: true,
+                debug: {
+                  drawBoundingBox: false,
+                  showFrequency: true,
+                  drawScanline: true,
+                  showPattern: false
+                }
               };
               
               Quagga.init(fallbackConfig, (err2) => {
@@ -455,6 +474,23 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
         Quagga.onDetected((result) => {
           const code = result.codeResult.code;
           const format = result.codeResult.format;
+          const confidence = result.codeResult.decodedCodes?.length || 0;
+          
+          // Add confidence threshold to improve precision (based on forum insights)
+          if (confidence < 3) {
+            // Low confidence detection, ignore to prevent false positives
+            return;
+          }
+          
+          // Debounce mechanism to prevent duplicate scans (based on forum insights)
+          const currentTime = Date.now();
+          if (code === lastScannedCode && currentTime - lastScanTime < 2000) {
+            // Same code scanned within 2 seconds, ignore
+            return;
+          }
+          
+          setLastScannedCode(code);
+          setLastScanTime(currentTime);
           
           // Handle QR codes differently
           if (format === 'qr_reader' || format === 'qr') {
@@ -759,8 +795,8 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                     onChange={(e) => handleCameraChange(e.target.value)}
                     className="bg-transparent text-white text-xs border-none outline-none cursor-pointer"
                   >
-                    {availableCameras.map((camera) => (
-                      <option key={camera.deviceId} value={camera.deviceId} className="bg-gray-800 text-white">
+                    {availableCameras.map((camera, index) => (
+                      <option key={camera.deviceId || `camera-${index}`} value={camera.deviceId} className="bg-gray-800 text-white">
                         {(camera as any).isExternal ? `📱 ${camera.label}` : camera.label || `Camera ${camera.deviceId.substring(0, 8)}...`}
                       </option>
                     ))}
