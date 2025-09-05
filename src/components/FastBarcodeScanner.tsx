@@ -305,7 +305,7 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
       // Detect Safari iOS for special configuration
       const isSafariIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
 
-      // Quagga2 configuration - optimized for mobile video quality and Safari iOS compatibility
+      // Quagga2 configuration - optimized for maximum precision
       const config = {
         inputStream: {
           name: "Live",
@@ -314,24 +314,32 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
           constraints: selectedCamera === 'fallback-camera'
             ? {
                 // Fallback constraints for external camera apps
-                width: { min: 1280 },
-                height: { min: 720 },
+                width: { min: 1280, ideal: 1920 },
+                height: { min: 720, ideal: 1080 },
                 facingMode: "environment",
                 aspectRatio: { min: 1.5, max: 2.0 }
               }
             : {
-                width: { min: 1280 },
-                height: { min: 720 },
+                width: { min: 1280, ideal: 1920 },
+                height: { min: 720, ideal: 1080 },
                 facingMode: selectedCamera ? "environment" : "environment",
                 aspectRatio: { min: 1.5, max: 2.0 }
               }
         },
         locator: {
-          patchSize: (isSafariIOS || isExternalCamera) ? "small" : "medium", // Use small patch for better iPhone performance
-          halfSample: (isSafariIOS || isExternalCamera) ? true : false // Enable half sampling for Safari iOS and external cameras
+          patchSize: (isSafariIOS || isExternalCamera) ? "small" : "large", // Use large patch for better precision
+          halfSample: false, // Disable half sampling for maximum precision
+          showCanvas: false,
+          showPatches: false,
+          showFoundPatches: false,
+          showSkeleton: false,
+          showLabels: false,
+          showPatchLabels: false,
+          showBoundingBox: false,
+          showCrosshair: false
         },
-        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 2, // Reduced workers for better iPhone stability
-        frequency: (isSafariIOS || isExternalCamera) ? 10 : 50, // Optimized frequency based on forum insights
+        numOfWorkers: (isSafariIOS || isExternalCamera) ? 0 : 4, // More workers for better precision
+        frequency: (isSafariIOS || isExternalCamera) ? 10 : 100, // Higher frequency for better detection
         decoder: {
           readers: isSafariIOS 
             ? [
@@ -350,8 +358,7 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                 "codabar_reader",
                 "upc_reader",
                 "upc_e_reader",
-                "i2of5_reader",
-                "qr_reader"
+                "i2of5_reader"
               ]
         },
         locate: true,
@@ -475,39 +482,40 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
           const code = result.codeResult.code;
           const format = result.codeResult.format;
           const confidence = result.codeResult.decodedCodes?.length || 0;
+          const quality = result.codeResult.decodedCodes?.reduce((acc, item) => acc + (item.error || 0), 0) || 0;
+          const avgQuality = confidence > 0 ? quality / confidence : 0;
           
-          // Add confidence threshold to improve precision (based on forum insights)
-          if (confidence < 3) {
-            // Low confidence detection, ignore to prevent false positives
+          console.log('Fast Scanner - Detected:', {
+            code: code,
+            format: format,
+            confidence: confidence,
+            quality: avgQuality,
+            length: code.length
+          });
+          
+          // Enhanced confidence threshold for better precision
+          if (confidence < 4 || avgQuality > 0.5) {
+            console.log('Fast Scanner - Low confidence, ignoring:', code);
             return;
           }
           
-          // Debounce mechanism to prevent duplicate scans (based on forum insights)
+          // Additional validation for code length
+          if (code.length < 3 || code.length > 50) {
+            console.log('Fast Scanner - Invalid length, ignoring:', code);
+            return;
+          }
+          
+          // Debounce mechanism to prevent duplicate scans
           const currentTime = Date.now();
-          if (code === lastScannedCode && currentTime - lastScanTime < 2000) {
-            // Same code scanned within 2 seconds, ignore
+          if (code === lastScannedCode && currentTime - lastScanTime < 1500) {
+            console.log('Fast Scanner - Duplicate scan, ignoring:', code);
             return;
           }
           
           setLastScannedCode(code);
           setLastScanTime(currentTime);
           
-          // Handle QR codes differently
-          if (format === 'qr_reader' || format === 'qr') {
-            // For QR codes, try to extract numeric parts
-            const numericMatch = code.match(/\d{6,12}/);
-            if (numericMatch) {
-              const numericCode = numericMatch[0];
-              onScan(numericCode);
-              stopScanning();
-              return;
-            } else {
-              setError(
-                `QR Code detectado: "${code}"\n\nNo se pudo extraer un código numérico válido del QR.\n\nConsejos:\n• Verifica que el QR contenga un código numérico de 6-12 dígitos\n• Intenta escanear el código de barras lineal en su lugar`
-              );
-              return;
-            }
-          }
+          // This scanner is for barcodes only, not QR codes
           
           // Validate the scanned code - support both numeric codes and VIN codes
           const numericPattern = /^\d{6,12}$/;
@@ -695,7 +703,7 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                 <h2 className={`font-bold uppercase tracking-hero leading-heading text-shadow truncate ${
                   isFullscreen ? 'text-lg' : 'text-lg sm:text-xl'
                 }`}>
-                  Escáner Rápido (QuaggaJS)
+                  Escáner de Códigos de Barras
                 </h2>
                                  <p className={`text-white/70 truncate ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
                    {isScanning 
@@ -864,7 +872,7 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                   <ScanLine className={`text-white ${isFullscreen ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}`} />
                 </div>
                 <p className={`text-white font-medium ${isFullscreen ? 'text-sm' : 'text-sm sm:text-base'}`}>
-                  Escáner optimizado para velocidad máxima
+                  Escáner optimizado para códigos de barras lineales
                 </p>
               </div>
               
@@ -875,7 +883,7 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                     <p className={`text-white ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-                      <strong>Velocidad:</strong> Escaneo en milisegundos (10x más rápido que ZXing)
+                      <strong>Especializado:</strong> Códigos de barras lineales (Code 128, Code 39, EAN, UPC)
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -888,6 +896,12 @@ const FastBarcodeScanner: React.FC<FastBarcodeScannerProps> = ({ onScan, onClose
                     <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
                     <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
                       <strong>Optimizado:</strong> Procesamiento en tiempo real con múltiples workers
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
+                      <strong>Nota:</strong> Los QR Codes deben escanearse con el escáner de QR
                     </p>
                   </div>
                 </div>

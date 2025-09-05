@@ -29,7 +29,6 @@ import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
 import CompletionModal from './CompletionModal';
 import ConfirmationModal from './ConfirmationModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
-import FastBarcodeScanner from './FastBarcodeScanner';
 import Footer from './Footer';
 import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
@@ -37,6 +36,7 @@ import ManualInputModal from './ManualInputModal';
 import NewInventoryConfirmationModal from './NewInventoryConfirmationModal';
 import ScannedCodesList from './ScannedCodesList';
 import SessionTerminatedModal from './SessionTerminatedModal';
+import UnifiedScanner from './UnifiedScanner';
 
 const InventoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -1210,14 +1210,16 @@ const InventoryPage: React.FC = () => {
             </div>
           ) : (
             // Session is active - show scanning and management options
-            <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
-              <button
-                onClick={() => setShowScanner(true)}
-                className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-              >
-                <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Escanear Código de Barras</span>
-              </button>
+            <div className='flex flex-col gap-4 mb-6'>
+              
+              <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
+                                  <button
+                    onClick={() => setShowScanner(true)}
+                    className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                  >
+                    <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
+                    <span>Escanear Código</span>
+                  </button>
 
               <button
                 onClick={() => setShowManualInput(true)}
@@ -1235,8 +1237,8 @@ const InventoryPage: React.FC = () => {
                 <span>Gestionar Sesión</span>
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Session Validation Loading */}
         {isValidatingSession && (
@@ -1288,10 +1290,11 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
       </div>
+    </div>
 
       {/* Modals */}
       {showScanner && (
-        <FastBarcodeScanner
+        <UnifiedScanner
           onScan={handleScan}
           onClose={() => setShowScanner(false)}
         />

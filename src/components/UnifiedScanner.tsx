@@ -1,14 +1,26 @@
+import Quagga from '@ericblade/quagga2';
 import { BarcodeFormat, BrowserMultiFormatReader, DecodeHintType, Result } from '@zxing/library';
 import { Camera, Flashlight, FlashlightOff, Focus, Monitor, RotateCcw, ScanLine, Smartphone, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
-interface BarcodeScannerProps {
+// Extend MediaTrackCapabilities to include torch
+interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+// Extend MediaTrackConstraints to include torch
+interface ExtendedMediaTrackConstraints extends MediaTrackConstraints {
+  advanced?: Array<MediaTrackConstraintSet & { torch?: boolean }>;
+}
+
+interface UnifiedScannerProps {
   onScan: (result: string) => void;
   onClose: () => void;
 }
 
-const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
+const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerRef = useRef<HTMLDivElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -18,15 +30,24 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isFocusing, setIsFocusing] = useState(false);
   const [focusCapabilities, setFocusCapabilities] = useState<string[]>([]);
-  const [imageEnhancement, setImageEnhancement] = useState(true);
+  const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
+  const [scannerType, setScannerType] = useState<'qr' | 'barcode' | 'auto'>('auto');
+  const [detectedType, setDetectedType] = useState<'qr' | 'barcode' | null>(null);
+  
+  // QR Scanner refs
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  
+  // Barcode Scanner refs
+  const isQuaggaInitialized = useRef(false);
+  const initAttempts = useRef(0);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [lastScannedCode, setLastScannedCode] = useState<string>('');
+  const [lastScanTime, setLastScanTime] = useState<number>(0);
 
   useEffect(() => {
     initializeScanner();
     detectOrientation();
     
-    // Listen for orientation changes
     const handleOrientationChange = () => {
       setTimeout(detectOrientation, 100);
     };
@@ -35,12 +56,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
     window.addEventListener('resize', handleOrientationChange);
     
     return () => {
-      if (readerRef.current) {
-        readerRef.current.reset();
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      cleanup();
       window.removeEventListener('orientationchange', handleOrientationChange);
       window.removeEventListener('resize', handleOrientationChange);
     };
@@ -51,13 +67,108 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
     setOrientation(isPortrait ? 'portrait' : 'landscape');
   };
 
+  const cleanup = () => {
+    // Cleanup QR scanner
+    if (readerRef.current) {
+      readerRef.current.reset();
+    }
+    
+    // Cleanup barcode scanner
+    if (Quagga && isQuaggaInitialized.current) {
+      try {
+        Quagga.stop();
+        if (typeof Quagga.offDetected === 'function') {
+          Quagga.offDetected(() => {});
+        }
+      } catch (err) {
+        console.log('Quagga cleanup error:', err);
+      }
+      isQuaggaInitialized.current = false;
+    }
+    
+    // Stop media stream
+    if (streamRef) {
+      streamRef.getTracks().forEach(track => track.stop());
+      setStreamRef(null);
+    }
+    
+    setIsScanning(false);
+    setIsInitialized(false);
+  };
+
   const initializeScanner = async () => {
+    try {
+      setError('');
+      
+      // Get available video devices
+      const videoDevices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = videoDevices.filter(device => device.kind === 'videoinput');
+      setDevices(cameras);
+
+      if (cameras.length > 0) {
+        setSelectedDevice(cameras[0].deviceId);
+        await startScanning(cameras[0].deviceId);
+      }
+    } catch (err) {
+      setError('Falló al inicializar el escáner. Por favor verifica los permisos de la cámara.');
+    }
+  };
+
+  const startScanning = async (deviceId: string) => {
+    try {
+      setIsScanning(true);
+      setError('');
+
+      // Get video stream
+      const constraints = getVideoConstraints();
+      let stream;
+      
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            ...constraints
+          },
+        });
+      } catch (error) {
+        // Fallback to basic constraints
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'environment'
+          }
+        });
+      }
+
+      setStreamRef(stream);
+
+      // Check camera capabilities
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const capabilities = videoTrack.getCapabilities() as any;
+        const focusModes = capabilities.focusMode || [];
+        setFocusCapabilities(focusModes);
+      }
+
+      // Initialize both scanners
+      await initializeQRScanner(stream);
+      await initializeBarcodeScanner(stream);
+
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(`Falló al iniciar el escaneo: ${errorMsg}`);
+      setIsScanning(false);
+    }
+  };
+
+  const initializeQRScanner = async (stream: MediaStream) => {
     try {
       const reader = new BrowserMultiFormatReader();
       readerRef.current = reader;
       
-      // Optimize for precision and speed
-      reader.timeBetweenDecodingAttempts = 50; // Faster detection
+      reader.timeBetweenDecodingAttempts = 50;
       
       // Configure hints for maximum precision
       try {
@@ -73,85 +184,18 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
           BarcodeFormat.ITF
         ]);
         
-        // Enable character set detection for better accuracy
         reader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
-        
-        // Enable try harder for better detection
         reader.hints.set(DecodeHintType.TRY_HARDER, true);
-        
-        // Enable pure barcode mode for linear codes
         reader.hints.set(DecodeHintType.PURE_BARCODE, false);
-        
       } catch (e) {
         console.log('Could not set hints, using default formats');
-      }
-
-      // Get available video devices
-      const videoDevices = await reader.listVideoInputDevices();
-      setDevices(videoDevices);
-
-      if (videoDevices.length > 0) {
-        setSelectedDevice(videoDevices[0].deviceId);
-        startScanning(videoDevices[0].deviceId);
-      }
-    } catch (err) {
-      setError(
-        'Falló al inicializar el escáner. Por favor verifica los permisos de la cámara.'
-      );
-      // console.error('Scanner initialization error:', err); // Removed console.error
-    }
-  };
-
-  const startScanning = async (deviceId: string) => {
-    if (!videoRef.current || !readerRef.current) return;
-
-    try {
-      setIsScanning(true);
-      setError('');
-
-      // Get optimal video constraints based on orientation
-      const constraints = getVideoConstraints();
-      
-      // First, get the video stream manually to ensure it's working
-      let stream;
-      try {
-        // Try with full constraints first
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            ...constraints
-          },
-        });
-      } catch (error) {
-        console.log('Advanced constraints failed, trying basic constraints:', error);
-        // Fallback to basic constraints if advanced ones fail
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: 'environment'
-          }
-        });
-      }
-
-      // Store stream reference for flash control
-      streamRef.current = stream;
-
-      // Check camera capabilities
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        const capabilities = videoTrack.getCapabilities() as any;
-        const focusModes = capabilities.focusMode || [];
-        setFocusCapabilities(focusModes);
-        console.log('Available focus modes:', focusModes);
       }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
 
-      // Wait for video to be ready before starting scanner
+      // Wait for video to be ready
       await new Promise<void>((resolve, reject) => {
         if (!videoRef.current) {
           reject(new Error('Video element not found'));
@@ -159,7 +203,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         }
 
         const video = videoRef.current;
-
         const onCanPlay = () => {
           video.removeEventListener('canplay', onCanPlay);
           video.removeEventListener('error', onError);
@@ -169,160 +212,208 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         const onError = (e: Event) => {
           const target = e.target as HTMLVideoElement;
           const error = target.error;
-          const errorMsg = error
-            ? `Video error: ${error.code} - ${error.message}`
-            : 'Unknown video error';
+          const errorMsg = error ? `Video error: ${error.code} - ${error.message}` : 'Unknown video error';
           reject(new Error(errorMsg));
         };
 
         video.addEventListener('canplay', onCanPlay);
         video.addEventListener('error', onError);
 
-        // Set a timeout in case the video never loads
         setTimeout(() => {
           video.removeEventListener('canplay', onCanPlay);
           video.removeEventListener('error', onError);
-          reject(
-            new Error('Tiempo de espera agotado para el video - la cámara puede no ser accesible')
-          );
-        }, 15000); // Increased timeout to 15 seconds
+          reject(new Error('Tiempo de espera agotado para el video'));
+        }, 15000);
       });
 
+      // Start QR scanning
       await readerRef.current.decodeFromVideoDevice(
-        deviceId,
+        selectedDevice,
         videoRef.current,
         (result: Result | null, err: any) => {
           if (result) {
             const scannedCode = result.getText().trim();
             const format = result.getBarcodeFormat();
             const resultPoints = result.getResultPoints();
-            
-            // Calculate confidence based on result points and code length
             const confidence = resultPoints ? resultPoints.length : 0;
-            const isValidLength = scannedCode.length >= 3 && scannedCode.length <= 50;
             
-            console.log('Universal Scanner - Detected:', {
+            console.log('QR Scanner - Detected:', {
               text: scannedCode,
               format: format,
-              length: scannedCode.length,
-              confidence: confidence,
-              isValidLength: isValidLength
+              confidence: confidence
             });
 
-            // Enhanced validation with confidence scoring
-            const numericPattern = /^\d{6,12}$/;
-            const vinPattern = /^[A-HJ-NPR-Z0-9]{6,17}$/;
-            const alphanumericPattern = /^[A-Za-z0-9]{6,20}$/;
-            
-            // Minimum confidence threshold
-            if (confidence < 2 && scannedCode.length < 6) {
-              console.log('Universal Scanner - Low confidence, ignoring:', scannedCode);
-              return;
-            }
-            
-            // First, let's see if we can detect ANY content
-            if (scannedCode.length > 0) {
-              console.log('Universal Scanner - Raw content detected:', scannedCode);
-            }
-            
-            if (numericPattern.test(scannedCode)) {
-              // Process numeric QR code
-              let processedCode = scannedCode;
-              if (scannedCode.length < 8) {
-                processedCode = scannedCode.padStart(8, '0');
-              } else if (scannedCode.length > 8) {
-                processedCode = scannedCode.slice(-8);
-              }
-              
-              onScan(processedCode);
-              stopScanning();
-            } else if (vinPattern.test(scannedCode)) {
-              // Process VIN from QR code
-              const numericMatch = scannedCode.match(/\d{6,12}/);
-              if (numericMatch) {
-                const numericCode = numericMatch[0];
-                let processedCode = numericCode;
-                if (numericCode.length < 8) {
-                  processedCode = numericCode.padStart(8, '0');
-                } else if (numericCode.length > 8) {
-                  processedCode = numericCode.slice(-8);
-                }
-                onScan(processedCode);
-                stopScanning();
-              } else {
-                onScan(scannedCode);
-                stopScanning();
-              }
-            } else {
-              // Try to extract numeric part from QR content
-              const numericMatch = scannedCode.match(/\d{6,12}/);
-              if (numericMatch) {
-                const numericCode = numericMatch[0];
-                let processedCode = numericCode;
-                if (numericCode.length < 8) {
-                  processedCode = numericCode.padStart(8, '0');
-                } else if (numericCode.length > 8) {
-                  processedCode = numericCode.slice(-8);
-                }
-                onScan(processedCode);
-                stopScanning();
-              } else {
-                // For debugging - temporarily accept any QR code content
-                console.log('QR Scanner - Accepting any QR content for testing:', scannedCode);
-                onScan(scannedCode);
-                stopScanning();
-                
-                // Uncomment this for production:
-                // setError(
-                //   `QR Code escaneado: "${scannedCode}"\n\nNo se pudo extraer un código numérico válido del QR.\n\nConsejos:\n• Verifica que el QR contenga un código numérico de 6-12 dígitos\n• Asegúrate de que el QR esté bien iluminado\n• Intenta usar el enfoque manual si el QR se ve borroso`
-                // );
-              }
+            if (confidence >= 2 && scannedCode.length >= 3) {
+              setDetectedType('qr');
+              processScannedCode(scannedCode, 'qr');
             }
           }
           if (err && err.name !== 'NotFoundException') {
-            console.log('QR Scanner - Error:', err.name, err.message);
-            // Only show significant errors, not the frequent "looking for barcode" messages
             if (err.name === 'ChecksumException' || err.name === 'FormatException') {
-              setError('QR Code dañado o ilegible. Intenta escanear desde un ángulo diferente o usa entrada manual.');
+              setError('Código dañado o ilegible. Intenta escanear desde un ángulo diferente.');
             }
           }
         }
       );
-
-      // setDebugInfo('Scanner started successfully - Ready to scan!'); // Removed debugInfo
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.log('QR Scanner initialization failed:', err);
+    }
+  };
 
-      // Provide more helpful error messages
-      let userFriendlyError = 'Falló al iniciar el escaneo. ';
-      if (errorMsg.includes('timeout')) {
-        userFriendlyError +=
-          'La cámara no responde. Por favor verifica los permisos de la cámara e intenta de nuevo.';
-      } else if (errorMsg.includes('NotAllowedError')) {
-        userFriendlyError +=
-          'Acceso a la cámara denegado. Por favor permite los permisos de la cámara.';
-      } else if (errorMsg.includes('NotFoundError')) {
-        userFriendlyError +=
-          'Cámara no encontrada. Por favor verifica la conexión de tu cámara.';
-      } else {
-        userFriendlyError += errorMsg;
+  const initializeBarcodeScanner = async (stream: MediaStream) => {
+    try {
+      const isSafariIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
+      
+      const config = {
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: scannerRef.current,
+          constraints: {
+            width: { min: 1280, ideal: 1920 },
+            height: { min: 720, ideal: 1080 },
+            facingMode: "environment",
+            aspectRatio: { min: 1.5, max: 2.0 }
+          }
+        },
+        locator: {
+          patchSize: isSafariIOS ? "small" : "large",
+          halfSample: false,
+          showCanvas: false,
+          showPatches: false,
+          showFoundPatches: false,
+          showSkeleton: false,
+          showLabels: false,
+          showPatchLabels: false,
+          showBoundingBox: false,
+          showCrosshair: false
+        },
+        numOfWorkers: isSafariIOS ? 0 : 4,
+        frequency: isSafariIOS ? 10 : 100,
+        decoder: {
+          readers: isSafariIOS 
+            ? ["code_128_reader", "ean_reader", "code_39_reader", "code_39_vin_reader"]
+            : ["code_39_vin_reader", "code_39_reader", "code_128_reader", "ean_reader", "ean_8_reader", "codabar_reader", "upc_reader", "upc_e_reader", "i2of5_reader"]
+        },
+        locate: true,
+        debug: {
+          drawBoundingBox: false,
+          showFrequency: true,
+          drawScanline: true,
+          showPattern: false
+        }
+      };
+
+      if (!scannerRef.current) {
+        setError('Error: El elemento del escáner no está disponible');
+        return;
       }
 
-      setError(userFriendlyError);
-      // setDebugInfo(`Start error: ${errorMsg}`); // Removed debugInfo
-      setIsScanning(false);
+      const rect = scannerRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        initAttempts.current++;
+        if (initAttempts.current < 10) {
+          setTimeout(() => initializeBarcodeScanner(stream), 100);
+          return;
+        } else {
+          setError('Error: El elemento del escáner no se pudo inicializar');
+          return;
+        }
+      }
+
+      Quagga.init(config, (err) => {
+        if (err) {
+          console.log('Barcode scanner initialization failed:', err);
+          return;
+        }
+        
+        setIsInitialized(true);
+        isQuaggaInitialized.current = true;
+        
+        // Listen for barcode detection
+        Quagga.onDetected((result) => {
+          const code = result.codeResult.code;
+          const format = result.codeResult.format;
+          const confidence = result.codeResult.decodedCodes?.length || 0;
+          const quality = result.codeResult.decodedCodes?.reduce((acc, item) => acc + (item.error || 0), 0) || 0;
+          const avgQuality = confidence > 0 ? quality / confidence : 0;
+          
+          console.log('Barcode Scanner - Detected:', {
+            code: code,
+            format: format,
+            confidence: confidence,
+            quality: avgQuality
+          });
+          
+          if (confidence >= 4 && avgQuality <= 0.5 && code.length >= 3 && code.length <= 50) {
+            // Debounce mechanism
+            const currentTime = Date.now();
+            if (code !== lastScannedCode || currentTime - lastScanTime > 1500) {
+              setLastScannedCode(code);
+              setLastScanTime(currentTime);
+              setDetectedType('barcode');
+              processScannedCode(code, 'barcode');
+            }
+          }
+        });
+      });
+    } catch (err) {
+      console.log('Barcode scanner setup error:', err);
+    }
+  };
+
+  const processScannedCode = (code: string, type: 'qr' | 'barcode') => {
+    // Only accept 8-digit numeric codes
+    const eightDigitPattern = /^\d{8}$/;
+    const numericPattern = /^\d+$/;
+    
+    if (eightDigitPattern.test(code)) {
+      // Perfect 8-digit code
+      onScan(code);
+      stopScanning();
+    } else if (numericPattern.test(code)) {
+      // Numeric code that needs to be adjusted to 8 digits
+      let processedCode = code;
+      if (code.length < 8) {
+        processedCode = code.padStart(8, '0');
+      } else if (code.length > 8) {
+        processedCode = code.slice(-8);
+      }
+      onScan(processedCode);
+      stopScanning();
+    } else if (type === 'qr') {
+      // For QR codes, try to extract 8-digit numeric part
+      const numericMatch = code.match(/\d{8}/);
+      if (numericMatch) {
+        onScan(numericMatch[0]);
+        stopScanning();
+      } else {
+        // Try to extract any numeric part and pad/trim to 8 digits
+        const anyNumericMatch = code.match(/\d+/);
+        if (anyNumericMatch) {
+          let processedCode = anyNumericMatch[0];
+          if (processedCode.length < 8) {
+            processedCode = processedCode.padStart(8, '0');
+          } else if (processedCode.length > 8) {
+            processedCode = processedCode.slice(-8);
+          }
+          onScan(processedCode);
+          stopScanning();
+        } else {
+          setError(
+            `Código QR escaneado: "${code}"\n\nNo se pudo extraer un código numérico de 8 dígitos del QR.\n\nConsejos:\n• Verifica que el QR contenga un código numérico\n• Asegúrate de que el QR esté bien iluminado\n• Intenta usar el enfoque manual si el QR se ve borroso`
+          );
+        }
+      }
+    } else {
+      setError(
+        `Código escaneado: "${code}"\n\nEste código no es válido para inventarios de vehículos. Se espera un código numérico de 8 dígitos.\n\nConsejos:\n• Verifica que estés escaneando el código correcto del vehículo\n• Asegúrate de que el código esté bien iluminado\n• Intenta desde un ángulo diferente`
+      );
     }
   };
 
   const stopScanning = () => {
-    if (readerRef.current) {
-      readerRef.current.reset();
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    setIsScanning(false);
-    setIsFlashOn(false);
+    cleanup();
   };
 
   const handleDeviceChange = (deviceId: string) => {
@@ -334,17 +425,17 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const getVideoConstraints = () => {
     if (orientation === 'portrait') {
       return {
-        width: { ideal: 1920, max: 2560 }, // High resolution for precision
+        width: { ideal: 1920, max: 2560 },
         height: { ideal: 1080, max: 1440 },
-        facingMode: 'environment', // Use back camera on mobile
-        focusMode: 'continuous', // Auto-focus for better code reading
-        exposureMode: 'continuous', // Auto-exposure
-        whiteBalanceMode: 'continuous', // Auto white balance
-        frameRate: { ideal: 30, max: 60 } // Stable frame rate for better scanning
+        facingMode: 'environment',
+        focusMode: 'continuous',
+        exposureMode: 'continuous',
+        whiteBalanceMode: 'continuous',
+        frameRate: { ideal: 30, max: 60 }
       };
     } else {
       return {
-        width: { ideal: 2560, max: 3840 }, // High resolution for landscape
+        width: { ideal: 2560, max: 3840 },
         height: { ideal: 1440, max: 2160 },
         facingMode: 'environment',
         focusMode: 'continuous',
@@ -366,13 +457,13 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   };
 
   const toggleFlash = async () => {
-    if (!streamRef.current) return;
+    if (!streamRef) return;
 
     try {
-      const videoTrack = streamRef.current.getVideoTracks()[0];
+      const videoTrack = streamRef.getVideoTracks()[0];
       if (!videoTrack) return;
 
-      const capabilities = videoTrack.getCapabilities() as any;
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
       if (!capabilities.torch) {
         setError('Flash no disponible en este dispositivo');
         return;
@@ -390,11 +481,11 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   };
 
   const manualFocus = async () => {
-    if (!streamRef.current || isFocusing) return;
+    if (!streamRef || isFocusing) return;
 
     try {
       setIsFocusing(true);
-      const videoTrack = streamRef.current.getVideoTracks()[0];
+      const videoTrack = streamRef.getVideoTracks()[0];
       if (!videoTrack) {
         setIsFocusing(false);
         setError('No se pudo acceder al control de la cámara');
@@ -402,15 +493,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
       }
 
       const capabilities = videoTrack.getCapabilities() as any;
-      const settings = videoTrack.getSettings() as any;
       
-      console.log('Camera capabilities:', capabilities);
-      console.log('Camera settings:', settings);
-
-      // Enhanced focus strategies for maximum precision
-      let focusSuccess = false;
-
-      // Strategy 1: Try manual focus with enhanced settings
       if (capabilities.focusMode && capabilities.focusMode.includes('manual')) {
         try {
           await videoTrack.applyConstraints({
@@ -421,7 +504,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             ] as any
           });
           
-          // Wait and reset to auto
           setTimeout(async () => {
             try {
               await videoTrack.applyConstraints({
@@ -435,79 +517,17 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
               console.log('Error resetting to auto mode:', err);
             }
           }, 800);
-          
-          focusSuccess = true;
-          console.log('Enhanced manual focus applied successfully');
         } catch (err) {
-          console.log('Enhanced manual focus failed:', err);
+          console.log('Manual focus failed:', err);
         }
       }
 
-      // Strategy 2: Resolution cycling for better focus
-      if (!focusSuccess) {
-        try {
-          const currentSettings = videoTrack.getSettings();
-          const resolutions = [
-            { width: 1280, height: 720 },
-            { width: 1920, height: 1080 },
-            { width: 2560, height: 1440 },
-            { width: currentSettings.width, height: currentSettings.height }
-          ];
-          
-          for (let i = 0; i < resolutions.length; i++) {
-            await videoTrack.applyConstraints({
-              width: resolutions[i].width,
-              height: resolutions[i].height,
-              frameRate: { ideal: 60 }
-            });
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-          
-          focusSuccess = true;
-          console.log('Resolution cycling focus applied');
-        } catch (err) {
-          console.log('Resolution cycling failed:', err);
-        }
-      }
-
-      // Strategy 3: Exposure and white balance cycling
-      if (!focusSuccess && capabilities.exposureMode) {
-        try {
-          const modes = ['manual', 'continuous', 'single-shot'];
-          for (const mode of modes) {
-            if (capabilities.exposureMode.includes(mode)) {
-              await videoTrack.applyConstraints({
-                advanced: [{ exposureMode: mode }] as any
-              });
-              await new Promise(resolve => setTimeout(resolve, 300));
-            }
-          }
-          
-          // Reset to continuous
-          await videoTrack.applyConstraints({
-            advanced: [{ exposureMode: 'continuous' }] as any
-          });
-          
-          focusSuccess = true;
-          console.log('Exposure cycling focus applied');
-        } catch (err) {
-          console.log('Exposure cycling failed:', err);
-        }
-      }
-
-      // Reset focus after delay
       setTimeout(() => {
         setIsFocusing(false);
-        if (focusSuccess) {
-          console.log('Focus enhancement completed successfully');
-        } else {
-          console.log('Focus enhancement completed with limited success');
-        }
       }, 2000);
 
     } catch (err) {
       setIsFocusing(false);
-      console.error('Focus error:', err);
       setError('No se pudo controlar el enfoque. Intenta acercar o alejar el teléfono del código.');
     }
   };
@@ -647,6 +667,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
           {/* Video Container */}
           <div className={`${isFullscreen ? 'p-4' : 'p-4 sm:p-6'}`}>
             <div className="relative glass-effect rounded-2xl overflow-hidden border border-white/20 shadow-lg flex items-center justify-center">
+              {/* QR Scanner Video */}
               <video
                 ref={videoRef}
                 className={`w-full h-full object-cover cursor-pointer ${
@@ -671,30 +692,41 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 title="Toca para enfocar"
               />
 
-              {/* Scanning Overlay - Perfectly Centered */}
+              {/* Barcode Scanner Container */}
+              <div 
+                ref={scannerRef}
+                className="absolute inset-0 w-full h-full"
+                style={{ 
+                  position: 'absolute',
+                  backgroundColor: 'transparent',
+                  overflow: 'hidden',
+                  borderRadius: '12px'
+                }}
+              />
+
+              {/* Scanning Overlay */}
               {isScanning && (
                 <div className="absolute inset-0">
-                  {/* Scanning frame - absolutely centered */}
                   <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                     <div className={`border-2 border-white rounded-xl relative shadow-lg ${
                       orientation === 'portrait'
                         ? 'w-40 h-48 sm:w-48 sm:h-56 md:w-56 md:h-64'
                         : 'w-48 h-40 sm:w-64 sm:h-48 md:w-72 md:h-56'
                     }`}>
-                      {/* Corner markers - larger and more visible */}
+                      {/* Corner markers */}
                       <div className="absolute -top-3 -left-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-l-4 border-t-4 border-white rounded-tl-lg"></div>
                       <div className="absolute -top-3 -right-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-r-4 border-t-4 border-white rounded-tr-lg"></div>
                       <div className="absolute -bottom-3 -left-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-l-4 border-b-4 border-white rounded-bl-lg"></div>
                       <div className="absolute -bottom-3 -right-3 w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 border-r-4 border-b-4 border-white rounded-br-lg"></div>
                       
-                      {/* Scanning line animation - more prominent */}
+                      {/* Scanning line animation */}
                       <div className={`absolute bg-gradient-to-r from-transparent via-white to-transparent animate-pulse shadow-lg ${
                         orientation === 'portrait'
                           ? 'w-40 h-1 sm:w-48 sm:h-1.5 md:w-56 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
                           : 'w-48 h-1 sm:w-64 sm:h-1.5 md:w-72 md:h-2 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'
                       }`}></div>
                       
-                      {/* Center crosshair for better alignment */}
+                      {/* Center crosshair */}
                       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                         <div className="w-1 h-1 bg-white rounded-full animate-pulse"></div>
                       </div>
@@ -702,7 +734,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                       {/* Code type indicator */}
                       <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
                         <div className="bg-white/90 text-black px-2 py-1 rounded text-xs font-medium">
-                          QR + Códigos de Barras
+                          {detectedType === 'qr' ? 'QR Code' : detectedType === 'barcode' ? 'Código de Barras' : 'QR + Códigos de Barras'}
                         </div>
                       </div>
                     </div>
@@ -710,7 +742,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 </div>
               )}
 
-              {/* Video overlay info */}
+              {/* Status indicators */}
               <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
                 <div className="flex items-center space-x-2">
                   <div className={`w-2 h-2 rounded-full ${isScanning ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
@@ -720,12 +752,11 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 </div>
               </div>
 
-              {/* Precision indicator */}
               <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                   <span className="text-white text-xs font-medium">
-                    Alta Precisión
+                    Detección Automática
                   </span>
                 </div>
               </div>
@@ -750,7 +781,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                   <ScanLine className={`text-white ${isFullscreen ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}`} />
                 </div>
                 <p className={`text-white font-medium ${isFullscreen ? 'text-sm' : 'text-sm sm:text-base'}`}>
-                  Posiciona el código (QR o de barras) dentro del marco para escanear
+                  Escáner inteligente que detecta automáticamente QR y códigos de barras
                 </p>
               </div>
               
@@ -761,19 +792,19 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                     <p className={`text-white ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-                      <strong>Formato Esperado:</strong> QR Code o código de barras con 6-12 dígitos
+                      <strong>Detección Automática:</strong> QR Codes y códigos de barras lineales
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
                     <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      Compatible con QR Codes y códigos de barras lineales
+                      <strong>Formato:</strong> Código numérico de 8 dígitos
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                     <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      <strong>Orientación:</strong> Funciona en vertical y horizontal
+                      <strong>Optimizado:</strong> Máxima precisión con detección dual
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -786,28 +817,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                     <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
                     <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
                       <strong>Consejo:</strong> Mantén el teléfono estable y a 15-30cm del código
-                    </p>
-                  </div>
-                  {focusCapabilities.length > 0 && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                        <strong>Enfoque:</strong> Usa el botón de enfoque si el código se ve borroso
-                      </p>
-                    </div>
-                  )}
-                  {focusCapabilities.length === 0 && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                        <strong>Enfoque:</strong> Toca la pantalla de la cámara para enfocar
-                      </p>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      <strong>Chrome:</strong> Si el enfoque no funciona, acerca/aleja el teléfono
                     </p>
                   </div>
                 </div>
@@ -904,4 +913,4 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   );
 };
 
-export default BarcodeScanner;
+export default UnifiedScanner;
