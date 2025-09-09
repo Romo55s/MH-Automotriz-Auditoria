@@ -3,23 +3,29 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import {
-    checkInventoryCompletion,
-    checkInventoryLimits,
-    checkMonthlyInventory,
-    deleteMultipleScannedEntries,
-    deleteScannedEntry,
-    downloadInventoryCSV,
-    downloadInventoryExcel,
-    finishSession,
-    getMonthlyInventory,
-    saveScan,
+  checkInventoryCompletion,
+  checkInventoryLimits,
+  checkMonthlyInventory,
+  deleteMultipleScannedEntries,
+  deleteScannedEntry,
+  downloadInventoryCSV,
+  downloadInventoryExcel,
+  finishSession,
+  getMonthlyInventory,
+  saveScan,
 } from '../services/api';
 import { ScannedCode } from '../types/index';
 import {
-    clearSession,
-    loadSession,
-    saveSession,
-    SessionData,
+  cleanupExpiredLocalStorage,
+  clearScansFromLocalStorage,
+  loadScansFromLocalStorage,
+  saveScansToLocalStorage,
+} from '../utils/localStorageManager';
+import {
+  clearSession,
+  loadSession,
+  saveSession,
+  SessionData,
 } from '../utils/sessionManager';
 
 export const useInventory = () => {
@@ -139,7 +145,7 @@ export const useInventory = () => {
     }
   }, [selectedAgency, currentMonth, currentYear, isSessionActive, showError]);
 
-  // Load existing session data from sessionStorage
+  // Load existing session data from sessionStorage and local storage
   const loadExistingSession = useCallback(async () => {
     if (!selectedAgency || !currentMonth || !currentYear) return;
 
@@ -153,7 +159,10 @@ export const useInventory = () => {
       return;
     }
 
-    // If inventory is still active, check for cached session
+    // Clean up expired local storage data
+    cleanupExpiredLocalStorage();
+
+    // Check for cached session in sessionStorage first
     const savedSession = loadSession(
       selectedAgency.name,
       currentMonth,
@@ -175,6 +184,14 @@ export const useInventory = () => {
         setScannedCodes(codesWithDates);
         setIsSessionActive(savedSession.isSessionActive);
         setSessionId(savedSession.sessionId);
+
+        // Also save to local storage for backup
+        saveScansToLocalStorage(
+          savedSession.scannedCodes,
+          selectedAgency.name,
+          currentMonth,
+          currentYear
+        );
 
         // Check if we can continue this session
         if (savedSession.isSessionActive) {
@@ -198,8 +215,42 @@ export const useInventory = () => {
         clearSession(selectedAgency.name, currentMonth, currentYear);
       }
     } else {
-      // Check if monthly inventory exists and can be continued
-      await checkAndLoadExistingInventory();
+      // Check local storage for backup data
+      const localData = loadScansFromLocalStorage(
+        selectedAgency.name,
+        currentMonth,
+        currentYear
+      );
+
+      if (localData && localData.scannedCodes.length > 0) {
+        try {
+          // Convert timestamp strings back to Date objects
+          const codesWithDates: ScannedCode[] = localData.scannedCodes.map(
+            code => ({
+              ...code,
+              timestamp: new Date(code.timestamp),
+              user: code.user || 'Usuario desconocido',
+            })
+          );
+
+          // Restore from local storage
+          setScannedCodes(codesWithDates);
+          setIsSessionActive(false); // Mark as paused since it's from local storage
+          setSessionId(''); // No active session ID
+
+          showInfo(
+            'Datos Restaurados',
+            `Se restauraron ${codesWithDates.length} códigos escaneados desde el almacenamiento local. Los datos expiran en 1.5 días.`
+          );
+        } catch (err) {
+          console.error('Error loading local storage data:', err);
+          // Clear corrupted local storage data
+          clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
+        }
+      } else {
+        // Check if monthly inventory exists and can be continued
+        await checkAndLoadExistingInventory();
+      }
     }
   }, [selectedAgency, currentMonth, currentYear, showInfo, checkGlobalInventoryCompletion]);
 
@@ -209,6 +260,11 @@ export const useInventory = () => {
       loadExistingSession();
     }
   }, [selectedAgency, currentMonth, currentYear, loadExistingSession]);
+
+  // Cleanup expired local storage data on component mount
+  useEffect(() => {
+    cleanupExpiredLocalStorage();
+  }, []);
 
   // Periodic sync effect - sync every 10 seconds when session is active
   useEffect(() => {
@@ -273,7 +329,7 @@ export const useInventory = () => {
     }
   }, [selectedAgency, currentMonth, currentYear, showInfo]);
 
-  // Save session data to sessionStorage
+  // Save session data to sessionStorage and local storage
   const saveSessionToStorage = useCallback(
     (codes: ScannedCode[], active: boolean, id: string) => {
       if (!selectedAgency || !currentMonth || !currentYear) return;
@@ -294,7 +350,16 @@ export const useInventory = () => {
         year: currentYear,
       };
 
+      // Save to session storage
       saveSession(sessionData);
+
+      // Also save to local storage for backup (with 1.5 day expiry)
+      saveScansToLocalStorage(
+        sessionData.scannedCodes,
+        selectedAgency.name,
+        currentMonth,
+        currentYear
+      );
     },
     [selectedAgency, currentMonth, currentYear]
   );
@@ -878,9 +943,10 @@ export const useInventory = () => {
     setIsLoading(false);
     setSessionId('');
 
-    // Clear session storage
+    // Clear session storage and local storage
     if (selectedAgency && currentMonth && currentYear) {
       clearSession(selectedAgency.name, currentMonth, currentYear);
+      clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
     }
   }, [selectedAgency, currentMonth, currentYear]);
 
@@ -912,7 +978,23 @@ export const useInventory = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      showInfo('Descarga Completada', 'El archivo se ha descargado exitosamente. Los datos han sido eliminados del sistema.');
+      // Store the downloaded data locally with 36-hour expiry
+      const downloadedData = {
+        agencyName: selectedAgency.name,
+        month: currentMonth,
+        year: currentYear,
+        downloadedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(), // 36 hours from now
+        format: format,
+        data: scannedCodes // Store the current scanned codes
+      };
+
+      // Save to local storage with expiry
+      const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');
+      downloadedInventories.push(downloadedData);
+      localStorage.setItem('downloadedInventories', JSON.stringify(downloadedInventories));
+
+      showInfo('Descarga Completada', 'El archivo se ha descargado exitosamente. Los datos han sido eliminados de Google Sheets y almacenados localmente por 36 horas.');
       return true;
     } catch (error) {
       console.error('Error downloading inventory:', error);
@@ -921,7 +1003,7 @@ export const useInventory = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedAgency, currentMonth, currentYear, showError, showInfo]);
+  }, [selectedAgency, currentMonth, currentYear, scannedCodes, showError, showInfo]);
 
   return {
     // State

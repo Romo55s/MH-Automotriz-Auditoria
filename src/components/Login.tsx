@@ -1,5 +1,5 @@
 import { useAuth0 } from '@auth0/auth0-react';
-import { Car, Shield, Users, Zap } from 'lucide-react';
+import { Shield, Users, Zap } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth0Config } from '../config/auth0-config';
@@ -73,8 +73,12 @@ const Login: React.FC = () => {
       <div className='flex-1 flex flex-col items-center justify-center p-4'>
         <div className='z-10 relative max-w-2xl mx-auto text-center'>
           <div className='mb-8 sm:mb-12'>
-            <div className='mx-auto w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-6 sm:mb-8 border border-white/20'>
-              <Car className='w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-white' />
+            <div className='mx-auto w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-6 sm:mb-8 border border-white/20'>
+              <img 
+                src="/MH Automotriz-White.svg" 
+                alt="MH Automotriz Logo" 
+                className='w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16'
+              />
             </div>
             <h1 className='text-3xl sm:text-4xl lg:text-5xl font-bold uppercase mb-4 sm:mb-6 text-white'>
               <span className='block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent'>

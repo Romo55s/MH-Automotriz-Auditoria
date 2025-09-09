@@ -6,6 +6,7 @@ import {
   Camera,
   CheckCircle,
   Clock,
+  Download,
   FileText,
   Info,
   Pause,
@@ -29,9 +30,11 @@ import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
 import CompletionModal from './CompletionModal';
 import ConfirmationModal from './ConfirmationModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+import DownloadConfirmationModal from './DownloadConfirmationModal';
 import Footer from './Footer';
 import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
+import LocalStorageInfo from './LocalStorageInfo';
 import ManualInputModal from './ManualInputModal';
 import NewInventoryConfirmationModal from './NewInventoryConfirmationModal';
 import ScannedCodesList from './ScannedCodesList';
@@ -67,6 +70,14 @@ const InventoryPage: React.FC = () => {
   const [selectedIndicesForBulkDelete, setSelectedIndicesForBulkDelete] = useState<number[]>([]);
   const [selectedBarcodesForBulkDelete, setSelectedBarcodesForBulkDelete] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showDownloadConfirmation, setShowDownloadConfirmation] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadInventoryData, setDownloadInventoryData] = useState<{
+    monthName: string;
+    year: number;
+    totalScans: number;
+    createdBy: string;
+  } | null>(null);
   const [sessionTerminationData, setSessionTerminationData] = useState<{
     completedBy: string;
     isCurrentUser?: boolean;
@@ -415,6 +426,34 @@ const InventoryPage: React.FC = () => {
     }
   };
 
+  // Check if a completed inventory is still downloadable (within 1.5 days)
+  const isInventoryDownloadable = (inventory: MonthlyInventory) => {
+    if (inventory.status !== 'Completed') return false;
+    
+    const now = new Date();
+    const completedDate = new Date(inventory.lastUpdated);
+    const diffHours = (now.getTime() - completedDate.getTime()) / (1000 * 60 * 60);
+    
+    return diffHours <= 36; // 1.5 days = 36 hours
+  };
+
+  // Get time remaining for download
+  const getDownloadTimeRemaining = (inventory: MonthlyInventory) => {
+    if (inventory.status !== 'Completed') return null;
+    
+    const now = new Date();
+    const completedDate = new Date(inventory.lastUpdated);
+    const diffHours = (now.getTime() - completedDate.getTime()) / (1000 * 60 * 60);
+    const remainingHours = 36 - diffHours;
+    
+    if (remainingHours <= 0) return null;
+    
+    const hours = Math.floor(remainingHours);
+    const minutes = Math.floor((remainingHours - hours) * 60);
+    
+    return `${hours}h ${minutes}m`;
+  };
+
   const handleRefreshInventories = () => {
     loadInventories();
   };
@@ -535,7 +574,59 @@ const InventoryPage: React.FC = () => {
   };
 
   const handleDownloadCSV = async () => {
-    await downloadInventory('csv');
+    setShowDownloadConfirmation(true);
+  };
+
+  const handleDownloadConfirm = async () => {
+    if (!downloadInventoryData) return;
+
+    try {
+      setIsDownloading(true);
+      setShowDownloadConfirmation(false);
+      
+      showInfo(
+        'Iniciando Descarga',
+        'Preparando el archivo CSV del inventario y configurando almacenamiento local...'
+      );
+
+      await downloadInventory('csv');
+      
+      showSuccess(
+        'Descarga Completada',
+        'El inventario ha sido descargado y los datos se han eliminado de Google Sheets. Los datos están ahora almacenados localmente y se eliminarán automáticamente después de 36 horas.'
+      );
+    } catch (error) {
+      console.error('Error downloading inventory:', error);
+      showError(
+        'Error de Descarga',
+        'Ocurrió un error al descargar el inventario. Por favor, inténtalo de nuevo.'
+      );
+    } finally {
+      setIsDownloading(false);
+      setDownloadInventoryData(null);
+    }
+  };
+
+  const handleDownloadCancel = () => {
+    setShowDownloadConfirmation(false);
+    setDownloadInventoryData(null);
+  };
+
+  const handleDownloadInventory = async (inventory: MonthlyInventory) => {
+    if (!isInventoryDownloadable(inventory)) {
+      showError('Descarga No Disponible', 'Este inventario ya no está disponible para descarga. El período de descarga ha expirado.');
+      return;
+    }
+
+    // Set the download inventory data for the download confirmation modal
+    setDownloadInventoryData({
+      monthName: getMonthName(inventory.month),
+      year: inventory.year,
+      totalScans: inventory.totalScans,
+      createdBy: inventory.createdBy
+    });
+    
+    setShowDownloadConfirmation(true);
   };
 
   const handleStartNewInventory = async () => {
@@ -656,14 +747,14 @@ const InventoryPage: React.FC = () => {
 
   return (
     <div className='min-h-screen bg-background relative overflow-hidden flex flex-col'>
-      {/* Floating 3D shapes */}
-      <div className='floating-shape w-28 h-28 top-16 right-16'></div>
+      {/* Floating 3D shapes - Responsive positioning */}
+      <div className='floating-shape w-16 h-16 sm:w-20 sm:h-20 lg:w-28 lg:h-28 top-4 right-4 sm:top-16 sm:right-16'></div>
       <div
-        className='floating-shape w-20 h-20 bottom-1/3 left-20'
+        className='floating-shape w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bottom-1/3 left-4 sm:left-20'
         style={{ animationDelay: '2s' }}
       ></div>
       <div
-        className='floating-shape w-16 h-16 top-1/2 right-3'
+        className='floating-shape w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 top-1/2 right-2 sm:right-3'
         style={{ animationDelay: '4s' }}
       ></div>
 
@@ -716,7 +807,7 @@ const InventoryPage: React.FC = () => {
         </div>
       )}
 
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
+      <div className='w-full max-w-md py-6 sm:max-w-md md:max-w-4xl lg:max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 sm:py-6 relative z-10'>
         {/* Monthly Inventory Info */}
         <div className='card mb-6'>
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
@@ -730,7 +821,7 @@ const InventoryPage: React.FC = () => {
               </div>
             )}
           </div>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6'>
             <div className='text-center'>
               <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4'>
                 <Calendar className='w-7 h-7 sm:w-8 sm:h-8 text-white' />
@@ -1026,6 +1117,90 @@ const InventoryPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Download Section for Completed Inventories */}
+        {completedInventoriesThisMonth.length > 0 && (
+          <div className='card mb-6 border-blue-500/20 bg-blue-500/10'>
+            <div className='flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4'>
+              <Download className='w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mt-1 flex-shrink-0' />
+              <div className='flex-1'>
+                <h3 className='text-base sm:text-lg font-semibold text-blue-400 mb-2 sm:mb-3'>
+                  Inventarios Completados Disponibles para Descarga
+                </h3>
+                <p className='text-sm sm:text-base text-secondaryText mb-4'>
+                  Los inventarios completados están disponibles para descarga por 1.5 días (36 horas) después de su finalización.
+                </p>
+                <div className='space-y-3'>
+                  {completedInventoriesThisMonth.map((inventory, index) => (
+                    <div
+                      key={inventory.id}
+                      className='p-3 sm:p-4 glass-effect border border-white/20 rounded-xl'
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
+                        backdropFilter: 'blur(20px)'
+                      }}
+                    >
+                      <div className='flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0'>
+                        <div className='flex-1 min-w-0'>
+                          <div className='flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mb-2'>
+                            <div className='flex items-center space-x-2'>
+                              <CheckCircle className='w-4 h-4 sm:w-5 sm:h-5 text-green-400 flex-shrink-0' />
+                              <h4 className='text-sm sm:text-base font-bold text-white truncate'>
+                                {getMonthName(inventory.month)} {inventory.year} - {inventory.totalScans} códigos
+                              </h4>
+                            </div>
+                            <span className='text-xs text-secondaryText'>
+                              por {inventory.createdBy}
+                            </span>
+                          </div>
+                          <div className='flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-xs sm:text-sm text-secondaryText'>
+                            <span>Completado: {inventory.lastUpdated.toLocaleDateString()}</span>
+                            {isInventoryDownloadable(inventory) && (
+                              <span className='text-blue-300'>
+                                Tiempo restante: {getDownloadTimeRemaining(inventory)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className='flex-shrink-0 sm:ml-4'>
+                          {isInventoryDownloadable(inventory) ? (
+                            <button
+                              onClick={() => handleDownloadInventory(inventory)}
+                              className='w-full sm:w-auto btn-primary text-xs sm:text-sm py-2 sm:py-3 px-3 sm:px-4 flex items-center justify-center space-x-2'
+                              style={{
+                                background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
+                                backdropFilter: 'blur(20px)',
+                                borderRadius: '9999px',
+                                fontWeight: '600',
+                                border: '1px solid #fff'
+                              }}
+                            >
+                              <Download className='w-3 h-3 sm:w-4 sm:h-4' />
+                              <span>Descargar</span>
+                            </button>
+                          ) : (
+                            <div className='flex flex-col items-center space-y-1'>
+                              <button
+                                disabled
+                                className='w-full sm:w-auto bg-gray-600 text-gray-400 py-2 px-3 sm:px-4 rounded-pill font-bold text-xs sm:text-sm cursor-not-allowed opacity-50'
+                                style={{ borderRadius: '9999px' }}
+                              >
+                                <Download className='w-3 h-3 sm:w-4 sm:h-4' />
+                              </button>
+                              <span className='text-xs text-gray-400'>
+                                Expirado
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Paused Session Notice */}
         {existingInventory?.status === 'Paused' && (
           <div className='card mb-6 border-yellow-500/20 bg-yellow-500/10'>
@@ -1124,6 +1299,17 @@ const InventoryPage: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {/* Local Storage Info */}
+            {selectedAgency && (
+              <div className='flex justify-center mb-4'>
+                <LocalStorageInfo
+                  agencyName={selectedAgency.name}
+                  month={currentMonth}
+                  year={currentYear}
+                />
+              </div>
+            )}
             <p className='text-sm sm:text-base text-secondaryText'>
               {isSessionActive
                 ? 'Tu sesión de inventario está activa actualmente. Escanea códigos de barras o gestiona tu sesión abajo.'
@@ -1149,55 +1335,58 @@ const InventoryPage: React.FC = () => {
                   </span>
                 </div>
               )}
-              {!currentUserActiveSession && completedInventoriesThisMonth.length < 2 && (
-                <button
-                  onClick={() => {
-                    if (activeSessionsThisMonth.length > 0) {
-                      // Continue existing active session
-                      const activeSession = activeSessionsThisMonth[0];
-                      handleContinueInventory(activeSession);
-                    } else {
-                      // Start new session
-                      handleStartNewInventory();
-                    }
-                  }}
-                  className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-                >
-                  {activeSessionsThisMonth.length > 0 ? (
-                    <>
-                      <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                      <span>Continuar Sesión</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
-                      <span>Iniciar Nueva Sesión</span>
-                    </>
-                  )}
-                </button>
-              )}
+              
+              <div className='btn-group mb-4'>
+                {!currentUserActiveSession && completedInventoriesThisMonth.length < 2 && (
+                  <button
+                    onClick={() => {
+                      if (activeSessionsThisMonth.length > 0) {
+                        // Continue existing active session
+                        const activeSession = activeSessionsThisMonth[0];
+                        handleContinueInventory(activeSession);
+                      } else {
+                        // Start new session
+                        handleStartNewInventory();
+                      }
+                    }}
+                    className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                  >
+                    {activeSessionsThisMonth.length > 0 ? (
+                      <>
+                        <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                        <span>Continuar Sesión</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className='w-5 h-5 sm:w-6 sm:h-6' />
+                        <span>Iniciar Nueva Sesión</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
-              {/* Continue user's active session */}
-              {currentUserActiveSession && (
-                <button
-                  onClick={() => handleContinueInventory(currentUserActiveSession)}
-                  className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-                >
-                  <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Continuar Mi Sesión Activa</span>
-                </button>
-              )}
+                {/* Continue user's active session */}
+                {currentUserActiveSession && (
+                  <button
+                    onClick={() => handleContinueInventory(currentUserActiveSession)}
+                    className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                  >
+                    <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                    <span>Continuar Mi Sesión Activa</span>
+                  </button>
+                )}
 
-              {/* Continue user's paused session */}
-              {currentUserPausedSession && (
-                <button
-                  onClick={() => handleContinueInventory(currentUserPausedSession)}
-                  className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-                >
-                  <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Continuar Mi Sesión Pausada</span>
-                </button>
-              )}
+                {/* Continue user's paused session */}
+                {currentUserPausedSession && (
+                  <button
+                    onClick={() => handleContinueInventory(currentUserPausedSession)}
+                    className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                  >
+                    <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
+                    <span>Continuar Mi Sesión Pausada</span>
+                  </button>
+                )}
+              </div>
 
               {/* Show if monthly inventory limit is reached */}
               {completedInventoriesThisMonth.length >= 2 && (
@@ -1212,31 +1401,31 @@ const InventoryPage: React.FC = () => {
             // Session is active - show scanning and management options
             <div className='flex flex-col gap-4 mb-6'>
               
-              <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center'>
-                                  <button
-                    onClick={() => setShowScanner(true)}
-                    className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-                  >
-                    <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
-                    <span>Escanear Código</span>
-                  </button>
+              <div className='flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 justify-center'>
+                <button
+                  onClick={() => setShowScanner(true)}
+                  className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <Camera className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Escanear Código</span>
+                </button>
 
-              <button
-                onClick={() => setShowManualInput(true)}
-                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-              >
-                <FileText className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Entrada Manual</span>
-              </button>
+                <button
+                  onClick={() => setShowManualInput(true)}
+                  className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <FileText className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Entrada Manual</span>
+                </button>
 
-              <button
-                onClick={handleStopInventory}
-                className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-              >
-                <Pause className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Gestionar Sesión</span>
-              </button>
-            </div>
+                <button
+                  onClick={handleStopInventory}
+                  className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <Pause className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Gestionar Sesión</span>
+                </button>
+              </div>
           </div>
         )}
 
@@ -1265,11 +1454,11 @@ const InventoryPage: React.FC = () => {
         {/* Ready to Start Section - No Buttons, Just Info */}
         {!isSessionActive && completedInventoriesThisMonth.length < 2 && (
           <div className='card text-center'>
-            <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
-            <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
+            <Camera className='w-16 h-16 sm:w-20 sm:h-20 text-secondaryText mx-auto mb-6 opacity-50' />
+            <h3 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Listo para Comenzar
             </h3>
-            <p className='text-body text-secondaryText mb-8 max-w-md mx-auto'>
+            <p className='text-sm sm:text-base text-secondaryText mb-8 max-w-md mx-auto'>
               Usa los Controles de Sesión de Inventario de arriba para iniciar o continuar una sesión de inventario para{' '}
               {monthName} {currentYear}
             </p>
@@ -1279,11 +1468,11 @@ const InventoryPage: React.FC = () => {
         {/* Empty State - Session Active but No Scans */}
         {!isValidatingSession && scannedCodes.length === 0 && isSessionActive && (
           <div className='card text-center'>
-            <Camera className='w-20 h-20 text-secondaryText mx-auto mb-6 opacity-50' />
-            <h3 className='text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
+            <Camera className='w-16 h-16 sm:w-20 sm:h-20 text-secondaryText mx-auto mb-6 opacity-50' />
+            <h3 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Aún no se han escaneado códigos
             </h3>
-            <p className='text-body text-secondaryText mb-8 max-w-md mx-auto'>
+            <p className='text-sm sm:text-base text-secondaryText mb-8 max-w-md mx-auto'>
               Comienza a escanear códigos de barras para construir tu lista de inventario para{' '}
               {monthName} {currentYear}
             </p>
@@ -1318,12 +1507,12 @@ const InventoryPage: React.FC = () => {
       {/* Stop Options Modal */}
       {showStopOptions && (
         <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'>
-          <div className='card max-w-md w-full'>
+          <div className='responsive-card max-w-md w-full'>
             <div className='text-center mb-6'>
-              <h3 className='text-xl font-bold text-white mb-2'>
+              <h3 className='text-section text-white mb-2'>
                 Gestionar Sesión
               </h3>
-              <p className='text-secondaryText'>
+              <p className='text-body text-secondaryText'>
                 ¿Qué te gustaría hacer con tu sesión actual?
               </p>
             </div>
@@ -1331,25 +1520,25 @@ const InventoryPage: React.FC = () => {
             <div className='space-y-4'>
               <button
                 onClick={() => void handleCompleteSession()}
-                className='w-full btn-primary text-lg py-4 px-6 flex items-center justify-center space-x-3'
+                className='w-full btn-primary text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
-                <CheckCircle className='w-6 h-6' />
+                <CheckCircle className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Completar y Finalizar Sesión</span>
               </button>
 
               <button
                 onClick={() => void handlePauseSession()}
-                className='w-full bg-yellow-600 hover:bg-yellow-700 text-white text-lg py-4 px-6 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-3'
+                className='w-full btn-accent text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
-                <Pause className='w-6 h-6' />
+                <Pause className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Pausar Sesión (Continuar Después)</span>
               </button>
 
               <button
                 onClick={handleContinueSession}
-                className='w-full btn-secondary text-lg py-4 px-6 flex items-center justify-center space-x-3'
+                className='w-full btn-secondary text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
-                <RotateCcw className='w-6 h-6' />
+                <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Continuar Escaneando</span>
               </button>
             </div>
@@ -1360,13 +1549,13 @@ const InventoryPage: React.FC = () => {
       {/* Reset Confirmation Modal */}
       {showResetConfirmation && (
         <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'>
-          <div className='card max-w-md w-full'>
+          <div className='responsive-card max-w-md w-full'>
             <div className='text-center mb-6'>
-              <AlertTriangle className='w-16 h-16 text-yellow-500 mx-auto mb-4' />
-              <h3 className='text-xl font-bold text-white mb-2'>
+              <AlertTriangle className='w-12 h-12 sm:w-16 sm:h-16 text-yellow-500 mx-auto mb-4' />
+              <h3 className='text-section text-white mb-2'>
                 Reiniciar Sesión de Inventario
               </h3>
-              <p className='text-secondaryText'>
+              <p className='text-body text-secondaryText'>
                 ¿Estás seguro de que quieres reiniciar la sesión de inventario actual? Esto borrará todos los códigos escaneados y no se puede deshacer.
               </p>
             </div>
@@ -1377,17 +1566,17 @@ const InventoryPage: React.FC = () => {
                   reset();
                   setShowResetConfirmation(false);
                 }}
-                className='w-full bg-red-600 hover:bg-red-700 text-white text-lg py-4 px-6 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-3'
+                className='w-full bg-red-600 hover:bg-red-700 text-white text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 rounded-pill font-bold transition-all duration-300 flex items-center justify-center space-x-2 sm:space-x-3'
               >
-                <RotateCcw className='w-6 h-6' />
+                <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Sí, Reiniciar Sesión</span>
               </button>
 
               <button
                 onClick={() => setShowResetConfirmation(false)}
-                className='w-full btn-secondary text-lg py-4 px-6 flex items-center justify-center space-x-3'
+                className='w-full btn-secondary text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
-                <X className='w-6 h-6' />
+                <X className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Cancelar</span>
               </button>
             </div>
@@ -1453,6 +1642,19 @@ const InventoryPage: React.FC = () => {
         selectedCount={selectedIndicesForBulkDelete.length}
         selectedBarcodes={selectedBarcodesForBulkDelete}
         isLoading={isBulkDeleting}
+      />
+
+      {/* Download Confirmation Modal */}
+      <DownloadConfirmationModal
+        isOpen={showDownloadConfirmation && !!downloadInventoryData}
+        onClose={handleDownloadCancel}
+        onConfirm={handleDownloadConfirm}
+        inventoryData={downloadInventoryData || {
+          monthName: '',
+          year: 0,
+          totalScans: 0,
+          createdBy: ''
+        }}
       />
 
       {/* Footer */}
