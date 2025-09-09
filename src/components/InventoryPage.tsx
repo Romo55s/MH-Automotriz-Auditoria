@@ -593,7 +593,7 @@ const InventoryPage: React.FC = () => {
       
       showSuccess(
         'Descarga Completada',
-        'El inventario ha sido descargado y los datos se han eliminado de Google Sheets. Los datos están ahora almacenados localmente y se eliminarán automáticamente después de 36 horas.'
+        'El inventario ha sido descargado y los datos se han eliminado de Google Sheets. Los datos están ahora almacenados localmente y se eliminarán automáticamente al inicio del próximo mes.'
       );
     } catch (error) {
       console.error('Error downloading inventory:', error);
@@ -1127,7 +1127,7 @@ const InventoryPage: React.FC = () => {
                   Inventarios Completados Disponibles para Descarga
                 </h3>
                 <p className='text-sm sm:text-base text-secondaryText mb-4'>
-                  Los inventarios completados están disponibles para descarga por 1.5 días (36 horas) después de su finalización.
+                  Los inventarios completados están disponibles para descarga hasta el final del mes actual.
                 </p>
                 <div className='space-y-3'>
                   {completedInventoriesThisMonth.map((inventory, index) => (

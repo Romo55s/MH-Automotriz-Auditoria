@@ -65,7 +65,7 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
                   ⚠️ Importante: Cambios en los Datos
                 </h4>
                 <p className='text-xs text-gray-300'>
-                  Al descargar este inventario, los datos serán <strong className='text-white'>eliminados permanentemente</strong> de Google Sheets y almacenados localmente en tu dispositivo.
+                  Al descargar este inventario, los datos serán <strong className='text-white'>eliminados permanentemente</strong> de Google Sheets y almacenados localmente hasta el próximo mes.
                 </p>
               </div>
             </div>
@@ -96,7 +96,7 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
               <Download className='w-4 h-4 text-green-400' />
               <div className='flex-1'>
                 <p className='text-xs font-medium text-green-300 uppercase tracking-wide'>Almacenamiento Local</p>
-                <p className='text-xs text-gray-300'>Los datos se guardarán en tu dispositivo</p>
+                <p className='text-xs text-gray-300'>Los datos se guardarán en tu dispositivo hasta el próximo mes</p>
               </div>
             </div>
 
@@ -110,7 +110,7 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
               <Clock className='w-4 h-4 text-orange-400' />
               <div className='flex-1'>
                 <p className='text-xs font-medium text-orange-300 uppercase tracking-wide'>Expiración Automática</p>
-                <p className='text-xs text-gray-300'>Los datos se eliminarán automáticamente después de 36 horas</p>
+                <p className='text-xs text-gray-300'>Los datos se eliminarán automáticamente al inicio del próximo mes</p>
               </div>
             </div>
           </div>

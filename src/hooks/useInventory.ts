@@ -978,13 +978,15 @@ export const useInventory = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      // Store the downloaded data locally with 36-hour expiry
+      // Store the downloaded data locally until next month
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1); // First day of next month
       const downloadedData = {
         agencyName: selectedAgency.name,
         month: currentMonth,
         year: currentYear,
-        downloadedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(), // 36 hours from now
+        downloadedAt: now.toISOString(),
+        expiresAt: nextMonth.toISOString(), // Expires at the start of next month
         format: format,
         data: scannedCodes // Store the current scanned codes
       };
@@ -994,7 +996,7 @@ export const useInventory = () => {
       downloadedInventories.push(downloadedData);
       localStorage.setItem('downloadedInventories', JSON.stringify(downloadedInventories));
 
-      showInfo('Descarga Completada', 'El archivo se ha descargado exitosamente. Los datos han sido eliminados de Google Sheets y almacenados localmente por 36 horas.');
+      showInfo('Descarga Completada', 'El archivo se ha descargado exitosamente. Los datos han sido eliminados de Google Sheets y almacenados localmente hasta el próximo mes.');
       return true;
     } catch (error) {
       console.error('Error downloading inventory:', error);

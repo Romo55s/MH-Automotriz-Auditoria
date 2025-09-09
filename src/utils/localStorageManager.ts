@@ -237,11 +237,14 @@ if (typeof window !== 'undefined') {
   // Run cleanup when the module is loaded
   cleanupExpiredLocalStorage();
   
-  // Set up periodic cleanup every hour
+  // Set up periodic cleanup every hour for regular scans, daily for downloaded inventories
   setInterval(() => {
     cleanupExpiredLocalStorage();
+  }, 60 * 60 * 1000); // 1 hour for regular scans
+  
+  setInterval(() => {
     cleanupExpiredDownloadedInventories();
-  }, 60 * 60 * 1000); // 1 hour
+  }, 24 * 60 * 60 * 1000); // 24 hours for downloaded inventories
 }
 
 // Downloaded inventories management
@@ -265,10 +268,16 @@ export const cleanupExpiredDownloadedInventories = (): void => {
   try {
     const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');
     const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
     
     const validInventories = downloadedInventories.filter((inventory: DownloadedInventory) => {
-      const expiresAt = new Date(inventory.expiresAt);
-      return expiresAt > now;
+      const inventoryDate = new Date(inventory.year, parseInt(inventory.month) - 1); // month is 1-based in inventory
+      const inventoryMonth = inventoryDate.getMonth();
+      const inventoryYear = inventoryDate.getFullYear();
+      
+      // Keep inventories from current month or previous months of current year
+      return inventoryYear === currentYear && inventoryMonth <= currentMonth;
     });
     
     if (validInventories.length !== downloadedInventories.length) {
@@ -284,11 +293,16 @@ export const getDownloadedInventories = (): DownloadedInventory[] => {
   try {
     const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');
     const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
     
-    // Filter out expired inventories
+    // Filter out expired inventories (keep current month and previous months of current year)
     const validInventories = downloadedInventories.filter((inventory: DownloadedInventory) => {
-      const expiresAt = new Date(inventory.expiresAt);
-      return expiresAt > now;
+      const inventoryDate = new Date(inventory.year, parseInt(inventory.month) - 1); // month is 1-based in inventory
+      const inventoryMonth = inventoryDate.getMonth();
+      const inventoryYear = inventoryDate.getFullYear();
+      
+      return inventoryYear === currentYear && inventoryMonth <= currentMonth;
     });
     
     return validInventories;
