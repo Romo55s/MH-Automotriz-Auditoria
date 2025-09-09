@@ -1,5 +1,5 @@
 import { BarcodeFormat, BrowserMultiFormatReader, DecodeHintType, Result } from '@zxing/library';
-import { Camera, Flashlight, FlashlightOff, Focus, Monitor, RotateCcw, ScanLine, Smartphone, X } from 'lucide-react';
+import { Camera, Flashlight, FlashlightOff, Focus, Monitor, RotateCcw, Smartphone, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 interface BarcodeScannerProps {
@@ -747,46 +747,86 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             <div className={`text-center ${isFullscreen ? 'mt-4' : 'mt-4 sm:mt-6'}`}>
               <div className="flex items-center justify-center space-x-2 mb-3 sm:mb-4">
                 <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
-                  <ScanLine className={`text-white ${isFullscreen ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}`} />
+                  <Smartphone className={`text-white ${isFullscreen ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}`} />
                 </div>
                 <p className={`text-white font-medium ${isFullscreen ? 'text-sm' : 'text-sm sm:text-base'}`}>
-                  Posiciona el código (QR o de barras) dentro del marco para escanear
+                  Mantén el teléfono vertical y posiciona el código dentro del marco
                 </p>
               </div>
               
-              <div className={`glass-effect border border-white/30 rounded-xl bg-white/5 ${
-                isFullscreen ? 'mb-4 p-4' : 'mb-4 p-4 sm:p-5'
-              }`}>
+              <div 
+                className={`rounded-xl border ${
+                  isFullscreen ? 'mb-4 p-4' : 'mb-4 p-4 sm:p-5'
+                }`}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #333333',
+                  borderRadius: '1rem'
+                }}
+              >
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <p className={`text-white ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-                      <strong>Formato Esperado:</strong> QR Code o código de barras con 6-12 dígitos
-                    </p>
+                  <div className="text-center mb-4">
+                    <h4 className="text-white font-bold text-sm sm:text-base uppercase tracking-wide">
+                      Instrucciones de Escaneo
+                    </h4>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      Compatible con QR Codes y códigos de barras lineales
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      <strong>Orientación:</strong> Funciona en vertical y horizontal
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      <strong>Para vehículos:</strong> Busca el código en el parabrisas, puerta o motor
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-                    <p className={`text-white/80 ${isFullscreen ? 'text-xs' : 'text-xs'}`}>
-                      <strong>Consejo:</strong> Mantén el teléfono estable y a 15-30cm del código
-                    </p>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333333' }}>
+                      <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Smartphone className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-sm mb-1">
+                          Orientación
+                        </p>
+                        <p className="text-gray-300 text-xs">
+                          Mantén el teléfono en posición vertical para mejor detección
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333333' }}>
+                      <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-sm font-bold">#</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-sm mb-1">
+                          Formato
+                        </p>
+                        <p className="text-gray-300 text-xs">
+                          Código de barras con 6-12 dígitos
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333333' }}>
+                      <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-sm">📍</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-sm mb-1">
+                          Ubicación
+                        </p>
+                        <p className="text-gray-300 text-xs">
+                          Busca el código en el parabrisas, puerta o motor
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333333' }}>
+                      <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-sm">📏</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-sm mb-1">
+                          Distancia
+                        </p>
+                        <p className="text-gray-300 text-xs">
+                          Mantén el teléfono a 15-30cm del código
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   {focusCapabilities.length > 0 && (
                     <div className="flex items-center space-x-2">
