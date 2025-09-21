@@ -1,20 +1,20 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import {
-  AlertTriangle,
-  BarChart3,
-  Calendar,
-  Camera,
-  CheckCircle,
-  Clock,
-  Download,
-  FileText,
-  Info,
-  Pause,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  User,
-  X
+    AlertTriangle,
+    BarChart3,
+    Calendar,
+    Camera,
+    CheckCircle,
+    Clock,
+    Download,
+    FileText,
+    Info,
+    Pause,
+    Plus,
+    RefreshCw,
+    RotateCcw,
+    User,
+    X
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -22,10 +22,10 @@ import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useInventory } from '../hooks/useInventory';
 import {
-  getAgencyInventories,
-  getMonthlyInventory
+    getAgencyInventories,
+    getMonthlyInventory
 } from '../services/api';
-import { MonthlyInventory } from '../types';
+import { MonthlyInventory, ScannedCode } from '../types';
 import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
 import CompletionModal from './CompletionModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -56,6 +56,7 @@ const InventoryPage: React.FC = () => {
   const [showStopOptions, setShowStopOptions] = useState(false);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showFinishConfirmation, setShowFinishConfirmation] = useState(false);
   const [codeToDelete, setCodeToDelete] = useState<{code: string, index: number} | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showNewInventoryConfirmation, setShowNewInventoryConfirmation] = useState(false);
@@ -77,6 +78,7 @@ const InventoryPage: React.FC = () => {
     year: number;
     totalScans: number;
     createdBy: string;
+    scannedCodes?: ScannedCode[];
   } | null>(null);
   const [sessionTerminationData, setSessionTerminationData] = useState<{
     completedBy: string;
@@ -247,11 +249,60 @@ const InventoryPage: React.FC = () => {
     setPreviousScanCount(scannedCodes.length);
   }, [scannedCodes.length, isSessionActive, previousScanCount, showInfo]);
 
-  const handleScan = (code: string) => {
-    setCurrentScannedCode(code);
-    setShowScanner(false);
-    setShowManualInput(false);
-    setShowConfirmation(true);
+  const handleScan = async (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
+    
+    // Check if this is from manual input (has carData but from manual input)
+    if (carData && code.includes('"location":"Manual Input"')) {
+      // Handle manual input with car data - use regular inventory system
+      try {
+        const success = await addScannedCode(carData.serie, carData);
+        if (success) {
+          showSuccess(`Vehículo agregado: ${carData.serie} - ${carData.marca} (${carData.color})`);
+          setShowScanner(false);
+          setShowManualInput(false);
+        }
+      } catch (error) {
+        console.error('🚨 Error processing manual input:', error);
+        showError(error instanceof Error ? error.message : 'Error al procesar el vehículo');
+      }
+    } else if (carData && code.startsWith('{')) {
+      // Handle actual QR codes from QR generation system
+      try {
+        const { scanQRCode } = await import('../services/api');
+        const result = await scanQRCode(code, user?.email || '', user?.name || '');
+        
+        if (result.success) {
+          showSuccess(`Escaneado: ${carData.serie} - ${carData.marca} (${carData.color})`);
+          setShowScanner(false);
+          setShowManualInput(false);
+          // Trigger a sync to refresh the inventory data
+          syncSessionData();
+        } else {
+          showError(result.message || 'Error al procesar el código QR');
+        }
+      } catch (error) {
+        showError(error instanceof Error ? error.message : 'Error al procesar el código QR');
+      }
+    } else if (/^[A-Z0-9]{17}$/i.test(code)) {
+      // Handle 17-character VIN codes (legacy)
+      try {
+        const success = await addScannedCode(code);
+        if (success) {
+          showSuccess(`Código confirmado: ${code}`);
+          setShowScanner(false);
+          setShowManualInput(false);
+        }
+      } catch (error) {
+        console.error('🚨 Error processing VIN code:', error);
+        showError(error instanceof Error ? error.message : 'Error al procesar el código');
+      }
+    } else {
+      // Handle legacy barcode scanning (8 digits)
+      setCurrentScannedCode(code);
+      setShowScanner(false);
+      setShowManualInput(false);
+      setShowConfirmation(true);
+    }
   };
 
   const handleConfirmScan = async (code: string) => {
@@ -574,6 +625,14 @@ const InventoryPage: React.FC = () => {
   };
 
   const handleDownloadCSV = async () => {
+    // Set the download inventory data for the download confirmation modal
+    setDownloadInventoryData({
+      monthName: monthName,
+      year: currentYear,
+      totalScans: scannedCodes.length,
+      createdBy: user?.name || user?.email || 'Usuario desconocido',
+      scannedCodes: scannedCodes // Include the complete scanned codes with car data
+    });
     setShowDownloadConfirmation(true);
   };
 
@@ -746,32 +805,33 @@ const InventoryPage: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-background relative overflow-hidden flex flex-col'>
-      {/* Floating 3D shapes - Responsive positioning */}
-      <div className='floating-shape w-16 h-16 sm:w-20 sm:h-20 lg:w-28 lg:h-28 top-4 right-4 sm:top-16 sm:right-16'></div>
+    <div className='min-h-screen bg-background relative overflow-hidden'>
+      {/* Floating 3D shapes */}
+      <div className='floating-shape w-32 h-32 top-20 right-20'></div>
       <div
-        className='floating-shape w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bottom-1/3 left-4 sm:left-20'
-        style={{ animationDelay: '2s' }}
+        className='floating-shape w-24 h-24 bottom-1/4 left-16'
+        style={{ animationDelay: '3s' }}
       ></div>
       <div
-        className='floating-shape w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 top-1/2 right-2 sm:right-3'
-        style={{ animationDelay: '4s' }}
+        className='floating-shape w-20 h-20 top-1/3 left-1/4'
+        style={{ animationDelay: '1s' }}
       ></div>
 
-      {/* Header */}
-      <Header
-        title={`${selectedAgency.name} - Sesión de Inventario`}
-        subtitle={`${monthName} ${currentYear} - Iniciado a las ${new Date().toLocaleTimeString()}`}
-        showBackButton={true}
-        onBackClick={() => navigate('/select-agency')}
-        showUserInfo={true}
-        showChangeAgency={true}
-      />
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>
+        {/* Header */}
+        <div className='mt-6 sm:mt-8 mb-6 sm:mb-section'>
+          <Header
+            title='MH Automotriz'
+            subtitle={`${selectedAgency.name} - Sesión de Inventario - ${monthName} ${currentYear}`}
+            showBackButton={true}
+            onBackClick={() => navigate('/select-agency')}
+            showUserInfo={true}
+          />
+        </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className='max-w-max mx-auto px-8 py-4 relative z-10'>
-          <div className='card border-red-500/20 bg-red-500/10'>
+        {/* Error Display */}
+        {error && (
+          <div className='card border-red-500/20 bg-red-500/10 mb-6'>
             <div className='flex items-center justify-between'>
               <div className='flex items-center space-x-3'>
                 <X className='w-5 h-5 text-red-400' />
@@ -804,12 +864,10 @@ const InventoryPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className='w-full max-w-md py-6 sm:max-w-md md:max-w-4xl lg:max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 sm:py-6 relative z-10'>
         {/* Monthly Inventory Info */}
-        <div className='card mb-6'>
+        <div className='card mb-6 sm:mb-section'>
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
               <Calendar className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
@@ -857,7 +915,7 @@ const InventoryPage: React.FC = () => {
         </div>
 
         {/* Monthly Inventory Management */}
-        <div className='card mb-6'>
+        <div className='card mb-6 sm:mb-section'>
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
               <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
@@ -1094,7 +1152,7 @@ const InventoryPage: React.FC = () => {
         </div>
 
         {/* Session Management Info */}
-        <div className='card mb-6 border-green-500/20 bg-green-500/10'>
+        <div className='card mb-6 sm:mb-section border-green-500/20 bg-green-500/10'>
           <div className='flex items-start space-x-3 sm:space-x-4'>
             <Info className='w-5 h-5 sm:w-6 sm:h-6 text-green-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>
@@ -1119,7 +1177,7 @@ const InventoryPage: React.FC = () => {
 
         {/* Download Section for Completed Inventories */}
         {completedInventoriesThisMonth.length > 0 && (
-          <div className='card mb-6 border-blue-500/20 bg-blue-500/10'>
+          <div className='card mb-6 sm:mb-section border-blue-500/20 bg-blue-500/10'>
             <div className='flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4'>
               <Download className='w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mt-1 flex-shrink-0' />
               <div className='flex-1'>
@@ -1203,7 +1261,7 @@ const InventoryPage: React.FC = () => {
 
         {/* Paused Session Notice */}
         {existingInventory?.status === 'Paused' && (
-          <div className='card mb-6 border-yellow-500/20 bg-yellow-500/10'>
+          <div className='card mb-6 sm:mb-section border-yellow-500/20 bg-yellow-500/10'>
             <div className='flex items-start space-x-3 sm:space-x-4'>
               <Clock className='w-5 h-5 sm:w-6 sm:h-6 text-yellow-400 mt-1 flex-shrink-0' />
               <div className='flex-1'>
@@ -1236,37 +1294,8 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
 
-        {/* REPUVE Manual Search Reminder */}
-        <div className='card mb-6 border-orange-500/20 bg-orange-500/10'>
-          <div className='flex items-start space-x-3 sm:space-x-4'>
-            <AlertTriangle className='w-5 h-5 sm:w-6 sm:h-6 text-orange-400 mt-1 flex-shrink-0' />
-            <div className='flex-1'>
-              <h3 className='text-base sm:text-lg font-semibold text-orange-400 mb-2 sm:mb-3'>
-                Importante: Búsqueda Manual en REPUVE Requerida
-              </h3>
-              <p className='text-sm sm:text-base text-secondaryText mb-3'>
-                Después de completar tu inventario, debes buscar manualmente cada
-                código de barras escaneado en el sitio web de REPUVE para extraer la información
-                completa del vehículo (marca, modelo, año, VIN, etc.).
-              </p>
-              <div className='p-3 sm:p-4 glass-effect border border-orange-500/20 rounded-xl'>
-                <p className='text-xs sm:text-sm text-orange-300 mb-3'>
-                  <strong>Proceso paso a paso:</strong>
-                </p>
-                <ol className='text-xs sm:text-sm text-orange-300 space-y-1 list-decimal list-inside'>
-                  <li>Completa tu sesión de inventario</li>
-                  <li>Ve al sitio web de REPUVE</li>
-                  <li>Busca cada código de barras individualmente</li>
-                  <li>Extrae y registra los detalles del vehículo</li>
-                  <li>Actualiza tus registros con información completa</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Inventory Session Controls */}
-        <div className='card mb-6'>
+        <div className='card mb-6 sm:mb-section'>
           <div className='text-center mb-6'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Controles de Sesión de Inventario
@@ -1418,6 +1447,7 @@ const InventoryPage: React.FC = () => {
                   <span>Entrada Manual</span>
                 </button>
 
+
                 <button
                   onClick={handleStopInventory}
                   className='btn-secondary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
@@ -1425,13 +1455,21 @@ const InventoryPage: React.FC = () => {
                   <Pause className='w-5 h-5 sm:w-6 sm:h-6' />
                   <span>Gestionar Sesión</span>
                 </button>
+
+                <button
+                  onClick={() => setShowFinishConfirmation(true)}
+                  className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                >
+                  <CheckCircle className='w-5 h-5 sm:w-6 sm:h-6' />
+                  <span>Finalizar Sesión</span>
+                </button>
               </div>
           </div>
         )}
 
         {/* Session Validation Loading */}
         {isValidatingSession && (
-          <div className='card mb-6'>
+          <div className='card mb-6 sm:mb-section'>
             <div className='text-center py-8'>
               <LoadingSpinner />
               <p className='text-sm sm:text-base text-secondaryText mt-4'>
@@ -1453,7 +1491,7 @@ const InventoryPage: React.FC = () => {
 
         {/* Ready to Start Section - No Buttons, Just Info */}
         {!isSessionActive && completedInventoriesThisMonth.length < 2 && (
-          <div className='card text-center'>
+          <div className='card mb-6 sm:mb-section text-center'>
             <Camera className='w-16 h-16 sm:w-20 sm:h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Listo para Comenzar
@@ -1467,7 +1505,7 @@ const InventoryPage: React.FC = () => {
 
         {/* Empty State - Session Active but No Scans */}
         {!isValidatingSession && scannedCodes.length === 0 && isSessionActive && (
-          <div className='card text-center'>
+          <div className='card mb-6 sm:mb-section text-center'>
             <Camera className='w-16 h-16 sm:w-20 sm:h-20 text-secondaryText mx-auto mb-6 opacity-50' />
             <h3 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
               Aún no se han escaneado códigos
@@ -1479,15 +1517,19 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
 
-      {/* Modals */}
+    {/* Modals */}
       {showScanner && (
         <UnifiedScanner
           onScan={handleScan}
           onClose={() => setShowScanner(false)}
         />
       )}
+
 
       {showConfirmation && (
         <ConfirmationModal
@@ -1541,6 +1583,65 @@ const InventoryPage: React.FC = () => {
                 <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Continuar Escaneando</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Finish Session Confirmation Modal */}
+      {showFinishConfirmation && (
+        <div className='fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-4'>
+          <div className='glass-effect rounded-3xl max-w-md w-full overflow-hidden border border-white/30 shadow-2xl'>
+            {/* Header */}
+            <div className='relative bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-b border-white/30 p-4 sm:p-6'>
+              <div className='flex items-center space-x-3 sm:space-x-4'>
+                <div className='w-12 h-12 sm:w-16 sm:h-16 bg-green-500/30 rounded-full flex items-center justify-center shadow-lg border-2 border-green-400/50'>
+                  <CheckCircle className='w-6 h-6 sm:w-8 sm:h-8 text-green-300' />
+                </div>
+                <div>
+                  <h2 className='text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-hero leading-heading text-white mb-1'>
+                    Finalizar Sesión
+                  </h2>
+                  <p className='text-xs sm:text-sm text-green-200 font-medium'>
+                    Confirmar finalización del inventario
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className='p-4 sm:p-6'>
+              <div className='text-center mb-6'>
+                <h3 className='text-lg font-bold text-white mb-3'>
+                  ¿Estás seguro que deseas finalizar la sesión?
+                </h3>
+                <p className='text-sm text-secondaryText mb-4'>
+                  Esta acción completará tu sesión de inventario y guardará todos los datos escaneados.
+                </p>
+                <div className='glass-effect rounded-xl p-4 border border-white/20 bg-white/5'>
+                  <p className='text-sm text-white font-medium'>
+                    📊 Total de códigos escaneados: <span className='text-green-300 font-bold'>{scannedCodes.length}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className='space-y-3'>
+                <button
+                  onClick={() => {
+                    setShowFinishConfirmation(false);
+                    void handleCompleteSession();
+                  }}
+                  className='w-full px-6 py-3 border border-white rounded-pill text-base font-semibold text-black bg-white hover:bg-transparent hover:text-white transition-all duration-300 hover:scale-105'
+                >
+                  Sí, Finalizar Sesión
+                </button>
+                <button
+                  onClick={() => setShowFinishConfirmation(false)}
+                  className='w-full px-6 py-3 border border-white rounded-pill text-base font-semibold text-white bg-transparent hover:bg-white hover:text-black transition-all duration-300 hover:scale-105'
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1656,9 +1757,6 @@ const InventoryPage: React.FC = () => {
           createdBy: ''
         }}
       />
-
-      {/* Footer */}
-      <Footer />
     </div>
   );
 };

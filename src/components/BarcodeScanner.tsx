@@ -1,9 +1,9 @@
 import { BarcodeFormat, BrowserMultiFormatReader, DecodeHintType, Result } from '@zxing/library';
-import { Camera, Flashlight, FlashlightOff, Focus, Monitor, RotateCcw, Smartphone, X } from 'lucide-react';
+import { Camera, Flashlight, FlashlightOff, Focus, Monitor, QrCode, RotateCcw, Smartphone, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 interface BarcodeScannerProps {
-  onScan: (result: string) => void;
+  onScan: (result: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => void;
   onClose: () => void;
 }
 
@@ -254,6 +254,42 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 stopScanning();
               }
             } else {
+              // Try to parse QR code as JSON (car inventory format)
+              try {
+                const qrData = JSON.parse(scannedCode);
+                
+                // Validate it's a car inventory QR with all required fields
+                if (qrData && 
+                    qrData.type === 'car_inventory' && 
+                    qrData.serie && 
+                    qrData.marca && 
+                    qrData.color && 
+                    qrData.ubicaciones && 
+                    qrData.location &&
+                    qrData.timestamp) {
+                  
+                  console.log('QR Scanner - Car inventory QR detected:', qrData);
+                  
+                  // Extract car information for display
+                  const carInfo = {
+                    serie: qrData.serie,
+                    marca: qrData.marca,
+                    color: qrData.color,
+                    ubicaciones: qrData.ubicaciones,
+                    location: qrData.location,
+                    scannedAt: new Date().toISOString()
+                  };
+                  
+                  // Pass the complete QR data as raw JSON string for backend processing
+                  onScan(scannedCode, carInfo);
+                  stopScanning();
+                  return;
+                }
+              } catch (e) {
+                // Not valid JSON, continue with legacy format attempts
+                console.log('QR code is not valid JSON car inventory format, trying legacy formats...');
+              }
+              
               // Try to extract numeric part from QR content
               const numericMatch = scannedCode.match(/\d{6,12}/);
               if (numericMatch) {
@@ -534,7 +570,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                 <h2 className={`font-bold uppercase tracking-hero leading-heading text-shadow truncate ${
                   isFullscreen ? 'text-lg' : 'text-lg sm:text-xl'
                 }`}>
-                  Escáner Universal (QR + Códigos de Barras)
+                  Escáner de Códigos QR de Inventario
                 </h2>
                 <p className={`text-white/70 truncate ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
                   {isScanning ? 'Escaneando...' : 'Listo para escanear'}
@@ -788,14 +824,14 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
 
                     <div className="flex items-center space-x-3 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333333' }}>
                       <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-sm font-bold">#</span>
+                        <QrCode className="w-4 h-4 text-white" />
                       </div>
                       <div className="flex-1">
                         <p className="text-white font-semibold text-sm mb-1">
-                          Formato
+                          Formato QR
                         </p>
                         <p className="text-gray-300 text-xs">
-                          Código de barras con 6-12 dígitos
+                          Códigos QR con serie de 17 caracteres alfanuméricos
                         </p>
                       </div>
                     </div>
@@ -809,7 +845,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
                           Ubicación
                         </p>
                         <p className="text-gray-300 text-xs">
-                          Busca el código en el parabrisas, puerta o motor
+                          Busca los códigos QR pegados en los vehículos
                         </p>
                       </div>
                     </div>

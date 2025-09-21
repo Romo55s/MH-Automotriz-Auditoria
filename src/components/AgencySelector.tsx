@@ -75,7 +75,7 @@ const AgencySelector: React.FC = () => {
           <div className='mt-6 sm:mt-8 mb-6 sm:mb-section'>
             <Header
               title='MH Automotriz'
-              subtitle='Agencia ya seleccionada'
+              subtitle='Ubicación ya seleccionada'
               showBackButton={false}
               showUserInfo={true}
             />
@@ -88,10 +88,10 @@ const AgencySelector: React.FC = () => {
                 <Building2 className='w-10 h-10 text-white' />
               </div>
               <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-4'>
-                Agencia Ya Seleccionada
+                Ubicación Ya Seleccionada
               </h2>
               <p className='text-sm sm:text-base text-secondaryText mb-6'>
-                Ya has seleccionado <strong className='text-white'>{selectedAgency.name}</strong> como tu agencia.
+                Ya has seleccionado <strong className='text-white'>{selectedAgency.name}</strong> como tu ubicación.
               </p>
             </div>
 
@@ -112,24 +112,16 @@ const AgencySelector: React.FC = () => {
               </button>
             </div>
 
+
             <div className='text-center'>
               <button
                 onClick={() => {
-                  // Check for active sessions before clearing agency
-                  const sessions = getSessionInfo();
-                  const activeSessions = sessions.filter(session => session.data.isSessionActive);
-                  
-                  if (activeSessions.length > 0) {
-                    setConflictAgency(activeSessions[0].data.agency);
-                    setPendingAgency({ agency: null, action: 'clear' });
-                    setShowSessionConflictModal(true);
-                  } else {
-                    setSelectedAgency(null);
-                  }
+                  setSelectedAgency(null);
+                  navigate('/select-agency');
                 }}
                 className='text-sm text-secondaryText hover:text-white transition-colors underline'
               >
-                Seleccionar Diferente Agencia
+                Seleccionar Diferente Ubicación
               </button>
             </div>
           </div>
@@ -248,7 +240,7 @@ const AgencySelector: React.FC = () => {
         {/* Agency Selection */}
         <div className='card mb-6 sm:mb-section'>
           <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading mb-6 sm:mb-8 text-center'>
-            Elige Tu Agencia
+            Elige Tu Ubicación
           </h2>
 
           <div className='relative mb-8 sm:mb-12'>
@@ -329,7 +321,7 @@ const AgencySelector: React.FC = () => {
             <div className='mt-6 sm:mt-8 p-4 sm:p-6 glass-effect rounded-2xl border border-white/20'>
               <h3 className='font-bold text-white mb-3 sm:mb-4 flex items-center'>
                 <Building2 className='w-4 h-4 sm:w-5 sm:h-5 mr-2' />
-                Detalles de la Agencia Seleccionada
+                Detalles de la Ubicación Seleccionada
               </h3>
               <div className='text-sm sm:text-base text-secondaryText space-y-2'>
                 <p>

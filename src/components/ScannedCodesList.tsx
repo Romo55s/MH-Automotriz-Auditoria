@@ -1,4 +1,4 @@
-import { Barcode, CheckSquare, ChevronLeft, ChevronRight, Clock, Search, Square, Trash2, User } from 'lucide-react';
+import { Barcode, Car, CheckSquare, ChevronLeft, ChevronRight, Clock, MapPin, Palette, Search, Square, Tag, Trash2, User } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScannedCode } from '../types';
 
@@ -34,9 +34,15 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
 
   // Filter and paginate codes
   const filteredAndPaginatedCodes = useMemo(() => {
-    const filtered = scannedCodes.filter(code =>
-      code.code.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = scannedCodes.filter(code => {
+      const searchLower = searchTerm.toLowerCase();
+      // Search in code and car data fields
+      return code.code.toLowerCase().includes(searchLower) ||
+             code.carData?.serie.toLowerCase().includes(searchLower) ||
+             code.carData?.marca.toLowerCase().includes(searchLower) ||
+             code.carData?.color.toLowerCase().includes(searchLower) ||
+             code.carData?.ubicaciones.toLowerCase().includes(searchLower);
+    });
 
     const itemsPerPage = isMobile ? MOBILE_ITEMS_PER_PAGE : ITEMS_PER_PAGE;
     const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -118,8 +124,8 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6'>
         <div>
           <h2 className='text-lg sm:text-xl font-bold text-white mb-2 flex items-center gap-2'>
-            <Barcode className='w-5 h-5 sm:w-6 sm:h-6' />
-            CÓDIGOS ESCANEADOS ({scannedCodes.length})
+            <Car className='w-5 h-5 sm:w-6 sm:h-6' />
+            VEHÍCULOS ESCANEADOS ({scannedCodes.length})
           </h2>
           {searchTerm && (
             <p className='text-sm text-white'>
@@ -142,7 +148,7 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
           <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white' />
           <input
             type='text'
-            placeholder='Buscar código de barras...'
+            placeholder='Buscar por serie, marca, color o ubicación...'
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
             className='w-full pl-10 pr-4 py-3 rounded-xl text-white placeholder-white/60 focus:outline-none border border-white/30 transition-all duration-300'
@@ -206,6 +212,7 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
               const globalIndex = filteredAndPaginatedCodes.startIndex + index;
               const isSelected = selectedIndices.has(globalIndex);
               
+              
               return (
                 <div
                   key={`${code.code}-${code.timestamp.getTime()}`}
@@ -248,27 +255,69 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
                   <div className='relative z-10 pt-8'>
                     <div className='flex items-center gap-3 mb-4'>
                       <div className='w-10 h-10 rounded-lg flex items-center justify-center border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                        <Barcode className='w-5 h-5 text-white' />
+                        {code.carData ? <Car className='w-5 h-5 text-white' /> : <Barcode className='w-5 h-5 text-white' />}
                       </div>
                       <div className='text-sm text-white font-medium'>
                         #{globalIndex + 1}
                       </div>
                     </div>
                     
-                    <div className='text-lg font-mono text-white mb-4 break-all bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent'>
-                      {code.code}
-                    </div>
+                    {/* Car Data Display */}
+                    {code.carData ? (
+                      <div className='space-y-3 mb-4'>
+                        {/* Serie */}
+                        <div className='flex items-center gap-2'>
+                          <Tag className='w-4 h-4 text-yellow-400' />
+                          <span className='text-xs text-white/80 uppercase tracking-wider'>Serie:</span>
+                          <span className='text-sm font-mono text-white bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent font-bold'>
+                            {code.carData.serie}
+                          </span>
+                        </div>
+                        
+                        {/* Marca */}
+                        <div className='flex items-center gap-2'>
+                          <Car className='w-4 h-4 text-blue-400' />
+                          <span className='text-xs text-white/80 uppercase tracking-wider'>Marca:</span>
+                          <span className='text-sm text-white font-medium'>
+                            {code.carData.marca}
+                          </span>
+                        </div>
+                        
+                        {/* Color */}
+                        <div className='flex items-center gap-2'>
+                          <Palette className='w-4 h-4 text-purple-400' />
+                          <span className='text-xs text-white/80 uppercase tracking-wider'>Color:</span>
+                          <span className='text-sm text-white font-medium'>
+                            {code.carData.color}
+                          </span>
+                        </div>
+                        
+                        {/* Ubicación */}
+                        <div className='flex items-center gap-2'>
+                          <MapPin className='w-4 h-4 text-green-400' />
+                          <span className='text-xs text-white/80 uppercase tracking-wider'>Ubicación:</span>
+                          <span className='text-sm text-white font-medium'>
+                            {code.carData.ubicaciones}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Legacy Barcode Display */
+                      <div className='text-lg font-mono text-white mb-4 break-all bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent'>
+                        {code.code}
+                      </div>
+                    )}
                     
-                    <div className='space-y-2'>
+                    <div className='space-y-2 pt-2 border-t border-white/20'>
                       <div className='flex items-center gap-2'>
-                        <Clock className='w-4 h-4 text-white' />
-                        <span className='text-sm text-white'>
+                        <Clock className='w-4 h-4 text-white/70' />
+                        <span className='text-xs text-white/70'>
                           {formatTime(code.timestamp)}
                         </span>
                       </div>
                       <div className='flex items-center gap-2'>
-                        <User className='w-4 h-4 text-white' />
-                        <span className='text-sm text-white truncate'>
+                        <User className='w-4 h-4 text-white/70' />
+                        <span className='text-xs text-white/70 truncate'>
                           {code.user}
                         </span>
                       </div>

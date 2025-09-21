@@ -9,7 +9,7 @@ export const auth0Config = {
         : process.env.NODE_ENV === 'production' 
           ? 'https://your-production-domain.com'
           : 'http://localhost:3000',
-    audience: process.env.REACT_APP_AUTH0_AUDIENCE || 'https://your-api.com',
+    audience: process.env.REACT_APP_AUTH0_AUDIENCE || 'http://localhost:5000',
     scope: 'openid profile email',
   },
   // Production optimizations

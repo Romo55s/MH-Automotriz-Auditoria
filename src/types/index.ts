@@ -16,6 +16,7 @@ export interface ScannedCode {
   timestamp: Date;
   confirmed: boolean;
   user: string;
+  carData?: CarData; // Optional for backward compatibility
 }
 
 export interface InventorySession {
@@ -44,4 +45,18 @@ export interface MonthlyInventory {
   totalScans: number;
   sessionId?: string;
   lastUpdated?: Date;
+}
+
+export interface CarData {
+  serie: string;
+  marca: string;
+  color: string;
+  ubicaciones: string;
+}
+
+export interface QRGenerationRequest {
+  agency: string;
+  carData: CarData[];
+  user: string;
+  userName: string;
 }

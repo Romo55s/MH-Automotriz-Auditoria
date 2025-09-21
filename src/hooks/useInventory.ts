@@ -3,29 +3,29 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import {
-  checkInventoryCompletion,
-  checkInventoryLimits,
-  checkMonthlyInventory,
-  deleteMultipleScannedEntries,
-  deleteScannedEntry,
-  downloadInventoryCSV,
-  downloadInventoryExcel,
-  finishSession,
-  getMonthlyInventory,
-  saveScan,
+    checkInventoryCompletion,
+    checkInventoryLimits,
+    checkMonthlyInventory,
+    deleteMultipleScannedEntries,
+    deleteScannedEntry,
+    downloadInventoryCSV,
+    downloadInventoryExcel,
+    finishSession,
+    getMonthlyInventory,
+    saveScan,
 } from '../services/api';
 import { ScannedCode } from '../types/index';
 import {
-  cleanupExpiredLocalStorage,
-  clearScansFromLocalStorage,
-  loadScansFromLocalStorage,
-  saveScansToLocalStorage,
+    cleanupExpiredLocalStorage,
+    clearScansFromLocalStorage,
+    loadScansFromLocalStorage,
+    saveScansToLocalStorage,
 } from '../utils/localStorageManager';
 import {
-  clearSession,
-  loadSession,
-  saveSession,
-  SessionData,
+    clearSession,
+    loadSession,
+    saveSession,
+    SessionData,
 } from '../utils/sessionManager';
 
 export const useInventory = () => {
@@ -68,7 +68,8 @@ export const useInventory = () => {
           code: scan.barcode || scan.code,
           timestamp: new Date(scan.timestamp || scan.scannedAt || scan.date || new Date()),
           confirmed: scan.confirmed || true,
-          user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido'
+          user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido',
+          carData: scan.carData // Include car data if available from backend
         }));
         
         // Only update if we got new data or if the data is different
@@ -131,9 +132,17 @@ export const useInventory = () => {
         setIsSessionActive(false);
         setSessionId('');
         
+        // Force cleanup of local storage scans (but keep downloaded inventories)
+        const { cleanupExpiredLocalStorage } = await import('../utils/localStorageManager');
+        cleanupExpiredLocalStorage();
+        
+        // Also cleanup this specific month's data even if not expired
+        const { clearScansFromLocalStorage } = await import('../utils/localStorageManager');
+        clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
+        
         showError(
           'Inventario Completado',
-          `El inventario para ${getMonthName(currentMonth)} ${currentYear} ha sido completado por ${completionCheck.completedBy || 'otro usuario'}. Tu sesión ha sido terminada.`
+          `El inventario para ${getMonthName(currentMonth)} ${currentYear} ha sido completado por ${completionCheck.completedBy || 'otro usuario'}. Tu sesión ha sido terminada y los datos de respaldo han sido limpiados.`
         );
         return true; // Inventory was completed and session was terminated
       }
@@ -177,6 +186,7 @@ export const useInventory = () => {
             ...code,
             timestamp: new Date(code.timestamp),
             user: code.user || 'Usuario desconocido', // Ensure user property exists
+            carData: code.carData, // Include car data if available
           })
         );
 
@@ -230,6 +240,7 @@ export const useInventory = () => {
               ...code,
               timestamp: new Date(code.timestamp),
               user: code.user || 'Usuario desconocido',
+              carData: code.carData, // Include car data if available
             })
           );
 
@@ -308,6 +319,7 @@ export const useInventory = () => {
               timestamp: new Date(scan.timestamp || scan.date),
               confirmed: true,
               user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido',
+              carData: scan.carData, // Include car data if available from backend
             })
           );
 
@@ -341,6 +353,7 @@ export const useInventory = () => {
           timestamp: code.timestamp.toISOString(),
           confirmed: code.confirmed,
           user: code.user || 'Usuario desconocido', // Ensure user is always present
+          carData: code.carData, // Include car data if available
         })),
         isSessionActive: active,
         sessionId: id,
@@ -387,7 +400,6 @@ export const useInventory = () => {
 
       // For completed inventories, let the backend's check-inventory-limits handle the blocking
       // This allows the proper 2-inventory-per-month logic to work
-      console.log('Monthly inventory check result:', response);
       return true;
     } catch (err) {
       console.error('Error checking existing inventory:', err);
@@ -469,7 +481,7 @@ export const useInventory = () => {
 
   // Add scanned code and save to backend
   const addScannedCode = useCallback(
-    async (barcode: string) => {
+    async (barcode: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
       if (!selectedAgency) {
         setError('No agency selected');
         return false;
@@ -480,13 +492,26 @@ export const useInventory = () => {
         return false;
       }
 
-      // Validate that the code is exactly 8 digits
-      const codePattern = /^\d{8}$/;
-      if (!codePattern.test(barcode)) {
-        setError(
-          `Invalid code format. Expected 8-digit number, got: "${barcode}". Please scan a valid 8-digit barcode or use manual input.`
-        );
-        return false;
+      // For new QR system with car data, validate 17 character VIN
+      if (carData) {
+        const codePattern = /^[A-Z0-9]{17}$/i;
+        if (!codePattern.test(carData.serie)) {
+          setError(
+            `Invalid VIN format. Expected 17-character alphanumeric code, got: "${carData.serie}". Please scan a valid QR code or use manual input.`
+          );
+          return false;
+        }
+        // Use the serie from carData as the barcode for duplicate checking
+        barcode = carData.serie;
+      } else {
+        // Legacy barcode validation (8 digits)
+        const codePattern = /^\d{8}$/;
+        if (!codePattern.test(barcode)) {
+          setError(
+            `Invalid code format. Expected 8-digit number, got: "${barcode}". Please scan a valid 8-digit barcode or use manual input.`
+          );
+          return false;
+        }
       }
 
       // Check if code was already scanned
@@ -541,6 +566,7 @@ export const useInventory = () => {
           userName: user.name || user.email || 'Unknown User',
           month: currentMonth,
           year: currentYear,
+          carData: carData, // Include car data if available
         };
 
         const response = await saveScan(scanData);
@@ -552,6 +578,7 @@ export const useInventory = () => {
           timestamp: new Date(),
           confirmed: true,
           user: user.name || user.email || 'Usuario desconocido',
+          carData: carData, // Include car data if available
         };
 
         const updatedCodes = [...scannedCodes, newScan];
@@ -636,6 +663,9 @@ export const useInventory = () => {
       // Clear session storage
       clearSession(selectedAgency.name, currentMonth, currentYear);
 
+      // DON'T clean up local storage yet - keep scan data for potential download
+      // Cleanup will happen after download or when starting new session
+
       // Reset local state
       setScannedCodes([]);
       setIsSessionActive(false);
@@ -687,7 +717,6 @@ export const useInventory = () => {
         currentYear
       );
       
-      console.log('Inventory limits check result:', result);
       
       // If the backend says we can't start, provide a specific message
       if (!result.canStart) {
@@ -766,6 +795,12 @@ export const useInventory = () => {
       return false;
     }
 
+      // Clean up any previous scan data before starting new session
+      if (selectedAgency && currentMonth && currentYear) {
+        const { clearScansFromLocalStorage } = await import('../utils/localStorageManager');
+        clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
+      }
+
     // Generate new session ID
     const newSessionId = `sess_${Date.now()}_${Math.random()
       .toString(36)
@@ -779,7 +814,7 @@ export const useInventory = () => {
     // Save to session storage
     saveSessionToStorage([], true, newSessionId);
     return true;
-  }, [checkLimits, checkExistingInventory, saveSessionToStorage, showError]);
+  }, [checkLimits, checkExistingInventory, saveSessionToStorage, showError, selectedAgency, currentMonth, currentYear]);
 
   // Continue existing session
   const continueSession = useCallback(async () => {
@@ -799,7 +834,8 @@ export const useInventory = () => {
           code: scan.barcode || scan.code,
           timestamp: new Date(scan.timestamp || scan.scannedAt || scan.date || new Date()),
           confirmed: scan.confirmed || true,
-          user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido'
+          user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido',
+          carData: scan.carData // Include car data if available from backend
         }));
 
         setScannedCodes(existingScans);
@@ -956,7 +992,9 @@ export const useInventory = () => {
 
   // Download inventory data
   const downloadInventory = useCallback(async (format: 'csv' | 'excel') => {
+    
     if (!selectedAgency || !currentMonth || !currentYear) {
+      console.error('🚨 Missing required data for download:', { selectedAgency, currentMonth, currentYear });
       showError('Error', 'Información de inventario faltante');
       return false;
     }
@@ -967,6 +1005,7 @@ export const useInventory = () => {
       const blob = format === 'csv' 
         ? await downloadInventoryCSV(selectedAgency.name, currentMonth, currentYear)
         : await downloadInventoryExcel(selectedAgency.name, currentMonth, currentYear);
+
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
@@ -995,6 +1034,10 @@ export const useInventory = () => {
       const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');
       downloadedInventories.push(downloadedData);
       localStorage.setItem('downloadedInventories', JSON.stringify(downloadedInventories));
+
+      // NOW clean up the scan data after successful download
+      const { clearScansFromLocalStorage } = await import('../utils/localStorageManager');
+      clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
 
       showInfo('Descarga Completada', 'El archivo se ha descargado exitosamente. Los datos han sido eliminados de Google Sheets y almacenados localmente hasta el próximo mes.');
       return true;

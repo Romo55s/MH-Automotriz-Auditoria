@@ -36,4 +36,14 @@ export const agencies: Agency[] = [
     name: 'Stellantis',
     googleSheetId: 'Stellantis',
   },
+  {
+    id: 'bodega-coyote',
+    name: 'Bodega Coyote',
+    googleSheetId: 'Bodega Coyote',
+  },
+  {
+    id: 'bodega-goyo',
+    name: 'Bodega Goyo',
+    googleSheetId: 'Bodega Goyo',
+  },
 ];

@@ -107,19 +107,18 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
           </div>
 
           {/* Important Notice */}
-          <div className='bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-400/50 rounded-2xl p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8'>
+          <div className='bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-400/50 rounded-2xl p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8'>
             <div className='flex items-start space-x-3 sm:space-x-4'>
-              <div className='w-8 h-8 sm:w-10 sm:h-10 bg-yellow-500/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1'>
-                <span className='text-yellow-300 text-sm sm:text-lg'>⚠️</span>
+              <div className='w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1'>
+                <span className='text-blue-300 text-sm sm:text-lg'>ℹ️</span>
               </div>
               <div>
-                <h4 className='text-sm sm:text-base lg:text-lg font-bold text-yellow-300 mb-2 sm:mb-3'>
-                  Importante: Búsqueda Manual en REPUVE Requerida
+                <h4 className='text-sm sm:text-base lg:text-lg font-bold text-blue-300 mb-2 sm:mb-3'>
+                  Información del Inventario Guardada
                 </h4>
                 <p className='text-xs sm:text-sm lg:text-base text-gray-300 leading-relaxed'>
-                  Recuerda que debes buscar manualmente cada código de barras en el sitio web de REPUVE 
-                  para obtener la información completa de los vehículos. Los códigos han sido guardados 
-                  en Google Sheets para tu referencia.
+                  Todos los datos de los vehículos (serie, marca, color, ubicación) han sido guardados 
+                  correctamente en Google Sheets. La información está completa y lista para su descarga.
                 </p>
               </div>
             </div>

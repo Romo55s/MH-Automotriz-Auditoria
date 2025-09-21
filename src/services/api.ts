@@ -1,13 +1,5 @@
 // API service for backend communication
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
-
-// Log the API base URL being used (only in development)
-if (process.env.NODE_ENV === 'development') {
-  console.log('🔧 API_BASE_URL configured as:', API_BASE_URL);
-}
-
-// Production environment detection
-const isProduction = process.env.NODE_ENV === 'production';
+import { API_BASE_URL } from '../config/environment';
 
 // Generic API request helper
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
@@ -35,15 +27,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
         errorDetails = response.statusText;
       }
 
-      // Log detailed errors for debugging (only in development)
-      if (process.env.NODE_ENV === 'development') {
-        console.error(`🚨 API Error ${response.status}:`, {
-          status: response.status,
-          statusText: response.statusText,
-          details: errorDetails,
-          url
-        });
-      }
 
       throw new Error(
         `API Error: ${response.status} ${response.statusText}${
@@ -54,10 +37,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
     return await response.json();
   } catch (error) {
-    // Log errors only in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('🚨 API Request failed:', error);
-    }
     throw error;
   }
 };
@@ -71,8 +50,14 @@ export const saveScan = async (data: {
   userName: string;
   month: string;
   year: number;
+  carData?: {
+    serie: string;
+    marca: string;
+    color: string;
+    ubicaciones: string;
+  };
 }) => {
-  return apiRequest('/inventory/save-scan', {
+  return apiRequest('/api/inventory/save-scan', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -87,7 +72,7 @@ export const finishSession = async (data: {
   year: number;
   totalScans: number;
 }) => {
-  return apiRequest('/inventory/finish-session', {
+  return apiRequest('/api/inventory/finish-session', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -99,12 +84,14 @@ export const getMonthlyInventory = async (
   month: string,
   year: number
 ) => {
-  return apiRequest(`/inventory/monthly-inventory/${agency}/${month}/${year}`);
+  const encodedAgency = encodeURIComponent(agency);
+  return apiRequest(`/api/inventory/monthly-inventory/${encodedAgency}/${month}/${year}`);
 };
 
 // Get all monthly inventories for an agency
 export const getAgencyInventories = async (agency: string) => {
-  return apiRequest(`/inventory/agency-inventories/${agency}`);
+  const encodedAgency = encodeURIComponent(agency);
+  return apiRequest(`/api/inventory/agency-inventories/${encodedAgency}`);
 };
 
 // Check if monthly inventory exists
@@ -113,7 +100,9 @@ export const checkMonthlyInventory = async (
   month: string,
   year: number
 ) => {
-  return apiRequest(`/inventory/check-monthly-inventory/${agency}/${month}/${year}`);
+  // Properly encode agency name and include all parameters
+  const encodedAgency = encodeURIComponent(agency);
+  return apiRequest(`/api/inventory/check-monthly-inventory/${encodedAgency}/${month}/${year}`);
 };
 
 // Check inventory limits before starting new inventory
@@ -122,7 +111,8 @@ export const checkInventoryLimits = async (
   month: string,
   year: number
 ) => {
-  return apiRequest(`/inventory/check-inventory-limits/${agency}/${month}/${year}`);
+  const encodedAgency = encodeURIComponent(agency);
+  return apiRequest(`/api/inventory/check-inventory-limits/${encodedAgency}/${month}/${year}`);
 };
 
 // Delete scanned entry from Google Sheets
@@ -130,7 +120,7 @@ export const deleteScannedEntry = async (data: {
   agency: string;
   barcode: string;
 }) => {
-  return apiRequest('/inventory/delete-scanned-entry', {
+  return apiRequest('/api/inventory/delete-scanned-entry', {
     method: 'DELETE',
     body: JSON.stringify(data),
   });
@@ -141,7 +131,7 @@ export const deleteMultipleScannedEntries = async (data: {
   agency: string;
   barcodes: string[];
 }) => {
-  return apiRequest('/inventory/delete-multiple', {
+  return apiRequest('/api/inventory/delete-multiple', {
     method: 'DELETE',
     body: JSON.stringify(data),
   });
@@ -153,7 +143,8 @@ export const getInventoryData = async (
   month: string,
   year: number
 ) => {
-  return apiRequest(`/inventory/inventory-data/${agency}/${month}/${year}`);
+  const encodedAgency = encodeURIComponent(agency);
+  return apiRequest(`/api/inventory/inventory-data/${encodedAgency}/${month}/${year}`);
 };
 
 // Download inventory as CSV
@@ -162,11 +153,14 @@ export const downloadInventoryCSV = async (
   month: string,
   year: number
 ) => {
-  const url = `${API_BASE_URL}/download/inventory/${agency}/${month}/${year}/csv`;
+  const encodedAgency = encodeURIComponent(agency);
+  const url = `${API_BASE_URL}/api/download/inventory/${encodedAgency}/${month}/${year}/csv`;
+  
   const response = await fetch(url);
   
   if (!response.ok) {
-    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Download failed: ${response.status} ${response.statusText} - ${errorText}`);
   }
   
   return response.blob();
@@ -178,7 +172,8 @@ export const downloadInventoryExcel = async (
   month: string,
   year: number
 ) => {
-  const url = `${API_BASE_URL}/download/inventory/${agency}/${month}/${year}/excel`;
+  const encodedAgency = encodeURIComponent(agency);
+  const url = `${API_BASE_URL}/api/download/inventory/${encodedAgency}/${month}/${year}/excel`;
   const response = await fetch(url);
   
   if (!response.ok) {
@@ -195,14 +190,15 @@ export const validateMonthlySummary = async (
   year?: number
 ) => {
   if (agency && month && year) {
-    return apiRequest(`/validation/monthly-summary/${agency}/${month}/${year}`);
+    const encodedAgency = encodeURIComponent(agency);
+    return apiRequest(`/api/validation/monthly-summary/${encodedAgency}/${month}/${year}`);
   }
-  return apiRequest('/validation/monthly-summary');
+  return apiRequest('/api/validation/monthly-summary');
 };
 
 // Cleanup duplicates
 export const cleanupDuplicates = async () => {
-  return apiRequest('/validation/cleanup-duplicates', {
+  return apiRequest('/api/validation/cleanup-duplicates', {
     method: 'POST',
   });
 };
@@ -213,7 +209,7 @@ export const cleanupSpecificDuplicates = async (data: {
   month: string;
   year: number;
 }) => {
-  return apiRequest('/validation/cleanup-specific-duplicates', {
+  return apiRequest('/api/validation/cleanup-specific-duplicates', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -225,10 +221,65 @@ export const checkInventoryCompletion = async (data: {
   month: string;
   year: number;
 }) => {
-  return apiRequest('/inventory/check-completion', {
+  return apiRequest('/api/inventory/check-completion', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+};
+
+// Upload CSV file and generate QR codes (combined endpoint as per backend spec)
+export const uploadCSVFile = async (file: File, location: string, user: string, userName: string) => {
+  const formData = new FormData();
+  formData.append('csvFile', file);
+  formData.append('location', location);
+  formData.append('user', user);
+  formData.append('userName', userName);
+
+  const response = await fetch(`${API_BASE_URL}/api/qr/upload-csv`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorDetails = '';
+    try {
+      const errorResponse = await response.json();
+      errorDetails = errorResponse.message || errorResponse.error || '';
+    } catch (e) {
+      errorDetails = response.statusText;
+    }
+    throw new Error(`CSV Upload failed: ${response.status} ${response.statusText}${errorDetails ? ` - ${errorDetails}` : ''}`);
+  }
+
+  return await response.json();
+};
+
+// Get available locations (agencies + bodegas)
+export const getLocations = async () => {
+  return apiRequest('/api/qr/locations');
+};
+
+// Process scanned QR code
+export const scanQRCode = async (qrData: string, user: string, userName: string) => {
+  return apiRequest('/api/qr/scan', {
+    method: 'POST',
+    body: JSON.stringify({
+      qrData,
+      user,
+      userName
+    }),
+  });
+};
+
+// Download QR codes as ZIP file
+export const downloadQRCodes = async (sessionId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/qr/download/${sessionId}`);
+  
+  if (!response.ok) {
+    throw new Error(`QR Download failed: ${response.status} ${response.statusText}`);
+  }
+  
+  return response.blob();
 };
 
 export default {
@@ -247,4 +298,8 @@ export default {
   cleanupDuplicates,
   cleanupSpecificDuplicates,
   checkInventoryCompletion,
+  uploadCSVFile,
+  downloadQRCodes,
+  getLocations,
+  scanQRCode,
 };

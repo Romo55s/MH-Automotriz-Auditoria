@@ -7,6 +7,12 @@ export interface SessionData {
     timestamp: string;
     confirmed: boolean;
     user: string;
+    carData?: {
+      serie: string;
+      marca: string;
+      color: string;
+      ubicaciones: string;
+    };
   }>;
   isSessionActive: boolean;
   sessionId: string;
@@ -136,7 +142,6 @@ export const cleanupExpiredSessions = (maxAgeHours: number = 24): void => {
     sessions.forEach(({ key, data }) => {
       if (isSessionExpired(data, maxAgeHours)) {
         sessionStorage.removeItem(key);
-        console.log(`Cleaned up expired session: ${key}`);
       }
     });
   } catch (error) {

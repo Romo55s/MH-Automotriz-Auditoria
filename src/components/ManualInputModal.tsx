@@ -1,8 +1,8 @@
-import { AlertCircle, QrCode, X } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import React, { useState } from 'react';
 
 interface ManualInputModalProps {
-  onConfirm: (code: string) => void;
+  onConfirm: (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => void;
   onCancel: () => void;
 }
 
@@ -11,40 +11,75 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
   onCancel,
 }) => {
   const [manualCode, setManualCode] = useState('');
+  const [marca, setMarca] = useState('');
+  const [color, setColor] = useState('');
+  const [ubicaciones, setUbicaciones] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
+    // Basic validation for all fields
     if (!manualCode.trim()) {
-      setError('Por favor ingresa un código de barras/QR');
+      setError('Por favor ingresa el código de serie');
+      return;
+    }
+    if (!marca.trim()) {
+      setError('Por favor ingresa la marca del vehículo');
+      return;
+    }
+    if (!color.trim()) {
+      setError('Por favor ingresa el color del vehículo');
+      return;
+    }
+    if (!ubicaciones.trim()) {
+      setError('Por favor ingresa la ubicación del vehículo');
       return;
     }
 
-    // Validate 8-digit format
-    const codePattern = /^\d{8}$/;
+    // Validate 17 alphanumeric format (VIN format)
+    const codePattern = /^[A-Z0-9]{17}$/i;
     if (!codePattern.test(manualCode.trim())) {
-      setError('El código debe tener exactamente 8 dígitos (ej., 12345678)');
+      setError('El código de serie debe tener exactamente 17 caracteres alfanuméricos (ej., 1HGCM82633A123456)');
       return;
     }
 
     // Clear any previous errors
     setError('');
 
-    // Call the same confirmation flow as scanning
-    onConfirm(manualCode.trim());
+    // Create car data object
+    const carData = {
+      serie: manualCode.trim(),
+      marca: marca.trim(),
+      color: color.trim(),
+      ubicaciones: ubicaciones.trim()
+    };
+
+
+    // Create QR-like JSON string for processing
+    const qrData = JSON.stringify({
+      ...carData,
+      location: 'Manual Input',
+      timestamp: new Date().toISOString(),
+      type: 'car_inventory'
+    });
+
+    // Call with QR data format
+    onConfirm(qrData, carData);
   };
 
   const handleCancel = () => {
     setManualCode('');
+    setMarca('');
+    setColor('');
+    setUbicaciones('');
     setError('');
     onCancel();
   };
 
   return (
-    <div className='fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-      <div className='glass-effect rounded-3xl max-w-lg w-full max-h-[90vh] overflow-hidden border border-white/20'>
+    <div className='fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-4'>
+      <div className='glass-effect rounded-3xl max-w-2xl w-full max-h-[95vh] overflow-y-auto border border-white/30 shadow-2xl'>
         {/* Header */}
         <div className='flex items-center justify-between p-4 sm:p-6 lg:p-8 border-b border-white/20'>
           <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading text-shadow'>
@@ -69,57 +104,101 @@ const ManualInputModal: React.FC<ManualInputModalProps> = ({
               </span>
             </div>
             <p className='text-sm sm:text-base text-secondaryText'>
-              Usa esta opción cuando el escáner de códigos de barras no funciona o el
-              código de barras está dañado. Ingresa el código de 8 dígitos exactamente como aparece
-              en el vehículo o documento.
+              Usa esta opción cuando el escáner de códigos QR no funciona o el
+              código QR está dañado. Ingresa toda la información del vehículo manualmente.
             </p>
           </div>
 
           {/* Manual Input Form */}
           <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
+            {/* Serie Field */}
             <div>
-              <label className='block text-sm sm:text-base font-semibold text-secondaryText mb-3 sm:mb-4'>
-                Código de 8 Dígitos
+              <label className='block text-sm font-semibold text-secondaryText mb-2'>
+                Código de Serie (17 Caracteres Alfanuméricos)
               </label>
-              <div className='glass-effect border border-white/20 rounded-2xl p-4 sm:p-6'>
-                <div className='flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4'>
-                  <QrCode className='w-5 h-5 sm:w-6 sm:h-6 text-secondaryText' />
-                  <input
-                    type='text'
-                    value={manualCode}
-                    onChange={e => {
-                      setManualCode(e.target.value);
-                      if (error) setError(''); // Clear error when typing
-                    }}
-                    onKeyDown={e => {
-                      if (
-                        e.key === 'Enter' &&
-                        /^\d{8}$/.test(manualCode.trim())
-                      ) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                      }
-                    }}
-                    placeholder='Ingresa código de 8 dígitos (ej., 12345678)...'
-                    className='flex-1 bg-transparent border-none outline-none text-white placeholder-secondaryText text-base sm:text-lg font-mono'
-                    autoFocus
-                    maxLength={8}
-                  />
-                </div>
-
-                <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 text-xs sm:text-sm'>
-                  <div className='text-secondaryText'>
-                    {manualCode.length}/8 dígitos
-                  </div>
-                  {error && (
-                    <div className='flex items-center space-x-2 text-red-400'>
-                      <AlertCircle className='w-3 h-3 sm:w-4 sm:h-4' />
-                      <span>{error}</span>
-                    </div>
-                  )}
-                </div>
+              <div className='glass-effect border border-white/20 rounded-xl p-3'>
+                <input
+                  type='text'
+                  value={manualCode}
+                  onChange={e => {
+                    setManualCode(e.target.value.toUpperCase());
+                    if (error) setError('');
+                  }}
+                  placeholder='1HGCM82633A123456'
+                  className='w-full bg-transparent border-none outline-none text-white placeholder-secondaryText text-sm font-mono'
+                  maxLength={17}
+                  autoFocus
+                />
+              </div>
+              <div className='text-xs text-secondaryText mt-1'>
+                {manualCode.length}/17 caracteres
               </div>
             </div>
+
+            {/* Marca Field */}
+            <div>
+              <label className='block text-sm font-semibold text-secondaryText mb-2'>
+                Marca del Vehículo
+              </label>
+              <div className='glass-effect border border-white/20 rounded-xl p-3'>
+                <input
+                  type='text'
+                  value={marca}
+                  onChange={e => {
+                    setMarca(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder='Toyota, Honda, Volkswagen...'
+                  className='w-full bg-transparent border-none outline-none text-white placeholder-secondaryText text-sm'
+                />
+              </div>
+            </div>
+
+            {/* Color Field */}
+            <div>
+              <label className='block text-sm font-semibold text-secondaryText mb-2'>
+                Color del Vehículo
+              </label>
+              <div className='glass-effect border border-white/20 rounded-xl p-3'>
+                <input
+                  type='text'
+                  value={color}
+                  onChange={e => {
+                    setColor(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder='Blanco, Azul, Rojo...'
+                  className='w-full bg-transparent border-none outline-none text-white placeholder-secondaryText text-sm'
+                />
+              </div>
+            </div>
+
+            {/* Ubicaciones Field */}
+            <div>
+              <label className='block text-sm font-semibold text-secondaryText mb-2'>
+                Ubicación del Vehículo
+              </label>
+              <div className='glass-effect border border-white/20 rounded-xl p-3'>
+                <input
+                  type='text'
+                  value={ubicaciones}
+                  onChange={e => {
+                    setUbicaciones(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder='Lote A-1, Área B-2...'
+                  className='w-full bg-transparent border-none outline-none text-white placeholder-secondaryText text-sm'
+                />
+              </div>
+            </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className='flex items-center space-x-2 text-red-400 p-3 glass-effect border border-red-500/30 rounded-xl bg-red-500/10'>
+                <AlertCircle className='w-4 h-4' />
+                <span className='text-sm'>{error}</span>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4'>

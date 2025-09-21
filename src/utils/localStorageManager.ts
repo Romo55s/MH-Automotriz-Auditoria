@@ -7,6 +7,12 @@ export interface LocalStorageData {
     timestamp: string;
     confirmed: boolean;
     user: string;
+    carData?: {
+      serie: string;
+      marca: string;
+      color: string;
+      ubicaciones: string;
+    };
   }>;
   agency: string;
   month: string;
@@ -33,6 +39,12 @@ export const saveScansToLocalStorage = (
     timestamp: string;
     confirmed: boolean;
     user: string;
+    carData?: {
+      serie: string;
+      marca: string;
+      color: string;
+      ubicaciones: string;
+    };
   }>,
   agency: string,
   month: string,
@@ -54,7 +66,6 @@ export const saveScansToLocalStorage = (
     const key = createLocalStorageKey(agency, month, year);
     localStorage.setItem(key, JSON.stringify(data));
     
-    console.log(`Scans saved to local storage. Expires at: ${expiresAt.toLocaleString()}`);
   } catch (error) {
     console.error('Failed to save scans to local storage:', error);
   }
@@ -74,7 +85,6 @@ export const loadScansFromLocalStorage = (
       
       // Check if data has expired
       if (isDataExpired(data)) {
-        console.log(`Local storage data expired for ${agency} ${month}/${year}`);
         clearScansFromLocalStorage(agency, month, year);
         return null;
       }
@@ -98,7 +108,6 @@ export const clearScansFromLocalStorage = (
   try {
     const key = createLocalStorageKey(agency, month, year);
     localStorage.removeItem(key);
-    console.log(`Cleared local storage data for ${agency} ${month}/${year}`);
   } catch (error) {
     console.error('Failed to clear scans from local storage:', error);
   }
@@ -142,11 +151,9 @@ export const cleanupExpiredLocalStorage = (): void => {
     // Remove expired data
     keysToRemove.forEach(key => {
       localStorage.removeItem(key);
-      console.log(`Cleaned up expired local storage data: ${key}`);
     });
 
     if (keysToRemove.length > 0) {
-      console.log(`Cleaned up ${keysToRemove.length} expired local storage entries`);
     }
   } catch (error) {
     console.error('Failed to cleanup expired local storage:', error);
@@ -261,6 +268,12 @@ export interface DownloadedInventory {
     timestamp: string;
     confirmed: boolean;
     user: string;
+    carData?: {
+      serie: string;
+      marca: string;
+      color: string;
+      ubicaciones: string;
+    };
   }>;
 }
 
@@ -276,13 +289,13 @@ export const cleanupExpiredDownloadedInventories = (): void => {
       const inventoryMonth = inventoryDate.getMonth();
       const inventoryYear = inventoryDate.getFullYear();
       
-      // Keep inventories from current month or previous months of current year
-      return inventoryYear === currentYear && inventoryMonth <= currentMonth;
+      // Keep only inventories from the current month and year
+      // Remove inventories from previous months (cleanup at beginning of each month)
+      return inventoryYear === currentYear && inventoryMonth === currentMonth;
     });
     
     if (validInventories.length !== downloadedInventories.length) {
       localStorage.setItem('downloadedInventories', JSON.stringify(validInventories));
-      console.log(`Cleaned up ${downloadedInventories.length - validInventories.length} expired downloaded inventories`);
     }
   } catch (error) {
     console.error('Error cleaning up expired downloaded inventories:', error);
@@ -296,13 +309,14 @@ export const getDownloadedInventories = (): DownloadedInventory[] => {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    // Filter out expired inventories (keep current month and previous months of current year)
+    // Filter out expired inventories (keep only current month and year)
     const validInventories = downloadedInventories.filter((inventory: DownloadedInventory) => {
       const inventoryDate = new Date(inventory.year, parseInt(inventory.month) - 1); // month is 1-based in inventory
       const inventoryMonth = inventoryDate.getMonth();
       const inventoryYear = inventoryDate.getFullYear();
       
-      return inventoryYear === currentYear && inventoryMonth <= currentMonth;
+      // Keep only inventories from the current month and year
+      return inventoryYear === currentYear && inventoryMonth === currentMonth;
     });
     
     return validInventories;

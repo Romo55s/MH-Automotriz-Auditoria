@@ -331,7 +331,7 @@ const MonthlyInventoryManager: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-background relative overflow-hidden flex flex-col'>
+    <div className='min-h-screen bg-background relative overflow-hidden'>
       {/* Floating 3D shapes */}
       <div className='floating-shape w-28 h-28 top-16 right-16'></div>
       <div
@@ -343,19 +343,19 @@ const MonthlyInventoryManager: React.FC = () => {
         style={{ animationDelay: '4s' }}
       ></div>
 
-      {/* Header */}
-      <Header
-        title={`${selectedAgency.name} - Inventarios Mensuales`}
-        subtitle='Gestiona y rastrea sesiones de inventario mensuales'
-        showBackButton={true}
-        onBackClick={() => navigate('/select-agency')}
-        showUserInfo={true}
-        showChangeAgency={true}
-      />
-
-      <div className='flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10'>
+      <div className='flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>
+        {/* Header */}
+        <div className='mt-6 sm:mt-8 mb-6 sm:mb-section'>
+          <Header
+            title='MH Automotriz'
+            subtitle={`${selectedAgency.name} - Gestiona y rastrea sesiones de inventario mensuales`}
+            showBackButton={false}
+            showUserInfo={true}
+          />
+        </div>
+        
         {/* Current Month Info */}
-        <div className='card mb-6'>
+        <div className='card mb-6 sm:mb-section'>
           <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4'>
             <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
               <Calendar className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
@@ -492,7 +492,7 @@ const MonthlyInventoryManager: React.FC = () => {
         )}
 
         {/* Existing Inventories */}
-        <div className='card'>
+        <div className='card mb-6 sm:mb-section'>
           <div className='px-4 sm:px-6 lg:px-8 py-6 sm:py-8 border-b border-white/20'>
             <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
               <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
@@ -760,7 +760,7 @@ const MonthlyInventoryManager: React.FC = () => {
         </div>
 
         {/* Info Section */}
-        <div className='card border-blue-500/20 bg-blue-500/10 mt-6'>
+        <div className='card border-blue-500/20 bg-blue-500/10 mb-6 sm:mb-section'>
           <div className='flex items-start space-x-3 sm:space-x-4'>
             <AlertCircle className='w-6 h-6 sm:w-8 sm:h-8 text-blue-400 mt-1 flex-shrink-0' />
             <div className='flex-1'>

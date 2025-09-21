@@ -9,6 +9,7 @@ import {
 import AgencySelector from './components/AgencySelector';
 import Auth0ErrorBoundary from './components/Auth0ErrorBoundary';
 import InventoryPage from './components/InventoryPage';
+import InventoryQRPage from './components/InventoryQRPage';
 import Login from './components/Login';
 import MonthlyInventoryManager from './components/MonthlyInventoryManager';
 import ProductionErrorBoundary from './components/ProductionErrorBoundary';
@@ -123,6 +124,14 @@ const App: React.FC = () => {
                       element={
                         <ProtectedRoute requireAuth={true}>
                           <MonthlyInventoryManager />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path='/inventory-qr'
+                      element={
+                        <ProtectedRoute requireAuth={true}>
+                          <InventoryQRPage />
                         </ProtectedRoute>
                       }
                     />

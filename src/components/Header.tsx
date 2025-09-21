@@ -1,5 +1,5 @@
 import { useAuth0 } from '@auth0/auth0-react';
-import { ArrowLeft, Building2, LogOut, User } from 'lucide-react';
+import { ArrowLeft, Building2, FileSpreadsheet, LogOut, User } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -10,7 +10,7 @@ interface HeaderProps {
   showBackButton?: boolean;
   onBackClick?: () => void;
   showUserInfo?: boolean;
-  showChangeAgency?: boolean;
+  showChangeLocation?: boolean;
   className?: string;
 }
 
@@ -20,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({
   showBackButton = false,
   onBackClick,
   showUserInfo = true,
-  showChangeAgency = false,
+  showChangeLocation = false,
   className = '',
 }) => {
   const { user, logout } = useAuth0();
@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
-  const handleChangeAgency = () => {
+  const handleChangeLocation = () => {
     setSelectedAgency(null);
     navigate('/select-agency');
   };
@@ -101,13 +101,23 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Action Buttons */}
             <div className='grid grid-cols-1 gap-3'>
-              {showChangeAgency && selectedAgency && (
+              {showChangeLocation && selectedAgency && (
                 <button
-                  onClick={handleChangeAgency}
+                  onClick={handleChangeLocation}
                   className='btn-secondary text-sm px-4 py-3 flex items-center justify-center space-x-3 hover:scale-105 transition-all duration-300 rounded-xl'
                 >
                   <Building2 className='w-5 h-5' />
-                  <span>Cambiar Agencia</span>
+                  <span>Cambiar Ubicación</span>
+                </button>
+              )}
+              
+              {selectedAgency && (
+                <button
+                  onClick={() => navigate('/inventory-qr')}
+                  className='btn-accent text-sm px-4 py-3 flex items-center justify-center space-x-3 hover:scale-105 transition-all duration-300 rounded-xl'
+                >
+                  <FileSpreadsheet className='w-5 h-5' />
+                  <span>Generar QR</span>
                 </button>
               )}
               
@@ -152,7 +162,7 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Section - User Info, Change Agency, and Logout */}
+          {/* Right Section - User Info, Change Location, and Logout */}
           {showUserInfo && (
             <div className='flex flex-row items-center gap-6'>
               <div className='flex items-center space-x-3 text-secondaryText'>
@@ -170,13 +180,23 @@ const Header: React.FC<HeaderProps> = ({
                 <span className='text-base truncate'>{user?.name || user?.email}</span>
               </div>
               
-              {showChangeAgency && selectedAgency && (
+              {showChangeLocation && selectedAgency && (
                 <button
-                  onClick={handleChangeAgency}
+                  onClick={handleChangeLocation}
                   className='btn-secondary text-sm px-4 py-2 flex items-center justify-center hover:scale-105 transition-all duration-300'
                 >
                   <Building2 className='w-4 h-4 mr-2' />
-                  Cambiar Agencia
+                  Cambiar Ubicación
+                </button>
+              )}
+              
+              {selectedAgency && (
+                <button
+                  onClick={() => navigate('/inventory-qr')}
+                  className='btn-accent text-sm px-4 py-2 flex items-center justify-center hover:scale-105 transition-all duration-300'
+                >
+                  <FileSpreadsheet className='w-4 h-4 mr-2' />
+                  Generar QR
                 </button>
               )}
               
