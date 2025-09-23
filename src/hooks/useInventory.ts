@@ -8,19 +8,13 @@ import {
     checkMonthlyInventory,
     deleteMultipleScannedEntries,
     deleteScannedEntry,
+    downloadInventoryBySessionId,
     downloadInventoryCSV,
-    downloadInventoryExcel,
     finishSession,
     getMonthlyInventory,
-    saveScan,
+    saveScan
 } from '../services/api';
 import { ScannedCode } from '../types/index';
-import {
-    cleanupExpiredLocalStorage,
-    clearScansFromLocalStorage,
-    loadScansFromLocalStorage,
-    saveScansToLocalStorage,
-} from '../utils/localStorageManager';
 import {
     clearSession,
     loadSession,
@@ -31,7 +25,7 @@ import {
 export const useInventory = () => {
   const { selectedAgency } = useAppContext();
   const { user } = useAuth0();
-  const { showInfo, showWarning, showError } = useToast();
+  const { showInfo, showWarning, showError, showSuccess } = useToast();
   const [scannedCodes, setScannedCodes] = useState<ScannedCode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,23 +48,38 @@ export const useInventory = () => {
 
 
 
+
   // Sync current session data with backend to get latest barcodes from other users
   const syncSessionData = useCallback(async () => {
-    if (!selectedAgency || !currentMonth || !currentYear || !isSessionActive) return;
+    if (!selectedAgency || !currentMonth || !currentYear || !isSessionActive) {
+      return;
+    }
     
     setIsSyncing(true);
     try {
       const response = await getMonthlyInventory(selectedAgency.name, currentMonth, currentYear);
       
       if (response && response.scans && Array.isArray(response.scans)) {
-        const latestScans: ScannedCode[] = response.scans.map((scan: any) => ({
-          id: scan.id || `${scan.barcode || scan.code}-${Date.now()}`,
-          code: scan.barcode || scan.code,
-          timestamp: new Date(scan.timestamp || scan.scannedAt || scan.date || new Date()),
-          confirmed: scan.confirmed || true,
-          user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido',
-          carData: scan.carData // Include car data if available from backend
-        }));
+        const latestScans: ScannedCode[] = response.scans.map((scan: any) => {
+          // Build carData from direct fields if they exist
+          const carData = (scan.serie || scan.marca || scan.color || scan.ubicaciones) ? {
+            serie: scan.serie || scan.identifier || scan.barcode || scan.code,
+            marca: scan.marca || '',
+            color: scan.color || '',
+            ubicaciones: scan.ubicaciones || ''
+          } : scan.carData; // Fall back to carData object if it exists
+          
+          return {
+            id: scan.id || `${scan.barcode || scan.code}-${Date.now()}`,
+            code: scan.barcode || scan.code,
+            timestamp: new Date(scan.timestamp || scan.scannedAt || scan.date || new Date()),
+            confirmed: scan.confirmed || true,
+            user: scan.scannedBy || scan.user || scan.userName || 'Usuario desconocido',
+            carData: carData // Use the constructed or existing car data
+          };
+        });
+        
+        console.log('🔍 latestScans after mapping:', latestScans);
         
         // Only update if we got new data or if the data is different
         const hasNewData = latestScans.length !== scannedCodes.length;
@@ -78,7 +87,32 @@ export const useInventory = () => {
           !scannedCodes[index] || scan.code !== scannedCodes[index].code
         );
         
-        if (hasNewData || hasDifferentData) {
+        // Also check if carData has changed
+        const hasCarDataChanges = latestScans.some((scan, index) => {
+          const existingCode = scannedCodes[index];
+          if (!existingCode) return true;
+          
+          const hasExistingCarData = !!existingCode.carData;
+          const hasNewCarData = !!scan.carData;
+          
+          // If one has carData and the other doesn't, it's a change
+          if (hasExistingCarData !== hasNewCarData) return true;
+          
+          // If both have carData, compare the fields
+          if (hasExistingCarData && hasNewCarData) {
+            return existingCode.carData?.serie !== scan.carData?.serie ||
+                   existingCode.carData?.marca !== scan.carData?.marca ||
+                   existingCode.carData?.color !== scan.carData?.color ||
+                   existingCode.carData?.ubicaciones !== scan.carData?.ubicaciones;
+          }
+          
+          return false;
+        });
+        
+        console.log('🔍 Update check:', { hasNewData, hasDifferentData, hasCarDataChanges, willUpdate: hasNewData || hasDifferentData || hasCarDataChanges });
+        
+        if (hasNewData || hasDifferentData || hasCarDataChanges) {
+          console.log('🔄 Updating scannedCodes state with:', latestScans);
           setScannedCodes(latestScans);
           setLastSyncTime(new Date());
           
@@ -107,6 +141,17 @@ export const useInventory = () => {
     }
   }, [selectedAgency, currentMonth, currentYear, isSessionActive, scannedCodes, sessionId, showInfo]);
 
+  // Force sync if we have codes without car data (from old storage)
+  useEffect(() => {
+    if (selectedAgency && currentMonth && currentYear && isSessionActive && scannedCodes.length > 0) {
+      const hasCodesWithoutCarData = scannedCodes.some(code => !code.carData);
+      if (hasCodesWithoutCarData) {
+        console.log('🔄 Detected codes without car data, forcing immediate sync...');
+        syncSessionData();
+      }
+    }
+  }, [selectedAgency, currentMonth, currentYear, isSessionActive, scannedCodes, syncSessionData]);
+
   // Check if inventory was completed by someone else (global check)
   const checkGlobalInventoryCompletion = useCallback(async () => {
     if (!selectedAgency || !currentMonth || !currentYear) return false;
@@ -121,24 +166,19 @@ export const useInventory = () => {
       // Only trigger session termination if:
       // 1. The inventory is completed AND
       // 2. The user currently has an active session AND
-      // 3. We've reached the 2-inventory limit (completedInventories >= 2)
+      // 3. We've reached the 2-inventory limit (completedInventories >= 2) AND
+      // 4. It was completed by someone else (not the current user)
       if ((completionCheck.completed || completionCheck.isCompleted) && 
           isSessionActive && 
-          completionCheck.completedInventories >= 2) {
+          completionCheck.completedInventories >= 2 &&
+          completionCheck.completedBy !== user?.name &&
+          completionCheck.completedBy !== user?.email) {
         
         // Clear any cached session since inventory was completed by someone else
         clearSession(selectedAgency.name, currentMonth, currentYear);
         setScannedCodes([]);
         setIsSessionActive(false);
         setSessionId('');
-        
-        // Force cleanup of local storage scans (but keep downloaded inventories)
-        const { cleanupExpiredLocalStorage } = await import('../utils/localStorageManager');
-        cleanupExpiredLocalStorage();
-        
-        // Also cleanup this specific month's data even if not expired
-        const { clearScansFromLocalStorage } = await import('../utils/localStorageManager');
-        clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
         
         showError(
           'Inventario Completado',
@@ -168,101 +208,55 @@ export const useInventory = () => {
       return;
     }
 
-    // Clean up expired local storage data
-    cleanupExpiredLocalStorage();
+  // Check for cached session in sessionStorage first
+  const savedSession = loadSession(
+    selectedAgency.name,
+    currentMonth,
+    currentYear
+  );
 
-    // Check for cached session in sessionStorage first
-    const savedSession = loadSession(
-      selectedAgency.name,
-      currentMonth,
-      currentYear
-    );
-
-    if (savedSession) {
-      try {
-        // Convert timestamp strings back to Date objects
-        const codesWithDates: ScannedCode[] = savedSession.scannedCodes.map(
-          code => ({
-            ...code,
-            timestamp: new Date(code.timestamp),
-            user: code.user || 'Usuario desconocido', // Ensure user property exists
-            carData: code.carData, // Include car data if available
-          })
-        );
-
-        // Restore session data
-        setScannedCodes(codesWithDates);
-        setIsSessionActive(savedSession.isSessionActive);
-        setSessionId(savedSession.sessionId);
-
-        // Also save to local storage for backup
-        saveScansToLocalStorage(
-          savedSession.scannedCodes,
-          selectedAgency.name,
-          currentMonth,
-          currentYear
-        );
-
-        // Check if we can continue this session
-        if (savedSession.isSessionActive) {
-          showInfo(
-            'Session Restored',
-            `Restored ${
-              savedSession.scannedCodes?.length || 0
-            } scanned codes from previous session`
-          );
-        } else if (savedSession.scannedCodes.length > 0) {
-          showInfo(
-            'Paused Session Found',
-            `Found paused session with ${
-              savedSession.scannedCodes?.length || 0
-            } scanned codes. You can continue or complete it.`
-          );
-        }
-      } catch (err) {
-        console.error('Error loading session data:', err);
-        // Clear corrupted session data
-        clearSession(selectedAgency.name, currentMonth, currentYear);
-      }
-    } else {
-      // Check local storage for backup data
-      const localData = loadScansFromLocalStorage(
-        selectedAgency.name,
-        currentMonth,
-        currentYear
+  if (savedSession) {
+    try {
+      // Convert timestamp strings back to Date objects
+      const codesWithDates: ScannedCode[] = savedSession.scannedCodes.map(
+        code => ({
+          ...code,
+          timestamp: new Date(code.timestamp),
+          user: code.user || 'Usuario desconocido', // Ensure user property exists
+          carData: code.carData, // Include car data if available
+        })
       );
 
-      if (localData && localData.scannedCodes.length > 0) {
-        try {
-          // Convert timestamp strings back to Date objects
-          const codesWithDates: ScannedCode[] = localData.scannedCodes.map(
-            code => ({
-              ...code,
-              timestamp: new Date(code.timestamp),
-              user: code.user || 'Usuario desconocido',
-              carData: code.carData, // Include car data if available
-            })
-          );
+      // Restore session data
+      setScannedCodes(codesWithDates);
+      setIsSessionActive(savedSession.isSessionActive);
+      setSessionId(savedSession.sessionId);
 
-          // Restore from local storage
-          setScannedCodes(codesWithDates);
-          setIsSessionActive(false); // Mark as paused since it's from local storage
-          setSessionId(''); // No active session ID
-
-          showInfo(
-            'Datos Restaurados',
-            `Se restauraron ${codesWithDates.length} códigos escaneados desde el almacenamiento local. Los datos expiran en 1.5 días.`
-          );
-        } catch (err) {
-          console.error('Error loading local storage data:', err);
-          // Clear corrupted local storage data
-          clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
-        }
-      } else {
-        // Check if monthly inventory exists and can be continued
-        await checkAndLoadExistingInventory();
+      // Check if we can continue this session
+      if (savedSession.isSessionActive) {
+        showInfo(
+          'Session Restored',
+          `Restored ${
+            savedSession.scannedCodes?.length || 0
+          } scanned codes from previous session`
+        );
+      } else if (savedSession.scannedCodes.length > 0) {
+        showInfo(
+          'Paused Session Found',
+          `Found paused session with ${
+            savedSession.scannedCodes?.length || 0
+          } scanned codes. You can continue or complete it.`
+        );
       }
+    } catch (err) {
+      console.error('Error loading session data:', err);
+      // Clear corrupted session data
+      clearSession(selectedAgency.name, currentMonth, currentYear);
     }
+  } else {
+    // Check if monthly inventory exists and can be continued
+    await checkAndLoadExistingInventory();
+  }
   }, [selectedAgency, currentMonth, currentYear, showInfo, checkGlobalInventoryCompletion]);
 
   // Load existing session data from sessionStorage on component mount
@@ -272,10 +266,7 @@ export const useInventory = () => {
     }
   }, [selectedAgency, currentMonth, currentYear, loadExistingSession]);
 
-  // Cleanup expired local storage data on component mount
-  useEffect(() => {
-    cleanupExpiredLocalStorage();
-  }, []);
+  // No longer needed - Google Drive handles file cleanup automatically
 
   // Periodic sync effect - sync every 10 seconds when session is active
   useEffect(() => {
@@ -366,13 +357,7 @@ export const useInventory = () => {
       // Save to session storage
       saveSession(sessionData);
 
-      // Also save to local storage for backup (with 1.5 day expiry)
-      saveScansToLocalStorage(
-        sessionData.scannedCodes,
-        selectedAgency.name,
-        currentMonth,
-        currentYear
-      );
+      // No longer saving to localStorage - Google Drive integration handles file storage
     },
     [selectedAgency, currentMonth, currentYear]
   );
@@ -636,8 +621,8 @@ export const useInventory = () => {
 
   // Finish inventory session (complete and close)
   const finishInventorySession = useCallback(async () => {
-    if (!selectedAgency || scannedCodes.length === 0) {
-      setError('No active session or no codes scanned');
+    if (!selectedAgency) {
+      setError('No active session');
       return false;
     }
 
@@ -650,7 +635,27 @@ export const useInventory = () => {
     setError(null);
 
     try {
-      // Call backend to finish session and save to Google Sheets
+      // If no codes were scanned, just clear the session locally
+      // No need to call backend since no inventory was created
+      if (scannedCodes.length === 0) {
+        // Clear session storage
+        clearSession(selectedAgency.name, currentMonth, currentYear);
+        
+        // Reset local state
+        setScannedCodes([]);
+        setIsSessionActive(false);
+        setSessionId('');
+        
+        // Return completion info for the UI
+        return {
+          success: true,
+          completedBy: user.name || user.email || 'Usuario desconocido',
+          isCurrentUser: true,
+          totalScans: 0
+        };
+      }
+
+      // Call backend to finish session and save to Google Sheets (only when there are scanned codes)
       await finishSession({
         agency: selectedAgency.name,
         user: user.email || user.name || '',
@@ -660,11 +665,11 @@ export const useInventory = () => {
         totalScans: scannedCodes.length,
       });
 
+      // Note: Google Drive backup now happens automatically on download
+      // No manual backup call needed - the backend handles it automatically
+
       // Clear session storage
       clearSession(selectedAgency.name, currentMonth, currentYear);
-
-      // DON'T clean up local storage yet - keep scan data for potential download
-      // Cleanup will happen after download or when starting new session
 
       // Reset local state
       setScannedCodes([]);
@@ -795,11 +800,7 @@ export const useInventory = () => {
       return false;
     }
 
-      // Clean up any previous scan data before starting new session
-      if (selectedAgency && currentMonth && currentYear) {
-        const { clearScansFromLocalStorage } = await import('../utils/localStorageManager');
-        clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
-      }
+      // No longer needed - Google Drive handles file management
 
     // Generate new session ID
     const newSessionId = `sess_${Date.now()}_${Math.random()
@@ -979,10 +980,9 @@ export const useInventory = () => {
     setIsLoading(false);
     setSessionId('');
 
-    // Clear session storage and local storage
+    // Clear session storage
     if (selectedAgency && currentMonth && currentYear) {
       clearSession(selectedAgency.name, currentMonth, currentYear);
-      clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
     }
   }, [selectedAgency, currentMonth, currentYear]);
 
@@ -990,65 +990,6 @@ export const useInventory = () => {
 
 
 
-  // Download inventory data
-  const downloadInventory = useCallback(async (format: 'csv' | 'excel') => {
-    
-    if (!selectedAgency || !currentMonth || !currentYear) {
-      console.error('🚨 Missing required data for download:', { selectedAgency, currentMonth, currentYear });
-      showError('Error', 'Información de inventario faltante');
-      return false;
-    }
-
-    try {
-      setIsLoading(true);
-      
-      const blob = format === 'csv' 
-        ? await downloadInventoryCSV(selectedAgency.name, currentMonth, currentYear)
-        : await downloadInventoryExcel(selectedAgency.name, currentMonth, currentYear);
-
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${selectedAgency.name}_${currentMonth}_${currentYear}_inventory.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      // Store the downloaded data locally until next month
-      const now = new Date();
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1); // First day of next month
-      const downloadedData = {
-        agencyName: selectedAgency.name,
-        month: currentMonth,
-        year: currentYear,
-        downloadedAt: now.toISOString(),
-        expiresAt: nextMonth.toISOString(), // Expires at the start of next month
-        format: format,
-        data: scannedCodes // Store the current scanned codes
-      };
-
-      // Save to local storage with expiry
-      const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');
-      downloadedInventories.push(downloadedData);
-      localStorage.setItem('downloadedInventories', JSON.stringify(downloadedInventories));
-
-      // NOW clean up the scan data after successful download
-      const { clearScansFromLocalStorage } = await import('../utils/localStorageManager');
-      clearScansFromLocalStorage(selectedAgency.name, currentMonth, currentYear);
-
-      showInfo('Descarga Completada', 'El archivo se ha descargado exitosamente. Los datos han sido eliminados de Google Sheets y almacenados localmente hasta el próximo mes.');
-      return true;
-    } catch (error) {
-      console.error('Error downloading inventory:', error);
-      showError('Error', 'No se pudo descargar el inventario');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedAgency, currentMonth, currentYear, scannedCodes, showError, showInfo]);
 
   return {
     // State
@@ -1077,7 +1018,75 @@ export const useInventory = () => {
     checkLimits,
     deleteScannedEntryFromBackend,
     deleteMultipleScannedCodes,
-    downloadInventory,
+    downloadInventory: useCallback(async (inventoryData: {
+      agencyName: string;
+      monthName: string;
+      year: number;
+      totalScans: number;
+      createdBy: string;
+      sessionId?: string; // Add session ID for multiple inventories
+      scannedCodes?: ScannedCode[];
+    }) => {
+      if (!inventoryData) {
+        showError('Error', 'No hay datos de inventario para descargar');
+        return false;
+      }
+
+      setIsLoading(true);
+      try {
+        let blob: Blob;
+        
+        // Use session ID if available (for multiple inventories per month)
+        if (inventoryData.sessionId) {
+          blob = await downloadInventoryBySessionId(
+            inventoryData.agencyName,
+            currentMonth,
+            currentYear,
+            inventoryData.sessionId,
+            'csv'
+          );
+        } else {
+          // Fallback to regular download (most recent inventory)
+          blob = await downloadInventoryCSV(
+            inventoryData.agencyName,
+            currentMonth,
+            currentYear
+          );
+        }
+        
+        if (blob) {
+          // Create download link and trigger download
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const filename = inventoryData.sessionId 
+            ? `${inventoryData.agencyName}_${inventoryData.monthName}_${inventoryData.year}_${inventoryData.sessionId}.csv`
+            : `${inventoryData.agencyName}_${inventoryData.monthName}_${inventoryData.year}.csv`;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente y respaldado automáticamente en Google Drive. Los datos han sido eliminados del sistema.');
+          
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error downloading inventory:', error);
+        
+        // Handle different types of errors
+        if (error.message.includes('Google Drive') || error.message.includes('backup')) {
+          showError('Error de Respaldo', 'El archivo se descargó pero el respaldo en Google Drive falló. Por favor contacta al soporte.');
+        } else {
+          showError('Error de Descarga', 'No se pudo descargar el archivo CSV');
+        }
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    }, [currentMonth, currentYear, showSuccess, showError]),
     checkForInventoryCompletion,
     syncSessionData,
 
@@ -1086,5 +1095,6 @@ export const useInventory = () => {
     hasActiveSession: isSessionActive && scannedCodes.length > 0,
     canFinishSession: scannedCodes.length > 0 && isSessionActive,
     monthName: currentMonth ? getMonthName(currentMonth) : 'Mes Inválido',
+    
   };
 };

@@ -7,6 +7,7 @@ This folder contains all the project documentation files. Here's what each file 
 ### **Core Documentation**
 - **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)** - Complete project architecture and file structure
 - **[QR_SYSTEM_MIGRATION.md](./QR_SYSTEM_MIGRATION.md)** - Migration guide from barcode to QR code system
+- **[MULTIPLE_INVENTORIES.md](./MULTIPLE_INVENTORIES.md)** - Multiple inventories per month with Google Drive integration
 
 ### **Setup & Configuration**
 - **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** - Environment variables and API configuration
@@ -32,6 +33,7 @@ This folder contains all the project documentation files. Here's what each file 
 ### For System Migration
 1. Review [QR_SYSTEM_MIGRATION.md](./QR_SYSTEM_MIGRATION.md) for the QR code system changes
 2. Check [SCANNER_COMPARISON.md](./SCANNER_COMPARISON.md) to understand the differences
+3. Read [MULTIPLE_INVENTORIES.md](./MULTIPLE_INVENTORIES.md) for multiple inventory support
 
 ## 📋 All Documentation Files
 
@@ -41,6 +43,7 @@ Here's the complete list of documentation files in this folder:
 |------|-------------|----------|
 | [DEBUG_SETUP.md](./DEBUG_SETUP.md) | Development debugging setup | Developers |
 | [ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md) | Environment variables & API config | Setup & Deployment |
+| [MULTIPLE_INVENTORIES.md](./MULTIPLE_INVENTORIES.md) | Multiple inventories per month guide | Advanced Features |
 | [PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md) | Production deployment guide | DevOps & Deployment |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | Complete project architecture | New Developers |
 | [QR_SYSTEM_MIGRATION.md](./QR_SYSTEM_MIGRATION.md) | QR code system migration guide | Understanding Changes |
@@ -51,6 +54,8 @@ Here's the complete list of documentation files in this folder:
 All documentation has been updated to reflect:
 - ✅ **QR Code System**: Complete migration from barcode to QR code scanning
 - ✅ **Vehicle Data**: Full car data capture (Serie, Marca, Color, Ubicaciones)
+- ✅ **Multiple Inventories**: Support for unlimited inventory sessions per month
+- ✅ **Google Drive Integration**: Automatic backup with 30-day retention
 - ✅ **Environment Config**: Proper environment variable management
 - ✅ **Clean Architecture**: Organized project structure and API endpoints
 - ✅ **Production Ready**: Deployment guides and best practices

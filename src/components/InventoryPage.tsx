@@ -1,20 +1,20 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import {
-    AlertTriangle,
-    BarChart3,
-    Calendar,
-    Camera,
-    CheckCircle,
-    Clock,
-    Download,
-    FileText,
-    Info,
-    Pause,
-    Plus,
-    RefreshCw,
-    RotateCcw,
-    User,
-    X
+  AlertTriangle,
+  BarChart3,
+  Calendar,
+  Camera,
+  CheckCircle,
+  Clock,
+  Download,
+  FileText,
+  Info,
+  Pause,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  User,
+  X
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -22,8 +22,8 @@ import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useInventory } from '../hooks/useInventory';
 import {
-    getAgencyInventories,
-    getMonthlyInventory
+  getAgencyInventories,
+  getMonthlyInventory
 } from '../services/api';
 import { MonthlyInventory, ScannedCode } from '../types';
 import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
@@ -34,12 +34,13 @@ import DownloadConfirmationModal from './DownloadConfirmationModal';
 import Footer from './Footer';
 import Header from './Header';
 import LoadingSpinner from './LoadingSpinner';
-import LocalStorageInfo from './LocalStorageInfo';
 import ManualInputModal from './ManualInputModal';
 import NewInventoryConfirmationModal from './NewInventoryConfirmationModal';
 import ScannedCodesList from './ScannedCodesList';
+import SessionEndedModal from './SessionEndedModal';
 import SessionTerminatedModal from './SessionTerminatedModal';
 import UnifiedScanner from './UnifiedScanner';
+import WrongLocationModal from './WrongLocationModal';
 
 const InventoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,6 +54,7 @@ const InventoryPage: React.FC = () => {
   const [showManualInput, setShowManualInput] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [currentScannedCode, setCurrentScannedCode] = useState('');
+  const [currentScannedCarData, setCurrentScannedCarData] = useState<{ serie: string; marca: string; color: string; ubicaciones: string } | undefined>(undefined);
   const [showStopOptions, setShowStopOptions] = useState(false);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -73,11 +75,24 @@ const InventoryPage: React.FC = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showDownloadConfirmation, setShowDownloadConfirmation] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showWrongLocationModal, setShowWrongLocationModal] = useState(false);
+  const [wrongLocationData, setWrongLocationData] = useState<{
+    currentLocation: string;
+    qrLocation: string;
+    vehicleInfo: { serie: string; marca: string; color: string };
+  } | null>(null);
+  const [showSessionEndedModal, setShowSessionEndedModal] = useState(false);
+  const [sessionEndedData, setSessionEndedData] = useState<{
+    agencyName: string;
+    monthName: string;
+    year: number;
+  } | null>(null);
   const [downloadInventoryData, setDownloadInventoryData] = useState<{
     monthName: string;
     year: number;
     totalScans: number;
     createdBy: string;
+    sessionId?: string; // Add session ID
     scannedCodes?: ScannedCode[];
   } | null>(null);
   const [sessionTerminationData, setSessionTerminationData] = useState<{
@@ -268,20 +283,35 @@ const InventoryPage: React.FC = () => {
     } else if (carData && code.startsWith('{')) {
       // Handle actual QR codes from QR generation system
       try {
-        const { scanQRCode } = await import('../services/api');
-        const result = await scanQRCode(code, user?.email || '', user?.name || '');
+        // Parse QR data to check the location
+        const qrData = JSON.parse(code);
+        const qrLocation = qrData.location;
+        const currentAgency = selectedAgency?.name;
         
-        if (result.success) {
-          showSuccess(`Escaneado: ${carData.serie} - ${carData.marca} (${carData.color})`);
+        // Check if QR code belongs to a different agency
+        if (qrLocation && currentAgency && qrLocation !== currentAgency) {
+          setWrongLocationData({
+            currentLocation: currentAgency,
+            qrLocation: qrLocation,
+            vehicleInfo: {
+              serie: carData.serie,
+              marca: carData.marca,
+              color: carData.color
+            }
+          });
+          setShowWrongLocationModal(true);
           setShowScanner(false);
-          setShowManualInput(false);
-          // Trigger a sync to refresh the inventory data
-          syncSessionData();
-        } else {
-          showError(result.message || 'Error al procesar el código QR');
+          return;
         }
+        
+        // Show confirmation modal for QR codes instead of immediately processing
+        setCurrentScannedCode(code);
+        setCurrentScannedCarData(carData);
+        setShowConfirmation(true);
+        setShowScanner(false);
+        return;
       } catch (error) {
-        showError(error instanceof Error ? error.message : 'Error al procesar el código QR');
+        showError('Error de Código QR', 'No se pudo procesar el código QR. Verifica que sea un código válido del sistema de inventario.');
       }
     } else if (/^[A-Z0-9]{17}$/i.test(code)) {
       // Handle 17-character VIN codes (legacy)
@@ -299,27 +329,83 @@ const InventoryPage: React.FC = () => {
     } else {
       // Handle legacy barcode scanning (8 digits)
       setCurrentScannedCode(code);
+      setCurrentScannedCarData(carData); // Pass carData if available
       setShowScanner(false);
       setShowManualInput(false);
       setShowConfirmation(true);
     }
   };
 
-  const handleConfirmScan = async (code: string) => {
+  const handleConfirmScan = async (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
     try {
-      const success = await addScannedCode(code);
-      if (success) {
-        showSuccess(
-          'Escaneo Confirmado',
-          `El código de barras ${code} ha sido guardado exitosamente`
+      if (carData && code.startsWith('{')) {
+        // Handle QR code with car data
+        const { scanQRCode } = await import('../services/api');
+        const result = await scanQRCode(code, user?.email || '', user?.name || '');
+        
+        if (result.success) {
+          showSuccess(`Vehículo confirmado: ${carData.serie} - ${carData.marca} (${carData.color})`);
+          setShowConfirmation(false);
+          setCurrentScannedCode('');
+          setCurrentScannedCarData(undefined);
+          
+          // Ensure session is active and sync data
+          if (!isSessionActive) {
+            await startSession();
+          }
+          await syncSessionData();
+        } else {
+          // Handle backend validation errors
+          const errorMessage = result.message || 'Error al procesar el código QR';
+          
+          if (errorMessage.includes('already been scanned')) {
+            showError(
+              'Vehículo Ya Escaneado',
+              `El vehículo ${carData.serie} (${carData.marca}) ya fue escaneado en este inventario.`
+            );
+            // Stop scanner to prevent continuous scanning of duplicate
+            setShowScanner(false);
+            setShowConfirmation(false);
+            setCurrentScannedCode('');
+            setCurrentScannedCarData(undefined);
+          } else {
+            showError('Error de Escaneo', errorMessage);
+          }
+        }
+      } else {
+        // Handle regular barcode
+        const success = await addScannedCode(code, carData);
+        if (success) {
+          showSuccess(
+            'Escaneo Confirmado',
+            carData 
+              ? `Vehículo ${carData.serie} - ${carData.marca} guardado exitosamente`
+              : `El código de barras ${code} ha sido guardado exitosamente`
+          );
+          setShowConfirmation(false);
+          setCurrentScannedCode('');
+          setCurrentScannedCarData(undefined);
+        }
+        // Note: If success is false, the useInventory hook will handle showing the appropriate toast
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error al guardar el escaneo';
+      
+      if (errorMsg.includes('already been scanned') || errorMsg.includes('ya fue escaneado')) {
+        showError(
+          'Código Ya Escaneado', 
+          carData 
+            ? `El vehículo ${carData.serie} ya fue escaneado en este inventario.`
+            : `El código ${code} ya fue escaneado en este inventario.`
         );
+        // Stop scanner to prevent continuous scanning of duplicate
+        setShowScanner(false);
         setShowConfirmation(false);
         setCurrentScannedCode('');
+        setCurrentScannedCarData(undefined);
+      } else {
+        showError('Error de Escaneo', 'Ocurrió un error al guardar el escaneo');
       }
-      // Note: If success is false, the useInventory hook will handle showing the appropriate toast
-      // (like duplicate barcode warning), so we don't need to show an additional error here
-    } catch (error) {
-      showError('Error de Escaneo', 'Ocurrió un error al guardar el escaneo');
     }
   };
 
@@ -328,16 +414,17 @@ const InventoryPage: React.FC = () => {
     setShowScanner(false);
     setShowManualInput(false);
     setCurrentScannedCode('');
+    setCurrentScannedCarData(undefined);
   };
 
+  const handleWrongLocationClose = () => {
+    setShowWrongLocationModal(false);
+    setWrongLocationData(null);
+  };
+
+
   const handleStopInventory = () => {
-    if (scannedCodes.length === 0) {
-      showWarning(
-        'Sin Escaneos',
-        'Por favor escanea al menos un código de barras antes de detener la sesión'
-      );
-      return;
-    }
+    // Allow stopping even with 0 scans (for wrong location scenarios)
     setShowStopOptions(true);
   };
 
@@ -352,14 +439,29 @@ const InventoryPage: React.FC = () => {
 
       const result = await finishInventorySession();
       if (result && result.success) {
-        showSuccess(
-          'Sesión Completada',
-          'La sesión de inventario ha sido finalizada exitosamente'
-        );
         loadInventories();
         
-        // Show completion modal with download functionality for the user who completed the inventory
-        handleShowCompletionModal(result.totalScans);
+        // Show different modals based on whether codes were scanned
+        if (result.totalScans === 0) {
+          // Show session ended modal for 0 scans
+          setSessionEndedData({
+            agencyName: selectedAgency?.name || '',
+            monthName: monthName,
+            year: currentYear
+          });
+          setShowSessionEndedModal(true);
+          showSuccess(
+            'Sesión Finalizada',
+            'La sesión ha sido cerrada exitosamente'
+          );
+        } else {
+          // Show completion modal with download functionality for sessions with scans
+          handleShowCompletionModal(result.totalScans);
+          showSuccess(
+            'Sesión Completada',
+            'La sesión de inventario ha sido finalizada exitosamente'
+          );
+        }
       } else {
         showError('Error de Sesión', 'Falló al finalizar la sesión de inventario');
       }
@@ -643,12 +745,26 @@ const InventoryPage: React.FC = () => {
       setIsDownloading(true);
       setShowDownloadConfirmation(false);
       
+      
       showInfo(
         'Iniciando Descarga',
         'Preparando el archivo CSV del inventario y configurando almacenamiento local...'
       );
 
-      await downloadInventory('csv');
+      // Use the new downloadInventory method with proper data structure
+      const success = await downloadInventory({
+        agencyName: selectedAgency?.name || '',
+        monthName: downloadInventoryData.monthName,
+        year: downloadInventoryData.year,
+        totalScans: downloadInventoryData.totalScans,
+        createdBy: user?.name || 'Unknown',
+        sessionId: downloadInventoryData.sessionId, // Add session ID
+        scannedCodes: scannedCodes
+      });
+      
+      if (!success) {
+        throw new Error('Download failed');
+      }
       
       showSuccess(
         'Descarga Completada',
@@ -671,6 +787,8 @@ const InventoryPage: React.FC = () => {
     setDownloadInventoryData(null);
   };
 
+
+
   const handleDownloadInventory = async (inventory: MonthlyInventory) => {
     if (!isInventoryDownloadable(inventory)) {
       showError('Descarga No Disponible', 'Este inventario ya no está disponible para descarga. El período de descarga ha expirado.');
@@ -682,7 +800,8 @@ const InventoryPage: React.FC = () => {
       monthName: getMonthName(inventory.month),
       year: inventory.year,
       totalScans: inventory.totalScans,
-      createdBy: inventory.createdBy
+      createdBy: inventory.createdBy,
+      sessionId: inventory.sessionId // Add session ID
     });
     
     setShowDownloadConfirmation(true);
@@ -1175,6 +1294,7 @@ const InventoryPage: React.FC = () => {
           </div>
         </div>
 
+
         {/* Download Section for Completed Inventories */}
         {completedInventoriesThisMonth.length > 0 && (
           <div className='card mb-6 sm:mb-section border-blue-500/20 bg-blue-500/10'>
@@ -1329,16 +1449,7 @@ const InventoryPage: React.FC = () => {
               </div>
             )}
 
-            {/* Local Storage Info */}
-            {selectedAgency && (
-              <div className='flex justify-center mb-4'>
-                <LocalStorageInfo
-                  agencyName={selectedAgency.name}
-                  month={currentMonth}
-                  year={currentYear}
-                />
-              </div>
-            )}
+            {/* Local Storage Info - No longer needed with Google Drive integration */}
             <p className='text-sm sm:text-base text-secondaryText'>
               {isSessionActive
                 ? 'Tu sesión de inventario está activa actualmente. Escanea códigos de barras o gestiona tu sesión abajo.'
@@ -1479,6 +1590,7 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
 
+
         {/* Scanned Codes Display - Optimized for 300+ barcodes */}
         {!isValidatingSession && scannedCodes.length > 0 && (
           <ScannedCodesList
@@ -1517,6 +1629,7 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
       </div>
+
 
       {/* Footer */}
       <Footer />
@@ -1754,9 +1867,45 @@ const InventoryPage: React.FC = () => {
           monthName: '',
           year: 0,
           totalScans: 0,
-          createdBy: ''
+          createdBy: '',
+          sessionId: undefined
         }}
       />
+
+      {/* Wrong Location Modal */}
+      {wrongLocationData && (
+        <WrongLocationModal
+          isOpen={showWrongLocationModal}
+          onClose={handleWrongLocationClose}
+          currentLocation={wrongLocationData.currentLocation}
+          qrLocation={wrongLocationData.qrLocation}
+          vehicleInfo={wrongLocationData.vehicleInfo}
+        />
+      )}
+
+      {/* Session Ended Modal (for 0 scans) */}
+      {sessionEndedData && (
+        <SessionEndedModal
+          isOpen={showSessionEndedModal}
+          onClose={() => {
+            setShowSessionEndedModal(false);
+            setSessionEndedData(null);
+          }}
+          agencyName={sessionEndedData.agencyName}
+          monthName={sessionEndedData.monthName}
+          year={sessionEndedData.year}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmation && (
+        <ConfirmationModal
+          scannedCode={currentScannedCode}
+          carData={currentScannedCarData}
+          onConfirm={handleConfirmScan}
+          onCancel={handleCancelScan}
+        />
+      )}
     </div>
   );
 };

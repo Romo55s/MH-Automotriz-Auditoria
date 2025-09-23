@@ -20,6 +20,8 @@ A modern React application for automating car inventory management using **QR co
 - **Rich Vehicle Cards** - Display Serie, Marca, Color, Ubicación with colored icons
 - **Advanced Search** - Search by any vehicle field (serie, marca, color, ubicación)
 - **Smart Storage** - Automatic cleanup of scan data after session completion
+- **Multiple Inventories per Month** - Support for multiple inventory sessions per month with unique session IDs
+- **Google Drive Integration** - Automatic backup to Google Drive with 30-day retention policy
 - **Download Preservation** - Keep downloaded inventories until next month
 
 ## 🛠️ Tech Stack
@@ -97,8 +99,10 @@ A modern React application for automating car inventory management using **QR co
 - **Real-time Sync**: Multi-user collaboration with live updates
 
 ### 5. **Session Management**
-- **2 Inventories per Month**: Support for bi-monthly inventory cycles
+- **Multiple Inventories per Month**: Support for unlimited inventory sessions per month
+- **Unique Session IDs**: Each inventory session has a unique identifier for precise tracking
 - **Auto-cleanup**: Scan data cleaned after session completion
+- **Google Drive Backup**: Automatic backup to Google Drive with 30-day retention
 - **Download Preservation**: Downloaded inventories kept until next month
 - **Session Restoration**: Automatic recovery of interrupted sessions
 
@@ -143,8 +147,10 @@ A modern React application for automating car inventory management using **QR co
 - **`GET /api/inventory/check-inventory-limits/{agency}/{month}/{year}`** - Check limits
 
 ### Download & Export
-- **`GET /api/download/inventory/{agency}/{month}/{year}/csv`** - Download CSV with car data
-- **`GET /api/download/inventory/{agency}/{month}/{year}/excel`** - Download Excel with car data
+- **`GET /api/download/inventory/{agency}/{month}/{year}/csv`** - Download most recent CSV with car data
+- **`GET /api/download/inventory/{agency}/{month}/{year}/excel`** - Download most recent Excel with car data
+- **`GET /api/download/inventory/{agency}/{month}/{year}/csv/{sessionId}`** - Download specific inventory by session ID
+- **`GET /api/download/inventory/{agency}/{month}/{year}/excel/{sessionId}`** - Download specific Excel by session ID
 
 ## 📊 Data Structure
 
@@ -180,6 +186,23 @@ interface ScannedCode {
   confirmed: boolean;
   user: string;
   carData?: CarData;     // Complete vehicle information
+}
+```
+
+### **Monthly Inventory Structure**
+```typescript
+interface MonthlyInventory {
+  id: string;
+  agencyId: string;
+  month: string;         // Format: "MM"
+  year: number;
+  monthName: string;     // e.g., "January 2024"
+  status: 'Active' | 'Completed' | 'Paused';
+  createdAt: Date;
+  createdBy: string;
+  totalScans: number;
+  sessionId?: string;    // Unique session identifier for multiple inventories
+  lastUpdated?: Date;
 }
 ```
 
@@ -247,9 +270,10 @@ Vehicle Data → QR Code → Scan → Validate → Store → Display → Export
 
 ### **Storage Layers**
 1. **Session Storage**: Active session data (until session ends)
-2. **Local Storage (Scans)**: Backup scan data (36 hours, cleaned after session)
-3. **Local Storage (Downloads)**: Downloaded inventories (until next month)
-4. **Google Sheets**: Permanent storage (until download/export)
+2. **Google Sheets**: Primary storage (until first download)
+3. **Google Drive**: Automatic backup with 30-day retention (after first download)
+4. **Local Storage (Scans)**: Backup scan data (36 hours, cleaned after session)
+5. **Local Storage (Downloads)**: Downloaded inventories (until next month)
 
 ## 🤝 Contributing
 
@@ -268,6 +292,7 @@ For detailed information about the project, please refer to the documentation in
 - **[📁 Documentation Index](./docs/README.md)** - Complete documentation overview and navigation
 - **[🏗️ Project Structure](./docs/PROJECT_STRUCTURE.md)** - Detailed project architecture and file organization
 - **[🔄 QR System Migration](./docs/QR_SYSTEM_MIGRATION.md)** - Complete migration guide from barcode to QR code system
+- **[📊 Multiple Inventories](./docs/MULTIPLE_INVENTORIES.md)** - Multiple inventories per month with Google Drive integration
 
 ### ⚙️ **Setup & Configuration**
 - **[🌍 Environment Setup](./docs/ENVIRONMENT_SETUP.md)** - Environment variables and API configuration guide
@@ -283,6 +308,7 @@ For detailed information about the project, please refer to the documentation in
 - **New Developer?** Start with [Project Structure](./docs/PROJECT_STRUCTURE.md) and [Environment Setup](./docs/ENVIRONMENT_SETUP.md)
 - **Deploying?** Check [Production Deployment](./docs/PRODUCTION_DEPLOYMENT.md) and [Environment Setup](./docs/ENVIRONMENT_SETUP.md)
 - **Understanding the System?** Read [QR System Migration](./docs/QR_SYSTEM_MIGRATION.md) and [Scanner Comparison](./docs/SCANNER_COMPARISON.md)
+- **Advanced Features?** Explore [Multiple Inventories](./docs/MULTIPLE_INVENTORIES.md) for Google Drive integration
 
 ## 📄 License
 
@@ -290,4 +316,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**Latest Update**: Complete migration from barcode system to QR code system with full vehicle data capture, location-based management, and enhanced user experience.
+**Latest Update**: Complete migration from barcode system to QR code system with full vehicle data capture, location-based management, multiple inventories per month support, Google Drive integration with automatic backup, and enhanced user experience.

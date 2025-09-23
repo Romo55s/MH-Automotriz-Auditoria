@@ -212,10 +212,12 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
               const globalIndex = filteredAndPaginatedCodes.startIndex + index;
               const isSelected = selectedIndices.has(globalIndex);
               
+              // Debug car data
+              console.log('🚗 Code in ScannedCodesList:', code.code, 'carData:', code.carData);
               
               return (
                 <div
-                  key={`${code.code}-${code.timestamp.getTime()}`}
+                  key={`${code.id || code.code}-${code.timestamp.getTime()}-${globalIndex}`}
                   className={`relative overflow-hidden rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
                     isSelected 
                       ? 'border-white/50' 

@@ -1,19 +1,26 @@
-import { Check, QrCode, X } from 'lucide-react';
+import { Car, Check, MapPin, Palette, QrCode, Tag, X } from 'lucide-react';
 import React from 'react';
 
 interface ConfirmationModalProps {
   scannedCode: string;
-  onConfirm: (code: string) => void;
+  carData?: {
+    serie: string;
+    marca: string;
+    color: string;
+    ubicaciones: string;
+  };
+  onConfirm: (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => void;
   onCancel: () => void;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   scannedCode,
+  carData,
   onConfirm,
   onCancel,
 }) => {
   const handleConfirm = () => {
-    onConfirm(scannedCode);
+    onConfirm(scannedCode, carData);
   };
 
   const handleCancel = () => {
@@ -50,34 +57,100 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
         {/* Content */}
         <div className='p-4 sm:p-6 lg:p-8'>
-          {/* Scanned Code Display */}
-          <div className='mb-6 sm:mb-8'>
-            <label className='block text-sm sm:text-base font-semibold text-secondaryText mb-3 sm:mb-4'>
-              Código de Barras Escaneado
-            </label>
-            <div className='glass-effect border border-white/30 rounded-2xl p-4 sm:p-6 text-center bg-white/5'>
-              <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 glow border-2 border-blue-400/50'>
-                <QrCode className='w-7 h-7 sm:w-8 sm:h-8 text-blue-300' />
+          {/* Vehicle Information Display */}
+          {carData ? (
+            <div className='mb-6 sm:mb-8'>
+              <label className='block text-sm sm:text-base font-semibold text-white mb-3 sm:mb-4 uppercase tracking-hero'>
+                Información del Vehículo
+              </label>
+              <div className='glass-effect border border-white/30 rounded-2xl p-4 sm:p-6 bg-white/5'>
+                <div className='space-y-4'>
+                  {/* Serie */}
+                  <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                    <div className='flex items-center gap-2 min-w-0'>
+                      <Tag className='w-4 h-4 text-yellow-400 flex-shrink-0' />
+                      <span className='text-xs text-white/80 uppercase tracking-wider font-semibold'>Serie:</span>
+                    </div>
+                    <span className='text-base sm:text-lg font-mono font-bold break-all' style={{
+                      background: 'linear-gradient(120deg, #f6d365 0%, #fda085 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent'
+                    }}>
+                      {carData.serie}
+                    </span>
+                  </div>
+                  
+                  {/* Marca */}
+                  <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                    <div className='flex items-center gap-2 min-w-0'>
+                      <Car className='w-4 h-4 text-blue-400 flex-shrink-0' />
+                      <span className='text-xs text-white/80 uppercase tracking-wider font-semibold'>Marca:</span>
+                    </div>
+                    <span className='text-base sm:text-lg text-white font-bold'>
+                      {carData.marca}
+                    </span>
+                  </div>
+                  
+                  {/* Color */}
+                  <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                    <div className='flex items-center gap-2 min-w-0'>
+                      <Palette className='w-4 h-4 text-purple-400 flex-shrink-0' />
+                      <span className='text-xs text-white/80 uppercase tracking-wider font-semibold'>Color:</span>
+                    </div>
+                    <span className='text-base sm:text-lg text-white font-medium'>
+                      {carData.color}
+                    </span>
+                  </div>
+                  
+                  {/* Ubicación */}
+                  <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                    <div className='flex items-center gap-2 min-w-0'>
+                      <MapPin className='w-4 h-4 text-green-400 flex-shrink-0' />
+                      <span className='text-xs text-white/80 uppercase tracking-wider font-semibold'>Ubicación:</span>
+                    </div>
+                    <span className='text-base sm:text-lg text-white font-medium'>
+                      {carData.ubicaciones}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <p className='text-xl sm:text-2xl lg:text-3xl font-mono text-white font-bold tracking-wider break-all bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent'>
-                {scannedCode}
-              </p>
             </div>
-          </div>
+          ) : (
+            /* Legacy Code Display */
+            <div className='mb-6 sm:mb-8'>
+              <label className='block text-sm sm:text-base font-semibold text-white mb-3 sm:mb-4 uppercase tracking-hero'>
+                Código de Barras Escaneado
+              </label>
+              <div className='glass-effect border border-white/30 rounded-2xl p-4 sm:p-6 text-center bg-white/5'>
+                <div className='w-14 h-14 sm:w-16 sm:h-16 glass-effect rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 glow border-2 border-blue-400/50'>
+                  <QrCode className='w-7 h-7 sm:w-8 sm:h-8 text-blue-300' />
+                </div>
+                <p className='text-xl sm:text-2xl lg:text-3xl font-mono text-white font-bold tracking-wider break-all' style={{
+                  background: 'linear-gradient(120deg, #f6d365 0%, #fda085 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  {scannedCode}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Information Notice */}
-          <div className='bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-400/50 rounded-2xl p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8'>
+          <div className='bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-400/50 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8'>
             <div className='flex items-start space-x-3 sm:space-x-4'>
-              <div className='w-8 h-8 sm:w-10 sm:h-10 bg-yellow-500/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1'>
-                <span className='text-yellow-300 text-sm sm:text-lg'>ℹ️</span>
+              <div className='w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1'>
+                <span className='text-blue-300 text-sm sm:text-lg'>ℹ️</span>
               </div>
               <div>
-                <h4 className='text-sm sm:text-base lg:text-lg font-bold text-yellow-300 mb-2 sm:mb-3'>
-                  Información Importante
+                <h4 className='text-sm sm:text-base lg:text-lg font-bold text-blue-300 mb-2 sm:mb-3'>
+                  Confirmar Información
                 </h4>
-                <p className='text-xs sm:text-sm lg:text-base text-gray-300 leading-relaxed'>
-                  Verifica que el código de barras escaneado sea correcto antes de confirmar. 
-                  Una vez confirmado, el código se agregará a tu inventario actual.
+                <p className='text-xs sm:text-sm lg:text-base text-blue-100 leading-relaxed'>
+                  {carData 
+                    ? 'Verifica que la información del vehículo sea correcta antes de confirmar. Una vez confirmado, se agregará a tu inventario actual.'
+                    : 'Verifica que el código de barras escaneado sea correcto antes de confirmar. Una vez confirmado, el código se agregará a tu inventario actual.'
+                  }
                 </p>
               </div>
             </div>

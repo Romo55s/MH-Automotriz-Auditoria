@@ -302,6 +302,59 @@ export const cleanupExpiredDownloadedInventories = (): void => {
   }
 };
 
+export const saveDownloadedInventory = (
+  agencyName: string,
+  month: string,
+  year: number,
+  format: 'csv' | 'excel',
+  scannedCodes: Array<{
+    id: string;
+    code: string;
+    timestamp: string;
+    confirmed: boolean;
+    user: string;
+    carData?: {
+      serie: string;
+      marca: string;
+      color: string;
+      ubicaciones: string;
+    };
+  }>
+): void => {
+  try {
+    const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');
+    const now = new Date();
+    // Set expiration to the end of the following month
+    // This ensures data is available for the entire next month regardless of month length
+    const expiresAt = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59); // Last day of next month
+    
+    const newInventory: DownloadedInventory = {
+      agencyName,
+      month,
+      year,
+      downloadedAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      format,
+      data: scannedCodes
+    };
+    
+    // Check if this inventory already exists and update it, or add new one
+    const existingIndex = downloadedInventories.findIndex((inv: DownloadedInventory) => 
+      inv.agencyName === agencyName && inv.month === month && inv.year === year
+    );
+    
+    if (existingIndex !== -1) {
+      downloadedInventories[existingIndex] = newInventory;
+    } else {
+      downloadedInventories.push(newInventory);
+    }
+    
+    localStorage.setItem('downloadedInventories', JSON.stringify(downloadedInventories));
+  } catch (error) {
+    console.error('Error saving downloaded inventory:', error);
+  }
+};
+
 export const getDownloadedInventories = (): DownloadedInventory[] => {
   try {
     const downloadedInventories = JSON.parse(localStorage.getItem('downloadedInventories') || '[]');

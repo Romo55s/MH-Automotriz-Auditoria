@@ -3,7 +3,7 @@ import { Download, FileSpreadsheet, Upload, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
-import { uploadCSVFile } from '../services/api';
+import { downloadQRCodes, uploadCSVFile } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 
 interface CSVUploadModalProps {
@@ -60,17 +60,8 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose }) => {
     if (!result?.result?.sessionId) return;
 
     try {
-      // Create the download URL using the sessionId
-      const downloadUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/qr/download/${result.result.sessionId}`;
-      
-      // Fetch the file as blob
-      const response = await fetch(downloadUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
+      // Use the centralized API service for consistent URL handling
+      const blob = await downloadQRCodes(result.result.sessionId);
       const url = window.URL.createObjectURL(blob);
       
       // Create a temporary link element to trigger download

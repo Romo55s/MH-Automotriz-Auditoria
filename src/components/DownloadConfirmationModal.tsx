@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Database, Download } from 'lucide-react';
+import { Clock, Database, Download } from 'lucide-react';
 import React from 'react';
 
 interface DownloadConfirmationModalProps {
@@ -10,6 +10,7 @@ interface DownloadConfirmationModalProps {
     year: number;
     totalScans: number;
     createdBy: string;
+    sessionId?: string; // Add session ID for multiple inventories
   };
 }
 
@@ -42,31 +43,37 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
           >
             <Download className='w-8 h-8 text-white' />
           </div>
-          <h3 className='text-lg sm:text-xl font-bold text-white mb-2 uppercase tracking-wide'>
-            Confirmar Descarga de Inventario
-          </h3>
-          <p className='text-sm text-gray-300'>
-            Descargando: {inventoryData.monthName} {inventoryData.year} - {inventoryData.totalScans} códigos
-          </p>
+              <h3 className='text-lg sm:text-xl font-bold text-white mb-2 uppercase tracking-wide'>
+                Confirmar Descarga de Inventario
+              </h3>
+              <p className='text-sm text-gray-300'>
+                Descargando: {inventoryData.monthName} {inventoryData.year} - {inventoryData.totalScans} códigos
+              </p>
+              {inventoryData.sessionId && (
+                <p className='text-xs text-blue-300 mt-1'>
+                  Sesión: {inventoryData.sessionId}
+                </p>
+              )}
         </div>
 
         <div className='space-y-4 mb-6'>
           <div 
             className='p-4 rounded-xl border'
             style={{
-              background: 'linear-gradient(135deg, rgba(255,193,7,0.1) 0%, rgba(255,193,7,0.05) 100%)',
-              border: '1px solid rgba(255,193,7,0.3)'
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(59,130,246,0.05) 100%)',
+              border: '1px solid rgba(59,130,246,0.3)'
             }}
           >
             <div className='flex items-start space-x-3'>
-              <AlertTriangle className='w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0' />
+              <Database className='w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0' />
               <div className='flex-1'>
-                <h4 className='text-sm font-semibold text-yellow-400 mb-2 uppercase tracking-wide'>
-                  ⚠️ Importante: Cambios en los Datos
-                </h4>
-                <p className='text-xs text-gray-300'>
-                  Al descargar este inventario, los datos serán <strong className='text-white'>eliminados permanentemente</strong> de Google Sheets y almacenados localmente hasta el próximo mes.
-                </p>
+                    <h4 className='text-sm font-semibold text-blue-400 mb-2 uppercase tracking-wide'>
+                      📊 Descarga y Respaldo Automático
+                    </h4>
+                    <p className='text-xs text-gray-300'>
+                      Al descargar, el archivo se respaldará automáticamente en Google Drive por 30 días y los datos serán eliminados del sistema. Esto libera espacio para el próximo inventario.
+                      {inventoryData.sessionId && ' Este inventario específico será descargado usando su ID de sesión único.'}
+                    </p>
               </div>
             </div>
           </div>
@@ -137,27 +144,26 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
           >
             <span>Cancelar</span>
           </button>
+          
           <button
             onClick={onConfirm}
             className='flex-1 text-sm py-3 px-6 flex items-center justify-center space-x-2 rounded-full font-semibold transition-all duration-300 hover:scale-105'
             style={{
-              background: 'linear-gradient(120deg, #f6d365 0%, #fda085 100%)',
+              background: 'linear-gradient(120deg, #10b981 0%, #059669 100%)',
               border: '1px solid #fff',
-              color: '#000',
+              color: '#fff',
               fontWeight: '600',
-              boxShadow: '0px 4px 20px rgba(255, 255, 255, 0.2)'
+              boxShadow: '0px 4px 20px rgba(16, 185, 129, 0.3)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#fff';
-              e.currentTarget.style.color = '#000';
+              e.currentTarget.style.background = '#059669';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(120deg, #f6d365 0%, #fda085 100%)';
-              e.currentTarget.style.color = '#000';
+              e.currentTarget.style.background = 'linear-gradient(120deg, #10b981 0%, #059669 100%)';
             }}
           >
             <Download className='w-4 h-4' />
-            <span>Confirmar Descarga</span>
+            <span>Descargar Inventario</span>
           </button>
         </div>
       </div>

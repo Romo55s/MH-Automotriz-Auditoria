@@ -60,3 +60,4 @@ export interface QRGenerationRequest {
   user: string;
   userName: string;
 }
+

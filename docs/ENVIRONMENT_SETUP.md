@@ -12,6 +12,7 @@ Create a `.env.local` file in the root directory with the following variables:
 
 ```bash
 # Backend API Configuration
+# IMPORTANT: Do NOT include /api in the base URL - it's added automatically
 REACT_APP_API_BASE_URL=http://localhost:5000
 
 # Environment
@@ -27,6 +28,7 @@ For production deployment, set these environment variables:
 
 ```bash
 # Production Backend API
+# IMPORTANT: Do NOT include /api in the base URL - it's added automatically
 REACT_APP_API_BASE_URL=https://your-production-api.com
 
 # Production Environment
@@ -89,8 +91,23 @@ Consult your hosting platform's documentation for setting environment variables.
 ### API Connection Issues
 
 1. **Check the API URL**: Ensure `REACT_APP_API_BASE_URL` points to the correct backend server
-2. **CORS Issues**: Make sure your backend allows requests from the frontend domain
-3. **Network Access**: Verify the backend server is accessible from the frontend
+2. **Double /api Prefix**: Make sure your base URL does NOT include `/api` (e.g., use `http://localhost:5000`, not `http://localhost:5000/api`)
+3. **CORS Issues**: Make sure your backend allows requests from the frontend domain
+4. **Network Access**: Verify the backend server is accessible from the frontend
+
+### Double /api Prefix Error
+
+**❌ Wrong Configuration:**
+```bash
+REACT_APP_API_BASE_URL=http://localhost:5000/api  # Has /api
+```
+Results in URLs like: `http://localhost:5000/api/api/inventory/save-scan`
+
+**✅ Correct Configuration:**
+```bash
+REACT_APP_API_BASE_URL=http://localhost:5000  # No /api
+```
+Results in URLs like: `http://localhost:5000/api/inventory/save-scan`
 
 ### Environment Variables Not Loading
 

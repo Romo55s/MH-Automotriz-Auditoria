@@ -19,6 +19,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const [isFocusing, setIsFocusing] = useState(false);
   const [focusCapabilities, setFocusCapabilities] = useState<string[]>([]);
   const [imageEnhancement, setImageEnhancement] = useState(true);
+  const [lastScannedCode, setLastScannedCode] = useState<string>('');
+  const [lastScanTime, setLastScanTime] = useState<number>(0);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -194,6 +196,17 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         (result: Result | null, err: any) => {
           if (result) {
             const scannedCode = result.getText().trim();
+            
+            // Debouncing: Prevent scanning the same code multiple times
+            const currentTime = Date.now();
+            if (scannedCode === lastScannedCode && currentTime - lastScanTime < 3000) {
+              console.log('🚫 Duplicate scan prevented:', scannedCode);
+              return;
+            }
+            
+            setLastScannedCode(scannedCode);
+            setLastScanTime(currentTime);
+            
             const format = result.getBarcodeFormat();
             const resultPoints = result.getResultPoints();
             

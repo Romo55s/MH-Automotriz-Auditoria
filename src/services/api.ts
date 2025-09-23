@@ -1,9 +1,26 @@
 // API service for backend communication
 import { API_BASE_URL } from '../config/environment';
 
+// Helper to build API URLs correctly (avoiding double /api prefix)
+const buildApiUrl = (endpoint: string): string => {
+  // Remove leading slash from endpoint if present
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  
+  // If API_BASE_URL already ends with /api, don't add it again
+  if (API_BASE_URL.endsWith('/api')) {
+    // Remove /api from endpoint if it starts with it
+    const finalEndpoint = cleanEndpoint.startsWith('api/') ? cleanEndpoint.slice(4) : cleanEndpoint;
+    return `${API_BASE_URL}/${finalEndpoint}`;
+  } else {
+    // API_BASE_URL doesn't have /api, so we need to include it in the endpoint
+    const finalEndpoint = cleanEndpoint.startsWith('api/') ? cleanEndpoint : `api/${cleanEndpoint}`;
+    return `${API_BASE_URL}/${finalEndpoint}`;
+  }
+};
+
 // Generic API request helper
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = buildApiUrl(endpoint);
 
   const defaultOptions: RequestInit = {
     headers: {
@@ -154,7 +171,7 @@ export const downloadInventoryCSV = async (
   year: number
 ) => {
   const encodedAgency = encodeURIComponent(agency);
-  const url = `${API_BASE_URL}/api/download/inventory/${encodedAgency}/${month}/${year}/csv`;
+  const url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/csv`);
   
   const response = await fetch(url);
   
@@ -166,22 +183,6 @@ export const downloadInventoryCSV = async (
   return response.blob();
 };
 
-// Download inventory as Excel
-export const downloadInventoryExcel = async (
-  agency: string,
-  month: string,
-  year: number
-) => {
-  const encodedAgency = encodeURIComponent(agency);
-  const url = `${API_BASE_URL}/api/download/inventory/${encodedAgency}/${month}/${year}/excel`;
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-  }
-  
-  return response.blob();
-};
 
 // Validate monthly summary
 export const validateMonthlySummary = async (
@@ -235,7 +236,7 @@ export const uploadCSVFile = async (file: File, location: string, user: string, 
   formData.append('user', user);
   formData.append('userName', userName);
 
-  const response = await fetch(`${API_BASE_URL}/api/qr/upload-csv`, {
+  const response = await fetch(buildApiUrl('/api/qr/upload-csv'), {
     method: 'POST',
     body: formData,
   });
@@ -273,13 +274,42 @@ export const scanQRCode = async (qrData: string, user: string, userName: string)
 
 // Download QR codes as ZIP file
 export const downloadQRCodes = async (sessionId: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/qr/download/${sessionId}`);
+  const response = await fetch(buildApiUrl(`/api/qr/download/${sessionId}`));
   
   if (!response.ok) {
     throw new Error(`QR Download failed: ${response.status} ${response.statusText}`);
   }
   
   return response.blob();
+};
+
+// Note: Google Drive integration is now handled automatically by the backend
+// No manual API calls needed - backup happens automatically on download
+
+// Download specific inventory by session ID (for multiple inventories per month)
+export const downloadInventoryBySessionId = async (
+  agency: string,
+  month: string,
+  year: number,
+  sessionId: string,
+  type: 'csv' | 'xlsx' = 'csv'
+): Promise<Blob> => {
+  try {
+    const encodedAgency = encodeURIComponent(agency);
+    const url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/${type}/${sessionId}`);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Error downloading inventory: ${response.status}`);
+    }
+    
+    return await response.blob();
+  } catch (error) {
+    console.error('Error downloading inventory by session ID:', error);
+    throw error;
+  }
 };
 
 export default {
@@ -293,7 +323,7 @@ export default {
   deleteMultipleScannedEntries,
   getInventoryData,
   downloadInventoryCSV,
-  downloadInventoryExcel,
+  downloadInventoryBySessionId, // New function for specific session downloads
   validateMonthlySummary,
   cleanupDuplicates,
   cleanupSpecificDuplicates,

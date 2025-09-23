@@ -1,5 +1,4 @@
-import Quagga from '@ericblade/quagga2';
-import { BarcodeFormat, BrowserMultiFormatReader, DecodeHintType, Result } from '@zxing/library';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Camera, Flashlight, FlashlightOff, Focus, Monitor, QrCode, RotateCcw, Smartphone, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -13,12 +12,12 @@ interface ExtendedMediaTrackConstraints extends MediaTrackConstraints {
   advanced?: Array<MediaTrackConstraintSet & { torch?: boolean }>;
 }
 
-interface UnifiedScannerProps {
+interface ModernQRScannerProps {
   onScan: (result: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => void;
   onClose: () => void;
 }
 
-const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
+const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -34,12 +33,9 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
   const [scannerType, setScannerType] = useState<'qr' | 'barcode' | 'auto'>('auto');
   const [detectedType, setDetectedType] = useState<'qr' | 'barcode' | null>(null);
   
-  // QR Scanner refs
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  // HTML5 QR Scanner refs
+  const qrScannerRef = useRef<Html5QrcodeScanner | null>(null);
   
-  // Barcode Scanner refs
-  const isQuaggaInitialized = useRef(false);
-  const initAttempts = useRef(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
   const [lastScanTime, setLastScanTime] = useState<number>(0);
@@ -69,22 +65,12 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
   };
 
   const cleanup = () => {
-    // Cleanup QR scanner
-    if (readerRef.current) {
-      readerRef.current.reset();
-    }
-    
-    // Cleanup barcode scanner
-    if (Quagga && isQuaggaInitialized.current) {
-      try {
-        Quagga.stop();
-        if (typeof Quagga.offDetected === 'function') {
-          Quagga.offDetected(() => {});
-        }
-      } catch (err) {
-        console.log('Quagga cleanup error:', err);
-      }
-      isQuaggaInitialized.current = false;
+    // Cleanup HTML5 QR scanner
+    if (qrScannerRef.current) {
+      qrScannerRef.current.clear().catch(error => {
+        console.error("Failed to clear html5QrcodeScanner. ", error);
+      });
+      qrScannerRef.current = null;
     }
     
     // Stop media stream
@@ -120,50 +106,8 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
       setIsScanning(true);
       setError('');
 
-      // Get video stream
-      const constraints = getVideoConstraints();
-      let stream;
-      
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            ...constraints
-          },
-        });
-      } catch (error) {
-        // Fallback to basic constraints
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            width: { ideal: 640, max: 1280 },
-            height: { ideal: 480, max: 720 },
-            facingMode: 'environment',
-            frameRate: { ideal: 24, max: 30 }
-          }
-        });
-      }
-
-      setStreamRef(stream);
-
-      // Check camera capabilities
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        const capabilities = videoTrack.getCapabilities() as any;
-        const focusModes = capabilities.focusMode || [];
-        setFocusCapabilities(focusModes);
-      }
-
-      // Initialize QR scanner first (more reliable)
-      await initializeQRScanner(stream);
-      
-      // Try to initialize barcode scanner with retry
-      try {
-        await initializeBarcodeScanner(stream);
-      } catch (err) {
-        console.log('Barcode scanner failed, continuing with QR scanner only:', err);
-        // Continue with QR scanner only
-      }
+      // Initialize HTML5 QR scanner
+      await initializeHTML5QRScanner(deviceId);
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -172,270 +116,66 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
     }
   };
 
-  const initializeQRScanner = async (stream: MediaStream) => {
+  const initializeHTML5QRScanner = async (deviceId: string) => {
     try {
-      const reader = new BrowserMultiFormatReader();
-      readerRef.current = reader;
-      
-      reader.timeBetweenDecodingAttempts = 100;
-      
-      // Configure hints for maximum precision
-      try {
-        reader.hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-          BarcodeFormat.QR_CODE,
-          BarcodeFormat.CODE_128,
-          BarcodeFormat.CODE_39,
-          BarcodeFormat.EAN_13,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
-          BarcodeFormat.CODABAR,
-          BarcodeFormat.ITF
-        ]);
-        
-        reader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
-        reader.hints.set(DecodeHintType.TRY_HARDER, true);
-        reader.hints.set(DecodeHintType.PURE_BARCODE, false);
-      } catch (e) {
-        console.log('Could not set hints, using default formats');
-      }
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-
-      // Wait for video to be ready
-      await new Promise<void>((resolve, reject) => {
-        if (!videoRef.current) {
-          reject(new Error('Video element not found'));
-          return;
-        }
-
-        const video = videoRef.current;
-        const onCanPlay = () => {
-          video.removeEventListener('canplay', onCanPlay);
-          video.removeEventListener('error', onError);
-          resolve();
-        };
-
-        const onError = (e: Event) => {
-          const target = e.target as HTMLVideoElement;
-          const error = target.error;
-          const errorMsg = error ? `Video error: ${error.code} - ${error.message}` : 'Unknown video error';
-          reject(new Error(errorMsg));
-        };
-
-        video.addEventListener('canplay', onCanPlay);
-        video.addEventListener('error', onError);
-
-        setTimeout(() => {
-          video.removeEventListener('canplay', onCanPlay);
-          video.removeEventListener('error', onError);
-          reject(new Error('Tiempo de espera agotado para el video'));
-        }, 15000);
-      });
-
-      // Start QR scanning with better error handling
-      try {
-        await readerRef.current.decodeFromVideoDevice(
-          selectedDevice,
-          videoRef.current,
-          (result: Result | null, err: any) => {
-            if (result) {
-              const scannedCode = result.getText().trim();
-              const format = result.getBarcodeFormat();
-              const resultPoints = result.getResultPoints();
-              const confidence = resultPoints ? resultPoints.length : 0;
-              
-              console.log('QR Scanner - Detected:', {
-                text: scannedCode,
-                format: format,
-                confidence: confidence
-              });
-
-              if (confidence >= 1 && scannedCode.length >= 3) {
-                setDetectedType('qr');
-                processScannedCode(scannedCode, 'qr');
-              }
-            }
-            if (err && err.name !== 'NotFoundException') {
-              if (err.name === 'ChecksumException' || err.name === 'FormatException') {
-                console.log('QR code error:', err.name);
-                // Don't show error for every failed attempt, just log it
-              }
-            }
-          }
-        );
-      } catch (err) {
-        console.log('QR scanner start failed:', err);
-        // Try alternative approach
-        setTimeout(() => {
-          if (readerRef.current && videoRef.current) {
-            readerRef.current.decodeFromVideoDevice(
-              selectedDevice,
-              videoRef.current,
-              (result: Result | null, err: any) => {
-                if (result) {
-                  const scannedCode = result.getText().trim();
-                  if (scannedCode.length >= 3) {
-                    setDetectedType('qr');
-                    processScannedCode(scannedCode, 'qr');
-                  }
-                }
-              }
-            );
-          }
-        }, 1000);
-      }
-    } catch (err) {
-      console.log('QR Scanner initialization failed:', err);
-    }
-  };
-
-  const initializeBarcodeScanner = async (stream: MediaStream) => {
-    try {
-      const isSafariIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
-      
-      const config = {
-        inputStream: {
-          name: "Live",
-          type: "LiveStream",
-          target: scannerRef.current,
-          constraints: {
-            width: { min: 320, ideal: 640, max: 1280 },
-            height: { min: 240, ideal: 480, max: 720 },
-            facingMode: "environment",
-            aspectRatio: { min: 0.5, max: 3.0 }
-          }
-        },
-        locator: {
-          patchSize: isSafariIOS ? "small" : "small",
-          halfSample: true,
-          showCanvas: false,
-          showPatches: false,
-          showFoundPatches: false,
-          showSkeleton: false,
-          showLabels: false,
-          showPatchLabels: false,
-          showBoundingBox: false,
-          showCrosshair: false
-        },
-        numOfWorkers: 0, // Disable workers for better compatibility
-        frequency: isSafariIOS ? 3 : 10,
-        decoder: {
-          readers: isSafariIOS 
-            ? ["code_128_reader", "ean_reader", "code_39_reader"]
-            : ["code_39_reader", "code_128_reader", "ean_reader"]
-        },
-        locate: true,
-        debug: {
-          drawBoundingBox: false,
-          showFrequency: false,
-          drawScanline: false,
-          showPattern: false
-        }
-      };
-
       if (!scannerRef.current) {
-        setError('Error: El elemento del escáner no está disponible');
+        setError('Elemento del escáner no disponible');
         return;
       }
 
-      // Wait for the element to be properly rendered
-      const rect = scannerRef.current.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        initAttempts.current++;
-        if (initAttempts.current < 15) {
-          setTimeout(() => initializeBarcodeScanner(stream), 200);
-          return;
-        } else {
-          setError('Error: El elemento del escáner no se pudo inicializar');
-          return;
-        }
-      }
+      // Create HTML5 QR Scanner configuration
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        disableFlip: false,
+        showTorchButtonIfSupported: true,
+        showZoomSliderIfSupported: true,
+        defaultZoomValueIfSupported: 2,
+        useBarCodeDetectorIfSupported: true
+      };
 
-      // Ensure the element has proper dimensions
-      if (rect.width < 100 || rect.height < 100) {
-        initAttempts.current++;
-        if (initAttempts.current < 15) {
-          setTimeout(() => initializeBarcodeScanner(stream), 200);
-          return;
-        } else {
-          setError('Error: El elemento del escáner es demasiado pequeño');
-          return;
-        }
-      }
-
-      Quagga.init(config, (err) => {
-        if (err) {
-          console.log('Barcode scanner initialization failed:', err);
-          // Try to reinitialize with a simpler config
-          if (initAttempts.current < 5) {
-            initAttempts.current++;
-            setTimeout(() => {
-              const simpleConfig = {
-                ...config,
-                inputStream: {
-                  ...config.inputStream,
-                  constraints: {
-                    width: { min: 640 },
-                    height: { min: 480 },
-                    facingMode: "environment"
-                  }
-                },
-                numOfWorkers: 0,
-                frequency: 5
-              };
-              
-              Quagga.init(simpleConfig, (retryErr) => {
-                if (retryErr) {
-                  console.log('Retry initialization failed:', retryErr);
-                  setError('No se pudo inicializar el escáner de códigos de barras');
-                } else {
-                  setIsInitialized(true);
-                  isQuaggaInitialized.current = true;
-                }
-              });
-            }, 500);
-            return;
-          } else {
-            setError('No se pudo inicializar el escáner de códigos de barras');
-            return;
-          }
-        }
-        
-        setIsInitialized(true);
-        isQuaggaInitialized.current = true;
-        
-        // Listen for barcode detection
-        Quagga.onDetected((result) => {
-          const code = result.codeResult.code;
-          const format = result.codeResult.format;
-          const confidence = result.codeResult.decodedCodes?.length || 0;
-          const quality = result.codeResult.decodedCodes?.reduce((acc, item) => acc + (item.error || 0), 0) || 0;
-          const avgQuality = confidence > 0 ? quality / confidence : 0;
-          
-          console.log('Barcode Scanner - Detected:', {
-            code: code,
-            format: format,
-            confidence: confidence,
-            quality: avgQuality
-          });
-          
-          if (confidence >= 2 && avgQuality <= 1.0 && code.length >= 3 && code.length <= 50) {
-            // Debounce mechanism
-            const currentTime = Date.now();
-            if (code !== lastScannedCode || currentTime - lastScanTime > 1000) {
-              setLastScannedCode(code);
-              setLastScanTime(currentTime);
-              setDetectedType('barcode');
-              processScannedCode(code, 'barcode');
-            }
-          }
+      // Success callback
+      const onScanSuccess = (decodedText: string, decodedResult: any) => {
+        console.log('HTML5 QR Scanner - Detected:', {
+          text: decodedText,
+          format: decodedResult.result.format
         });
-      });
+
+        // Debounce mechanism
+        const currentTime = Date.now();
+        if (decodedText !== lastScannedCode || currentTime - lastScanTime > 1000) {
+          setLastScannedCode(decodedText);
+          setLastScanTime(currentTime);
+          setDetectedType('qr');
+          processScannedCode(decodedText, 'qr');
+        }
+      };
+
+      // Error callback
+      const onScanFailure = (error: string) => {
+        // Don't log every scan failure, just silent failures
+        if (!error.includes('NotFoundException')) {
+          console.log('Scan error:', error);
+        }
+      };
+
+      // Create and start the scanner
+      const html5QrcodeScanner = new Html5QrcodeScanner(
+        scannerRef.current.id || 'html5-qrcode-scanner',
+        config,
+        false // verbose
+      );
+
+      qrScannerRef.current = html5QrcodeScanner;
+      
+      // Render the scanner
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+      setIsInitialized(true);
+
     } catch (err) {
-      console.log('Barcode scanner setup error:', err);
+      console.log('HTML5 QR Scanner initialization failed:', err);
+      setError('No se pudo inicializar el escáner HTML5 QR');
     }
   };
 
@@ -478,7 +218,7 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
             qrData.location &&
             qrData.timestamp) {
           
-          console.log('Unified Scanner - Car inventory QR detected:', qrData);
+          console.log('Modern QR Scanner - Car inventory QR detected:', qrData);
           
           // Extract car information for display
           const carInfo = {
@@ -694,7 +434,7 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
                 <h2 className={`font-bold uppercase tracking-hero leading-heading text-shadow truncate ${
                   isFullscreen ? 'text-lg' : 'text-lg sm:text-xl'
                 }`}>
-                  Escáner de Códigos QR de Inventario
+                  Escáner QR Moderno
                 </h2>
                 <p className={`text-white/70 truncate ${isFullscreen ? 'text-xs' : 'text-xs sm:text-sm'}`}>
                   {isScanning ? 'Escaneando...' : 'Listo para escanear'}
@@ -705,22 +445,14 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
               {/* Manual Focus Button */}
               <button
                 onClick={manualFocus}
-                disabled={isFocusing || focusCapabilities.length === 0}
+                disabled={isFocusing}
                 className={`glass-effect rounded-xl transition-all duration-300 hover:scale-105 border border-white/20 hover:border-white/40 ${
-                  isFocusing ? 'bg-blue-500/20 border-blue-400/50' : 
-                  focusCapabilities.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                  isFocusing ? 'bg-blue-500/20 border-blue-400/50' : ''
                 } ${isFullscreen ? 'p-2' : 'p-2 sm:p-3'}`}
-                title={
-                  focusCapabilities.length === 0 
-                    ? 'Enfoque manual no disponible en este dispositivo' 
-                    : isFocusing 
-                      ? 'Enfocando...' 
-                      : 'Enfoque manual'
-                }
+                title={isFocusing ? 'Enfocando...' : 'Enfoque manual'}
               >
                 <Focus className={`${
-                  isFocusing ? 'text-blue-300 animate-pulse' : 
-                  focusCapabilities.length === 0 ? 'text-gray-400' : 'text-white'
+                  isFocusing ? 'text-blue-300 animate-pulse' : 'text-white'
                 } ${isFullscreen ? 'w-5 h-5' : 'w-5 h-5 sm:w-6 sm:h-6'}`} />
               </button>
               {/* Flash Toggle */}
@@ -807,7 +539,7 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
           {/* Video Container */}
           <div className={`${isFullscreen ? 'p-4' : 'p-4 sm:p-6'}`}>
             <div className="relative glass-effect rounded-2xl overflow-hidden border border-white/20 shadow-lg flex items-center justify-center">
-              {/* QR Scanner Video */}
+              {/* Modern QR Scanner Video */}
               <video
                 ref={videoRef}
                 className={`w-full h-full object-cover cursor-pointer ${
@@ -832,9 +564,10 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
                 title="Toca para enfocar"
               />
 
-              {/* Barcode Scanner Container */}
+              {/* HTML5 QR Scanner Container */}
               <div 
                 ref={scannerRef}
+                id="html5-qrcode-scanner"
                 className="absolute inset-0 w-full h-full"
                 style={{ 
                   position: 'absolute',
@@ -905,7 +638,7 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
                   <Smartphone className={`text-white ${isFullscreen ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}`} />
                 </div>
                 <p className={`text-white font-medium ${isFullscreen ? 'text-sm' : 'text-sm sm:text-base'}`}>
-                  Mantén el teléfono en posición vertical para mejor escaneo
+                  Escáner QR Moderno - Optimizado para códigos físicos
                 </p>
               </div>
               
@@ -1065,4 +798,4 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
   );
 };
 
-export default UnifiedScanner;
+export default ModernQRScanner;

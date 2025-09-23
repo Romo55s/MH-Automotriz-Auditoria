@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { useInventory } from '../hooks/useInventory';
 import { checkMonthlyInventory, getAgencyInventories } from '../services/api';
 import { MonthlyInventory } from '../types/index';
 import Footer from './Footer';
@@ -17,6 +18,7 @@ import {
   ChevronRight,
   Clock,
   Database,
+  Download,
   FileText,
   Plus,
   RefreshCw,
@@ -30,6 +32,7 @@ const MonthlyInventoryManager: React.FC = () => {
   const { user } = useAuth0();
   const { selectedAgency, setSelectedAgency } = useAppContext();
   const { showSuccess, showError, showInfo } = useToast();
+  const { } = useInventory();
 
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,6 +90,7 @@ const MonthlyInventoryManager: React.FC = () => {
 
     try {
       const response = await getAgencyInventories(selectedAgency.name);
+      
       // Handle different response formats
       let inventories = [];
       
@@ -223,6 +227,49 @@ const MonthlyInventoryManager: React.FC = () => {
       return 'Fecha no disponible';
     }
   };
+
+  const handleDownloadInventory = async (inventory: MonthlyInventory) => {
+    try {
+      let response: Response;
+      
+      // Use session ID if available (for multiple inventories per month)
+      if (inventory.sessionId) {
+        response = await fetch(`/api/download/inventory/${selectedAgency?.name}/${inventory.month}/${inventory.year}/csv/${inventory.sessionId}`);
+      } else {
+        // Fallback to regular download (most recent inventory)
+        response = await fetch(`/api/download/inventory/${selectedAgency?.name}/${inventory.month}/${inventory.year}/csv`);
+      }
+      
+      if (!response.ok) {
+        throw new Error('Error al descargar el inventario');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const filename = inventory.sessionId 
+        ? `${selectedAgency?.name}_${inventory.monthName}_${inventory.year}_${inventory.sessionId}.csv`
+        : `${selectedAgency?.name}_${inventory.monthName}_${inventory.year}.csv`;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente y respaldado automáticamente en Google Drive. Los datos han sido eliminados del sistema.');
+    } catch (error) {
+      console.error('Error downloading inventory:', error);
+      
+      // Handle different types of errors
+      if (error.message && (error.message.includes('Google Drive') || error.message.includes('backup'))) {
+        showError('Error de Respaldo', 'El archivo se descargó pero el respaldo en Google Drive falló. Por favor contacta al soporte.');
+      } else {
+        showError('Error de Descarga', 'No se pudo descargar el inventario');
+      }
+    }
+  };
+
 
   const handleStartNewInventory = async () => {
     if (!selectedAgency) return;
@@ -634,10 +681,23 @@ const MonthlyInventoryManager: React.FC = () => {
                             )}
                             {inventory.status === 'Completed' && (
                               <div className='flex items-center space-x-2'>
-                                <CheckCircle className='w-5 h-5 text-green-400' />
-                                <span className='text-white text-sm font-medium'>
-                                  Completado
-                                </span>
+                                <div className='flex items-center space-x-2 mr-3'>
+                                  <CheckCircle className='w-5 h-5 text-green-400' />
+                                  <span className='text-white text-sm font-medium'>
+                                    Completado
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleDownloadInventory(inventory)}
+                                  className='btn-primary text-xs py-2 px-4 flex items-center space-x-2 rounded-xl transition-all duration-300 hover:scale-105 font-semibold'
+                                  style={{
+                                    background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
+                                    backdropFilter: 'blur(20px)'
+                                  }}
+                                >
+                                  <Download className='w-4 h-4' />
+                                  <span>Descargar CSV</span>
+                                </button>
                               </div>
                             )}
                           </td>
