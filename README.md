@@ -2,7 +2,7 @@
 
 A modern React application for automating car inventory management using **QR code scanning** and **complete vehicle data capture**.
 
-## ✨ New Features (Latest Update)
+## ✨ Latest Features (v2.0)
 
 ### 🎯 **QR Code System with Complete Vehicle Data**
 - **📱 QR Code Scanning** - Scan QR codes containing complete vehicle information
@@ -25,6 +25,21 @@ A modern React application for automating car inventory management using **QR co
 - **File Selection Modal** - Choose specific inventory files from Google Drive with real filenames
 - **Download Preservation** - Keep downloaded inventories until next month
 
+### 🤝 **Real-Time Collaboration System**
+- **Multi-User Sessions** - Multiple users can work on the same inventory simultaneously
+- **Session Joining** - Users can join existing active sessions for collaborative work
+- **Real-Time Sync** - All users see each other's scans immediately
+- **Session Notifications** - Notify users when inventory is completed by another user
+- **Smart Session Management** - Prevents false "session terminated" warnings
+- **Session-Specific Checking** - Only checks completion of current active session
+
+### 🏗️ **Modern Component Architecture**
+- **Organized Structure** - Components organized into logical folders for better maintainability
+- **Namespace Imports** - Clean import system with barrel exports
+- **Modular Design** - Large components broken down into smaller, focused components
+- **Type Safety** - Full TypeScript support with proper type definitions
+- **Performance Optimized** - Request throttling and deduplication for better performance
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 18 + TypeScript
@@ -34,6 +49,75 @@ A modern React application for automating car inventory management using **QR co
 - **Routing**: React Router v6
 - **Icons**: Lucide React
 - **Build Tool**: Create React App with production optimizations
+
+## 📁 Project Structure
+
+```
+src/
+├── components/                    # Organized component structure
+│   ├── common/                   # Shared components
+│   │   ├── display/             # UI display components
+│   │   │   ├── Header.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   ├── LoadingSpinner.tsx
+│   │   │   ├── Toast.tsx
+│   │   │   └── index.ts         # Barrel exports
+│   │   ├── forms/               # Form components
+│   │   │   ├── Login.tsx
+│   │   │   ├── AgencySelector.tsx
+│   │   │   └── index.ts
+│   │   └── modals/              # Modal components
+│   │       ├── DownloadConfirmationModal.tsx
+│   │       ├── InventoryCompletedByOtherModal.tsx
+│   │       ├── ManualInputModal.tsx
+│   │       └── index.ts
+│   ├── inventory/               # Inventory-specific components
+│   │   ├── controls/            # Scanner controls
+│   │   │   ├── UnifiedScanner.tsx
+│   │   │   ├── BarcodeScanner.tsx
+│   │   │   └── ModernQRScanner.tsx
+│   │   ├── display/             # Display components
+│   │   │   ├── InventoryList.tsx
+│   │   │   ├── ScannedCodesList.tsx
+│   │   │   └── index.ts
+│   │   ├── modals/              # Inventory modals
+│   │   │   ├── MultipleInventorySelector.tsx
+│   │   │   └── index.ts
+│   │   ├── monthly/             # Monthly inventory management
+│   │   │   ├── MonthlyInventoryManager.tsx
+│   │   │   ├── MonthlyInventoryTable.tsx
+│   │   │   └── index.ts
+│   │   └── session/             # Session management
+│   │       ├── InventoryPage.tsx
+│   │       ├── InventoryQRPage.tsx
+│   │       └── index.ts
+│   └── index.ts                 # Main component exports
+├── config/                      # Configuration files
+│   ├── auth0-config.ts
+│   └── environment.ts
+├── context/                     # React contexts
+│   ├── AppContext.tsx
+│   └── ToastContext.tsx
+├── hooks/                       # Custom hooks
+│   └── useInventory.ts
+├── services/                    # API services
+│   └── api.ts
+├── types/                       # TypeScript definitions
+│   ├── index.ts
+│   └── quagga.d.ts
+├── utils/                       # Utility functions
+│   ├── debug.ts
+│   ├── localStorageManager.ts
+│   └── sessionManager.ts
+└── App.tsx                      # Main app component
+```
+
+### 🏗️ **Component Organization Benefits**
+- **Logical Grouping**: Components organized by functionality and purpose
+- **Namespace Imports**: Clean imports using barrel exports (`import { Component } from './components'`)
+- **Maintainability**: Easy to find and modify specific components
+- **Scalability**: Structure supports future growth and new features
+- **Type Safety**: Full TypeScript support with proper type definitions
 
 ## 🚀 Getting Started
 
@@ -75,6 +159,14 @@ A modern React application for automating car inventory management using **QR co
    ```
 
    The app will open at `http://localhost:3000`
+
+## 📚 Documentation
+
+- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Modern component architecture and organization
+- **[Multiple Inventories](docs/MULTIPLE_INVENTORIES.md)** - Multiple inventory sessions per month
+- **[Collaboration System](docs/COLLABORATION_SYSTEM.md)** - Real-time multi-user collaboration
+- **[Environment Setup](docs/ENVIRONMENT_SETUP.md)** - Development environment configuration
+- **[Production Deployment](docs/PRODUCTION_DEPLOYMENT.md)** - Production deployment guide
 
 ## 📱 Usage
 

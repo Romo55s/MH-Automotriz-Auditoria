@@ -25,7 +25,22 @@ The Car Inventory App now supports **multiple inventory sessions per month** wit
 - **Fallback Support**: Download most recent inventory if session ID not specified
 - **Backward Compatibility**: Works with existing single-inventory workflows
 
+### **Real-Time Collaboration System**
+- **Multi-User Sessions**: Multiple users can work on the same inventory simultaneously
+- **Session Joining**: Users can join existing active sessions for collaborative work
+- **Real-Time Sync**: All users see each other's scans immediately
+- **Session Notifications**: Notify users when inventory is completed by another user
+- **Smart Session Management**: Prevents false "session terminated" warnings
+- **Session-Specific Checking**: Only checks completion of current active session
+
 ## 🔄 Workflow
+
+### **Collaborative Session Workflow**
+1. **User A starts session**: Creates new active inventory session
+2. **User B joins session**: Sees "Continuar Sesión" button and joins User A's session
+3. **Real-time collaboration**: Both users can scan codes and see each other's work
+4. **Session completion**: When one user completes, others get notification but can continue
+5. **New session**: Users can start new sessions even after previous ones are completed
 
 ### **First Inventory of the Month**
 1. **Start Session**: User starts new inventory session
