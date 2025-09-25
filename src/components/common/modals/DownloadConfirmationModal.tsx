@@ -11,14 +11,17 @@ interface DownloadConfirmationModalProps {
     totalScans: number;
     createdBy: string;
     sessionId?: string; // Add session ID for multiple inventories
+    agency?: string; // Add agency for proper file naming
   };
+  fileType?: 'csv' | 'xlsx'; // Add file type support
 }
 
 const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  inventoryData
+  inventoryData,
+  fileType = 'csv'
 }) => {
   if (!isOpen) return null;
 
@@ -54,6 +57,9 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
                   Sesión: {inventoryData.sessionId}
                 </p>
               )}
+              <p className='text-xs text-gray-400 mt-1'>
+                Formato: {fileType.toUpperCase()}
+              </p>
         </div>
 
         <div className='space-y-4 mb-6'>
@@ -88,8 +94,8 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
             >
               <Database className='w-4 h-4 text-blue-400' />
               <div className='flex-1'>
-                <p className='text-xs font-medium text-blue-300 uppercase tracking-wide'>Google Sheets</p>
-                <p className='text-xs text-gray-300'>Los datos serán eliminados permanentemente</p>
+                <p className='text-xs font-medium text-blue-300 uppercase tracking-wide'>Google Drive</p>
+                <p className='text-xs text-gray-300'>Respaldo automático por 30 días</p>
               </div>
             </div>
 
@@ -103,7 +109,7 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
               <Download className='w-4 h-4 text-green-400' />
               <div className='flex-1'>
                 <p className='text-xs font-medium text-green-300 uppercase tracking-wide'>Almacenamiento Local</p>
-                <p className='text-xs text-gray-300'>Los datos se guardarán en tu dispositivo hasta el próximo mes</p>
+                <p className='text-xs text-gray-300'>Los datos se guardarán en tu dispositivo</p>
               </div>
             </div>
 
@@ -116,8 +122,8 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
             >
               <Clock className='w-4 h-4 text-orange-400' />
               <div className='flex-1'>
-                <p className='text-xs font-medium text-orange-300 uppercase tracking-wide'>Expiración Automática</p>
-                <p className='text-xs text-gray-300'>Los datos se eliminarán automáticamente al inicio del próximo mes</p>
+                <p className='text-xs font-medium text-orange-300 uppercase tracking-wide'>Limpieza Automática</p>
+                <p className='text-xs text-gray-300'>Los datos se eliminarán del sistema después de la descarga</p>
               </div>
             </div>
           </div>
@@ -163,7 +169,7 @@ const DownloadConfirmationModal: React.FC<DownloadConfirmationModalProps> = ({
             }}
           >
             <Download className='w-4 h-4' />
-            <span>Descargar Inventario</span>
+            <span>Descargar {fileType.toUpperCase()}</span>
           </button>
         </div>
       </div>

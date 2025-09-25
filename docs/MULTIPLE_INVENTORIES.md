@@ -15,7 +15,8 @@ The Car Inventory App now supports **multiple inventory sessions per month** wit
 ### **Google Drive Integration**
 - **Automatic Backup**: First download triggers automatic Google Drive backup
 - **30-Day Retention**: Backups are automatically deleted after 30 days
-- **Smart Fallback**: Subsequent downloads use Google Drive backup
+- **Smart File Selection**: Users can choose from multiple available inventory files
+- **Real Filename Preservation**: Downloads use actual Google Drive filenames
 - **Data Cleanup**: Google Sheets data is cleared after first download
 
 ### **Enhanced Data Management**
@@ -48,6 +49,12 @@ The Car Inventory App now supports **multiple inventory sessions per month** wit
 ## 🛠️ Technical Implementation
 
 ### **API Endpoints**
+
+#### **Google Drive Integration**
+```http
+GET /api/download/stored-files/{agency}           # Get all stored files for agency
+GET /api/download/stored-file/{fileId}            # Download specific file by Google Drive ID
+```
 
 #### **Download Specific Inventory by Session ID**
 ```http
@@ -94,46 +101,55 @@ interface DownloadInventoryData {
 
 ### **Frontend Implementation**
 
-#### **Download Logic with Session ID Support**
+#### **Google Drive File Selection**
 ```typescript
-const handleDownloadInventory = async (inventory: MonthlyInventory) => {
+const handleSelectInventoryFromSelector = async (fileId: string) => {
   try {
-    let response: Response;
+    // Get stored files to find the correct filename
+    const { getStoredFiles } = await import('../services/api');
+    const storedFiles = await getStoredFiles(selectedAgency?.name || '');
     
-    // Use session ID if available (for multiple inventories per month)
-    if (inventory.sessionId) {
-      response = await fetch(`/api/download/inventory/${agency}/${month}/${year}/csv/${inventory.sessionId}`);
-    } else {
-      // Fallback to regular download (most recent inventory)
-      response = await fetch(`/api/download/inventory/${agency}/${month}/${year}/csv`);
-    }
+    // Find the file that matches this fileId
+    const matchingFile = storedFiles.files?.find((file: any) => file.id === fileId);
+    const filename = matchingFile?.name || `inventory_${fileId.slice(-8)}.csv`;
     
-    // Process download...
+    // Download with correct filename
+    const blob = await downloadStoredFile(fileId);
+    
+    // Create download link with real filename
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   } catch (error) {
-    // Handle errors...
+    console.error('Error downloading specific inventory:', error);
   }
 };
 ```
 
-#### **API Service with Session ID Support**
+#### **API Service with Google Drive Support**
 ```typescript
-export const downloadInventoryBySessionId = async (
-  agency: string,
-  month: string,
-  year: number,
-  sessionId: string,
-  type: 'csv' | 'xlsx' = 'csv'
-): Promise<Blob> => {
+// Get stored files for an agency (Google Drive files)
+export const getStoredFiles = async (agency: string) => {
   const encodedAgency = encodeURIComponent(agency);
-  const url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/${type}/${sessionId}`);
-  
+  const response = await apiRequest(`/api/download/stored-files/${encodedAgency}`);
+  return response;
+};
+
+// Download specific file by ID
+export const downloadStoredFile = async (fileId: string) => {
+  const url = buildApiUrl(`/api/download/stored-file/${fileId}`);
   const response = await fetch(url);
   
   if (!response.ok) {
-    throw new Error(`Error downloading inventory: ${response.status}`);
+    throw new Error(`Download failed: ${response.status} ${response.statusText}`);
   }
   
-  return await response.blob();
+  return response.blob();
 };
 ```
 
@@ -142,8 +158,14 @@ export const downloadInventoryBySessionId = async (
 ### **Inventory Management Page**
 - **Multiple Inventory Cards**: Each completed inventory shows as a separate card
 - **Session ID Display**: Shows unique session identifier for each inventory
-- **Download Buttons**: Individual download buttons for each inventory
+- **Download Button**: Header button to trigger file selection modal
 - **Status Indicators**: Clear status for each inventory session
+
+### **Multiple Inventory Selector Modal**
+- **File List**: Shows all available inventory files from Google Drive
+- **Real Filenames**: Displays actual Google Drive filenames
+- **File Details**: Shows creation date, size, and session information
+- **Smart Selection**: Users can choose specific inventory to download
 
 ### **Download Confirmation Modal**
 - **Session Information**: Displays session ID when available
@@ -152,8 +174,8 @@ export const downloadInventoryBySessionId = async (
 
 ### **File Naming Convention**
 ```
-Without Session ID: Agency_September_2025.csv
-With Session ID:    Agency_September_2025_sess_1758654024132.csv
+Google Drive Format: 2025-09-25_Jac_September_2025_8ced4e1e.csv
+Legacy Format:      Agency_September_2025_sess_1758654024132.csv
 ```
 
 ## 🔧 Configuration

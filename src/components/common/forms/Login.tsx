@@ -2,8 +2,8 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { Shield, Users, Zap } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth0Config } from '../config/auth0-config';
-import Footer from './Footer';
+import { auth0Config } from '../../../config/auth0-config';
+import { Footer } from '../display';
 
 const Login: React.FC = () => {
   const { loginWithRedirect, isLoading, isAuthenticated, user, error } =
@@ -19,7 +19,6 @@ const Login: React.FC = () => {
 
   const handleMainLogin = async () => {
     try {
-      console.log('🔑 Initiating login...');
 
       const authParams = {
         authorizationParams: {

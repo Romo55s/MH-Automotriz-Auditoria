@@ -3,23 +3,22 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import {
-    checkInventoryCompletion,
-    checkInventoryLimits,
-    checkMonthlyInventory,
-    deleteMultipleScannedEntries,
-    deleteScannedEntry,
-    downloadInventoryBySessionId,
-    downloadInventoryCSV,
-    finishSession,
-    getMonthlyInventory,
-    saveScan
+  checkInventoryCompletion,
+  checkInventoryCompletionByOther,
+  checkInventoryLimits,
+  checkMonthlyInventory,
+  deleteMultipleScannedEntries,
+  deleteScannedEntry,
+  finishSession,
+  getMonthlyInventory,
+  saveScan
 } from '../services/api';
 import { ScannedCode } from '../types/index';
 import {
-    clearSession,
-    loadSession,
-    saveSession,
-    SessionData,
+  clearSession,
+  loadSession,
+  saveSession,
+  SessionData,
 } from '../utils/sessionManager';
 
 export const useInventory = () => {
@@ -36,6 +35,13 @@ export const useInventory = () => {
   const [isValidatingSession, setIsValidatingSession] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [inventoryCompletedByOther, setInventoryCompletedByOther] = useState<{
+    isCompleted: boolean;
+    completedBy: string;
+    completedAt: string;
+  } | null>(null);
+  const [lastCompletionCheck, setLastCompletionCheck] = useState<number>(0);
+  const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
 
   // Initialize current month and year
   useEffect(() => {
@@ -79,7 +85,6 @@ export const useInventory = () => {
           };
         });
         
-        console.log('🔍 latestScans after mapping:', latestScans);
         
         // Only update if we got new data or if the data is different
         const hasNewData = latestScans.length !== scannedCodes.length;
@@ -109,10 +114,8 @@ export const useInventory = () => {
           return false;
         });
         
-        console.log('🔍 Update check:', { hasNewData, hasDifferentData, hasCarDataChanges, willUpdate: hasNewData || hasDifferentData || hasCarDataChanges });
         
         if (hasNewData || hasDifferentData || hasCarDataChanges) {
-          console.log('🔄 Updating scannedCodes state with:', latestScans);
           setScannedCodes(latestScans);
           setLastSyncTime(new Date());
           
@@ -146,7 +149,6 @@ export const useInventory = () => {
     if (selectedAgency && currentMonth && currentYear && isSessionActive && scannedCodes.length > 0) {
       const hasCodesWithoutCarData = scannedCodes.some(code => !code.carData);
       if (hasCodesWithoutCarData) {
-        console.log('🔄 Detected codes without car data, forcing immediate sync...');
         syncSessionData();
       }
     }
@@ -392,30 +394,46 @@ export const useInventory = () => {
     }
   }, [selectedAgency, currentMonth, currentYear]);
 
-  // Check if inventory was completed (which would terminate all active sessions)
+  // Check if inventory was completed by another user (with throttling and deduplication)
   const checkForInventoryCompletion = useCallback(async () => {
-    if (!selectedAgency || !currentMonth || !currentYear) {
+    if (!selectedAgency || !currentMonth || !currentYear || !isSessionActive || !user?.sub || !sessionId) {
+      return { wasCompleted: false };
+    }
+
+    // Throttle requests - only check every 60 seconds
+    const now = Date.now();
+    if (now - lastCompletionCheck < 60000) {
+      return { wasCompleted: false };
+    }
+
+    // Prevent concurrent requests
+    if (isCheckingCompletion) {
       return { wasCompleted: false };
     }
 
     try {
-      const result = await checkInventoryCompletion({
-        agency: selectedAgency.name,
-        month: currentMonth,
-        year: currentYear,
-      });
+      setIsCheckingCompletion(true);
+      setLastCompletionCheck(now);
 
-      if ((result.completed || result.isCompleted) && 
-          isSessionActive && 
-          result.completedInventories >= 2) {
+      const result = await checkInventoryCompletionByOther(
+        selectedAgency.name,
+        currentMonth,
+        currentYear,
+        user.sub,
+        sessionId
+      );
+
+      if (result.completed && result.completedBy !== user.name) {
+        // Inventory was completed by another user - show notification but don't terminate session
+        setInventoryCompletedByOther({
+          isCompleted: true,
+          completedBy: result.completedBy || 'Usuario desconocido',
+          completedAt: result.completedAt || new Date().toISOString()
+        });
         
-        // Clear the local session since inventory was completed by someone else AND limit reached
-        if (sessionId && selectedAgency) {
-          clearSession(selectedAgency.name, currentMonth, currentYear);
-        }
-        setIsSessionActive(false);
-        setScannedCodes([]);
-        setSessionId('');
+        // Don't clear the session - let users continue working together
+        // The notification will inform them that someone completed the inventory
+        // but they can choose to continue or end their session
         
         return {
           wasCompleted: true,
@@ -427,8 +445,17 @@ export const useInventory = () => {
     } catch (error) {
       console.error('Error checking inventory completion:', error);
       return { wasCompleted: false };
+    } finally {
+      setIsCheckingCompletion(false);
     }
-  }, [selectedAgency, currentMonth, currentYear, isSessionActive, sessionId]);
+  }, [selectedAgency, currentMonth, currentYear, isSessionActive, sessionId, user, lastCompletionCheck, isCheckingCompletion]);
+
+  // Clear inventory completed by other notification
+  const clearInventoryCompletedNotification = useCallback(() => {
+    setInventoryCompletedByOther(null);
+    setLastCompletionCheck(0); // Reset the throttle timer
+    setIsCheckingCompletion(false); // Reset the checking flag
+  }, []);
 
   // Get month name from month number
   const getMonthName = (month: string) => {
@@ -1034,45 +1061,45 @@ export const useInventory = () => {
 
       setIsLoading(true);
       try {
-        let blob: Blob;
+        // Use the new Google Drive download logic
+        const { getStoredFiles, downloadStoredFile } = await import('../services/api');
         
-        // Use session ID if available (for multiple inventories per month)
+        // Get stored files from Google Drive for this agency
+        const storedFiles = await getStoredFiles(inventoryData.agencyName);
+        
+        // Find the file that matches this inventory's session ID or get the most recent
+        let matchingFile;
         if (inventoryData.sessionId) {
-          blob = await downloadInventoryBySessionId(
-            inventoryData.agencyName,
-            currentMonth,
-            currentYear,
-            inventoryData.sessionId,
-            'csv'
-          );
+          matchingFile = storedFiles.files?.find((file: any) => {
+            const fileName = file.name || '';
+            const fileSessionId = fileName.split('_').pop()?.replace('.csv', '');
+            return fileSessionId === inventoryData.sessionId;
+          });
         } else {
-          // Fallback to regular download (most recent inventory)
-          blob = await downloadInventoryCSV(
-            inventoryData.agencyName,
-            currentMonth,
-            currentYear
-          );
+          // Get the most recent file
+          matchingFile = storedFiles.files?.[0];
         }
         
-        if (blob) {
-          // Create download link and trigger download
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          const filename = inventoryData.sessionId 
-            ? `${inventoryData.agencyName}_${inventoryData.monthName}_${inventoryData.year}_${inventoryData.sessionId}.csv`
-            : `${inventoryData.agencyName}_${inventoryData.monthName}_${inventoryData.year}.csv`;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-          
-          showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente y respaldado automáticamente en Google Drive. Los datos han sido eliminados del sistema.');
-          
-          return true;
+        if (!matchingFile) {
+          throw new Error('No se encontró el archivo correspondiente en Google Drive');
         }
-        return false;
+        
+        // Download the specific file using its Google Drive file ID
+        const blob = await downloadStoredFile(matchingFile.id);
+        
+        // Create download link with the correct filename
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = matchingFile.name || `${inventoryData.agencyName}_${inventoryData.monthName}_${inventoryData.year}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente desde Google Drive.');
+        
+        return true;
       } catch (error) {
         console.error('Error downloading inventory:', error);
         
@@ -1089,6 +1116,10 @@ export const useInventory = () => {
     }, [currentMonth, currentYear, showSuccess, showError]),
     checkForInventoryCompletion,
     syncSessionData,
+    clearInventoryCompletedNotification,
+
+    // State
+    inventoryCompletedByOther,
 
     // Computed
     scanCount: scannedCodes.length,

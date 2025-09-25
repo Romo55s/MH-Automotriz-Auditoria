@@ -1,6 +1,6 @@
 import { Barcode, Car, CheckSquare, ChevronLeft, ChevronRight, Clock, MapPin, Palette, Search, Square, Tag, Trash2, User } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScannedCode } from '../types';
+import { ScannedCode } from '../../../types';
 
 interface ScannedCodesListProps {
   scannedCodes: ScannedCode[];
@@ -212,8 +212,6 @@ const ScannedCodesList: React.FC<ScannedCodesListProps> = ({
               const globalIndex = filteredAndPaginatedCodes.startIndex + index;
               const isSelected = selectedIndices.has(globalIndex);
               
-              // Debug car data
-              console.log('🚗 Code in ScannedCodesList:', code.code, 'carData:', code.carData);
               
               return (
                 <div

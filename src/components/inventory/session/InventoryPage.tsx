@@ -6,7 +6,6 @@ import {
   Camera,
   CheckCircle,
   Clock,
-  Download,
   FileText,
   Info,
   Pause,
@@ -18,29 +17,30 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { useToast } from '../context/ToastContext';
-import { useInventory } from '../hooks/useInventory';
+import { useAppContext } from '../../../context/AppContext';
+import { useToast } from '../../../context/ToastContext';
+import { useInventory } from '../../../hooks/useInventory';
 import {
   getAgencyInventories,
   getMonthlyInventory
-} from '../services/api';
-import { MonthlyInventory, ScannedCode } from '../types';
-import BulkDeleteConfirmationModal from './BulkDeleteConfirmationModal';
-import CompletionModal from './CompletionModal';
-import ConfirmationModal from './ConfirmationModal';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-import DownloadConfirmationModal from './DownloadConfirmationModal';
-import Footer from './Footer';
-import Header from './Header';
-import LoadingSpinner from './LoadingSpinner';
-import ManualInputModal from './ManualInputModal';
-import NewInventoryConfirmationModal from './NewInventoryConfirmationModal';
-import ScannedCodesList from './ScannedCodesList';
-import SessionEndedModal from './SessionEndedModal';
-import SessionTerminatedModal from './SessionTerminatedModal';
-import UnifiedScanner from './UnifiedScanner';
-import WrongLocationModal from './WrongLocationModal';
+} from '../../../services/api';
+import { MonthlyInventory, ScannedCode } from '../../../types';
+import { Footer, Header, LoadingSpinner } from '../../common/display';
+import {
+  BulkDeleteConfirmationModal,
+  CompletionModal,
+  ConfirmationModal,
+  DeleteConfirmationModal,
+  DownloadConfirmationModal,
+  InventoryCompletedByOtherModal,
+  ManualInputModal,
+  NewInventoryConfirmationModal,
+  SessionEndedModal,
+  SessionTerminatedModal,
+  WrongLocationModal
+} from '../../common/modals';
+import { UnifiedScanner } from '../controls';
+import { ScannedCodesList } from '../display';
 
 const InventoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -93,6 +93,7 @@ const InventoryPage: React.FC = () => {
     totalScans: number;
     createdBy: string;
     sessionId?: string; // Add session ID
+    agency?: string; // Add agency for proper file naming
     scannedCodes?: ScannedCode[];
   } | null>(null);
   const [sessionTerminationData, setSessionTerminationData] = useState<{
@@ -133,6 +134,8 @@ const InventoryPage: React.FC = () => {
     downloadInventory,
     checkForInventoryCompletion,
     syncSessionData,
+    clearInventoryCompletedNotification,
+    inventoryCompletedByOther,
   } = useInventory();
 
   // Handle agency name from URL
@@ -238,14 +241,17 @@ const InventoryPage: React.FC = () => {
   useEffect(() => {
     const checkCompletion = async () => {
       if (selectedAgency && isSessionActive) {
-        const result = await checkForInventoryCompletion();
-        if (result.wasCompleted) {
-          setSessionTerminationData({ 
-            completedBy: result.completedBy,
-            isCurrentUser: false
-          });
-          setShowSessionTerminatedModal(true);
-        }
+        // Add a small delay to prevent immediate calls after session restoration
+        setTimeout(async () => {
+          const result = await checkForInventoryCompletion();
+          if (result.wasCompleted) {
+            setSessionTerminationData({ 
+              completedBy: result.completedBy,
+              isCurrentUser: false
+            });
+            setShowSessionTerminatedModal(true);
+          }
+        }, 5000); // 5 second delay
       }
     };
 
@@ -263,6 +269,17 @@ const InventoryPage: React.FC = () => {
     }
     setPreviousScanCount(scannedCodes.length);
   }, [scannedCodes.length, isSessionActive, previousScanCount, showInfo]);
+
+  // Check for inventory completion periodically (with longer interval and better conditions)
+  useEffect(() => {
+    if (isSessionActive && selectedAgency && !inventoryCompletedByOther && !showSessionTerminatedModal) {
+      const interval = setInterval(async () => {
+        await checkForInventoryCompletion();
+      }, 120000); // Check every 2 minutes instead of 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [isSessionActive, selectedAgency, checkForInventoryCompletion, inventoryCompletedByOther, showSessionTerminatedModal]);
 
   const handleScan = async (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
     
@@ -340,7 +357,7 @@ const InventoryPage: React.FC = () => {
     try {
       if (carData && code.startsWith('{')) {
         // Handle QR code with car data
-        const { scanQRCode } = await import('../services/api');
+        const { scanQRCode } = await import('../../../services/api');
         const result = await scanQRCode(code, user?.email || '', user?.name || '');
         
         if (result.success) {
@@ -421,6 +438,7 @@ const InventoryPage: React.FC = () => {
     setShowWrongLocationModal(false);
     setWrongLocationData(null);
   };
+
 
 
   const handleStopInventory = () => {
@@ -733,6 +751,7 @@ const InventoryPage: React.FC = () => {
       year: currentYear,
       totalScans: scannedCodes.length,
       createdBy: user?.name || user?.email || 'Usuario desconocido',
+      agency: selectedAgency?.name,
       scannedCodes: scannedCodes // Include the complete scanned codes with car data
     });
     setShowDownloadConfirmation(true);
@@ -801,7 +820,8 @@ const InventoryPage: React.FC = () => {
       year: inventory.year,
       totalScans: inventory.totalScans,
       createdBy: inventory.createdBy,
-      sessionId: inventory.sessionId // Add session ID
+      sessionId: inventory.sessionId, // Add session ID
+      agency: selectedAgency?.name
     });
     
     setShowDownloadConfirmation(true);
@@ -1294,91 +1314,6 @@ const InventoryPage: React.FC = () => {
           </div>
         </div>
 
-
-        {/* Download Section for Completed Inventories */}
-        {completedInventoriesThisMonth.length > 0 && (
-          <div className='card mb-6 sm:mb-section border-blue-500/20 bg-blue-500/10'>
-            <div className='flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4'>
-              <Download className='w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mt-1 flex-shrink-0' />
-              <div className='flex-1'>
-                <h3 className='text-base sm:text-lg font-semibold text-blue-400 mb-2 sm:mb-3'>
-                  Inventarios Completados Disponibles para Descarga
-                </h3>
-                <p className='text-sm sm:text-base text-secondaryText mb-4'>
-                  Los inventarios completados están disponibles para descarga hasta el final del mes actual.
-                </p>
-                <div className='space-y-3'>
-                  {completedInventoriesThisMonth.map((inventory, index) => (
-                    <div
-                      key={inventory.id}
-                      className='p-3 sm:p-4 glass-effect border border-white/20 rounded-xl'
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
-                        backdropFilter: 'blur(20px)'
-                      }}
-                    >
-                      <div className='flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0'>
-                        <div className='flex-1 min-w-0'>
-                          <div className='flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mb-2'>
-                            <div className='flex items-center space-x-2'>
-                              <CheckCircle className='w-4 h-4 sm:w-5 sm:h-5 text-green-400 flex-shrink-0' />
-                              <h4 className='text-sm sm:text-base font-bold text-white truncate'>
-                                {getMonthName(inventory.month)} {inventory.year} - {inventory.totalScans} códigos
-                              </h4>
-                            </div>
-                            <span className='text-xs text-secondaryText'>
-                              por {inventory.createdBy}
-                            </span>
-                          </div>
-                          <div className='flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-xs sm:text-sm text-secondaryText'>
-                            <span>Completado: {inventory.lastUpdated.toLocaleDateString()}</span>
-                            {isInventoryDownloadable(inventory) && (
-                              <span className='text-blue-300'>
-                                Tiempo restante: {getDownloadTimeRemaining(inventory)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className='flex-shrink-0 sm:ml-4'>
-                          {isInventoryDownloadable(inventory) ? (
-                            <button
-                              onClick={() => handleDownloadInventory(inventory)}
-                              className='w-full sm:w-auto btn-primary text-xs sm:text-sm py-2 sm:py-3 px-3 sm:px-4 flex items-center justify-center space-x-2'
-                              style={{
-                                background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
-                                backdropFilter: 'blur(20px)',
-                                borderRadius: '9999px',
-                                fontWeight: '600',
-                                border: '1px solid #fff'
-                              }}
-                            >
-                              <Download className='w-3 h-3 sm:w-4 sm:h-4' />
-                              <span>Descargar</span>
-                            </button>
-                          ) : (
-                            <div className='flex flex-col items-center space-y-1'>
-                              <button
-                                disabled
-                                className='w-full sm:w-auto bg-gray-600 text-gray-400 py-2 px-3 sm:px-4 rounded-pill font-bold text-xs sm:text-sm cursor-not-allowed opacity-50'
-                                style={{ borderRadius: '9999px' }}
-                              >
-                                <Download className='w-3 h-3 sm:w-4 sm:h-4' />
-                              </button>
-                              <span className='text-xs text-gray-400'>
-                                Expirado
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Paused Session Notice */}
         {existingInventory?.status === 'Paused' && (
           <div className='card mb-6 sm:mb-section border-yellow-500/20 bg-yellow-500/10'>
@@ -1567,13 +1502,7 @@ const InventoryPage: React.FC = () => {
                   <span>Gestionar Sesión</span>
                 </button>
 
-                <button
-                  onClick={() => setShowFinishConfirmation(true)}
-                  className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-4 sm:px-6 md:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
-                >
-                  <CheckCircle className='w-5 h-5 sm:w-6 sm:h-6' />
-                  <span>Finalizar Sesión</span>
-                </button>
+                {/* Finalizar Sesión button removed - now handled in "Gestión de Sesión" */}
               </div>
           </div>
         )}
@@ -1868,8 +1797,10 @@ const InventoryPage: React.FC = () => {
           year: 0,
           totalScans: 0,
           createdBy: '',
-          sessionId: undefined
+          sessionId: undefined,
+          agency: selectedAgency?.name
         }}
+        fileType="csv"
       />
 
       {/* Wrong Location Modal */}
@@ -1882,6 +1813,23 @@ const InventoryPage: React.FC = () => {
           vehicleInfo={wrongLocationData.vehicleInfo}
         />
       )}
+
+      {/* Inventory Completed by Other User Modal */}
+      {inventoryCompletedByOther && (
+        <InventoryCompletedByOtherModal
+          isOpen={inventoryCompletedByOther.isCompleted}
+          onClose={clearInventoryCompletedNotification}
+          completedBy={inventoryCompletedByOther.completedBy}
+          agencyName={selectedAgency?.name || ''}
+          monthName={monthName}
+          year={currentYear}
+          onEndSession={() => {
+            clearInventoryCompletedNotification();
+            navigate('/select-agency');
+          }}
+        />
+      )}
+
 
       {/* Session Ended Modal (for 0 scans) */}
       {sessionEndedData && (

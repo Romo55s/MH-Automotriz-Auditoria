@@ -1,14 +1,14 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { useToast } from '../context/ToastContext';
-import { useInventory } from '../hooks/useInventory';
-import { checkMonthlyInventory, getAgencyInventories } from '../services/api';
-import { MonthlyInventory } from '../types/index';
-import Footer from './Footer';
-import Header from './Header';
-import LoadingSpinner from './LoadingSpinner';
+import { MonthlyInventoryHeader } from '.';
+import { Footer, LoadingSpinner } from '../../../components/common/display';
+import { useAppContext } from '../../../context/AppContext';
+import { useToast } from '../../../context/ToastContext';
+import { useInventory } from '../../../hooks/useInventory';
+import { checkMonthlyInventory, downloadStoredFile, getAgencyInventories } from '../../../services/api';
+import { MonthlyInventory } from '../../../types/index';
+import { MultipleInventorySelector } from '../modals';
 
 import {
   AlertCircle,
@@ -32,7 +32,7 @@ const MonthlyInventoryManager: React.FC = () => {
   const { user } = useAuth0();
   const { selectedAgency, setSelectedAgency } = useAppContext();
   const { showSuccess, showError, showInfo } = useToast();
-  const { } = useInventory();
+  const { isSessionActive, sessionId } = useInventory();
 
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +40,8 @@ const MonthlyInventoryManager: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<string>('');
   const [currentYear, setCurrentYear] = useState<number>(0);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [showMultipleInventorySelector, setShowMultipleInventorySelector] = useState(false);
+  const [selectedInventoryForDownload, setSelectedInventoryForDownload] = useState<MonthlyInventory | null>(null);
 
   // Initialize current month and year
   useEffect(() => {
@@ -114,12 +116,35 @@ const MonthlyInventoryManager: React.FC = () => {
       
       // Transform backend data to match frontend interface
       const transformedInventories = inventories.map((inv: any, index: number) => {
-        // Convert month name to month number
+        
+        // Convert month name to month number - handle both English and Spanish
         const monthNames = [
           'January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December'
         ];
-        const monthNumber = (monthNames.indexOf(inv.month) + 1).toString().padStart(2, '0');
+        const spanishMonthNames = [
+          'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        
+        let monthNumber = '01'; // Default to January
+        if (inv.month) {
+          const englishIndex = monthNames.indexOf(inv.month);
+          const spanishIndex = spanishMonthNames.indexOf(inv.month);
+          
+          if (englishIndex !== -1) {
+            monthNumber = (englishIndex + 1).toString().padStart(2, '0');
+          } else if (spanishIndex !== -1) {
+            monthNumber = (spanishIndex + 1).toString().padStart(2, '0');
+          } else {
+            console.warn('Unknown month name:', inv.month);
+            // Try to extract month from date if available
+            if (inv.createdAt) {
+              const date = parseDateSafely(inv.createdAt);
+              monthNumber = (date.getMonth() + 1).toString().padStart(2, '0');
+            }
+          }
+        }
         
         return {
           id: inv.sessionId || `inv_${index}`,
@@ -174,7 +199,7 @@ const MonthlyInventoryManager: React.FC = () => {
     ];
     
     // Handle edge cases
-    if (!month || month === '00' || month === '0') {
+    if (!month || month === '00' || month === '0' || month.trim() === '') {
       console.warn('Invalid month value:', month);
       return 'Mes Inválido';
     }
@@ -182,7 +207,7 @@ const MonthlyInventoryManager: React.FC = () => {
     const monthIndex = parseInt(month) - 1;
     
     // Validate month index
-    if (monthIndex < 0 || monthIndex >= monthNames.length) {
+    if (isNaN(monthIndex) || monthIndex < 0 || monthIndex >= monthNames.length) {
       console.warn('Month index out of range:', monthIndex, 'for month:', month);
       return 'Mes Inválido';
     }
@@ -197,18 +222,29 @@ const MonthlyInventoryManager: React.FC = () => {
       // If it's already a Date object, return it
       if (dateString instanceof Date) return dateString;
       
-      // Try to parse the date string
-      const parsed = new Date(dateString);
-      
-      // Check if the date is valid
-      if (isNaN(parsed.getTime())) {
-        console.warn('Invalid date string:', dateString);
-        return new Date();
+      // Try ISO format first
+      let parsed = new Date(dateString);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
       }
       
-      return parsed;
+      // Try human-readable format (e.g., "September 24, 2025 at 5:10:37 PM")
+      const humanReadableDate = dateString.replace(' at ', ' ');
+      parsed = new Date(humanReadableDate);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+      
+      // Try other common formats
+      parsed = new Date(dateString.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1-$2-$3'));
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+      
+      console.warn('❌ Could not parse date string:', dateString);
+      return new Date();
     } catch (error) {
-      console.warn('Error parsing date:', dateString, error);
+      console.warn('❌ Error parsing date:', dateString, error);
       return new Date();
     }
   };
@@ -229,35 +265,74 @@ const MonthlyInventoryManager: React.FC = () => {
   };
 
   const handleDownloadInventory = async (inventory: MonthlyInventory) => {
+    // Show the inventory selector to let user choose from available files
+    setSelectedInventoryForDownload(inventory);
+    setShowMultipleInventorySelector(true);
+  };
+
+  const handleSelectInventoryFromSelector = async (fileId: string) => {
     try {
-      let response: Response;
+      // First, get the stored files to find the correct filename
+      const { getStoredFiles } = await import('../../../services/api');
+      const storedFiles = await getStoredFiles(selectedAgency?.name || '');
       
-      // Use session ID if available (for multiple inventories per month)
-      if (inventory.sessionId) {
-        response = await fetch(`/api/download/inventory/${selectedAgency?.name}/${inventory.month}/${inventory.year}/csv/${inventory.sessionId}`);
-      } else {
-        // Fallback to regular download (most recent inventory)
-        response = await fetch(`/api/download/inventory/${selectedAgency?.name}/${inventory.month}/${inventory.year}/csv`);
-      }
+      // Find the file that matches this fileId
+      const matchingFile = storedFiles.files?.find((file: any) => file.id === fileId);
+      const filename = matchingFile?.name || `inventory_${fileId.slice(-8)}.csv`;
       
-      if (!response.ok) {
-        throw new Error('Error al descargar el inventario');
-      }
+      // Use the downloadStoredFile function with the specific file ID
+      const blob = await downloadStoredFile(fileId);
       
-      const blob = await response.blob();
+      // Create download link with the correct filename
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const filename = inventory.sessionId 
-        ? `${selectedAgency?.name}_${inventory.monthName}_${inventory.year}_${inventory.sessionId}.csv`
-        : `${selectedAgency?.name}_${inventory.monthName}_${inventory.year}.csv`;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
-      showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente y respaldado automáticamente en Google Drive. Los datos han sido eliminados del sistema.');
+      showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente desde Google Drive.');
+    } catch (error) {
+      console.error('Error downloading specific inventory:', error);
+      showError('Error de Descarga', 'No se pudo descargar el inventario específico');
+    }
+  };
+
+  const downloadSpecificInventory = async (inventory: MonthlyInventory) => {
+    try {
+      // First, get the stored files to find the correct file ID for this inventory
+      const { getStoredFiles } = await import('../../../services/api');
+      const storedFiles = await getStoredFiles(selectedAgency?.name || '');
+      
+      // Find the file that matches this inventory's session ID
+      const matchingFile = storedFiles.files?.find((file: any) => {
+        const fileName = file.name || '';
+        // Extract session ID from filename (last part before .csv)
+        const fileSessionId = fileName.split('_').pop()?.replace('.csv', '');
+        return fileSessionId === inventory.sessionId;
+      });
+      
+      if (!matchingFile) {
+        throw new Error('No se encontró el archivo correspondiente en Google Drive');
+      }
+      
+      // Download the specific file using its Google Drive file ID
+      const blob = await downloadStoredFile(matchingFile.id);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const filename = `${selectedAgency?.name}_${inventory.monthName}_${inventory.year}_${inventory.sessionId}.csv`;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      showSuccess('Descarga Completada', 'El archivo CSV ha sido descargado exitosamente desde Google Drive.');
     } catch (error) {
       console.error('Error downloading inventory:', error);
       
@@ -269,6 +344,7 @@ const MonthlyInventoryManager: React.FC = () => {
       }
     }
   };
+
 
 
   const handleStartNewInventory = async () => {
@@ -316,10 +392,19 @@ const MonthlyInventoryManager: React.FC = () => {
   };
 
   const handleContinueInventory = (inventory: MonthlyInventory) => {
+    // Check if we're already in an active session
+    if (isSessionActive) {
+      showInfo(
+        'Inventario Ya Activo',
+        `Ya tienes una sesión de inventario activa. Ve a "Gestión de Sesión" para continuar.`
+      );
+      return;
+    }
+
     // For active/paused inventories, navigate to inventory page to continue
     showInfo(
       'Continuando Inventario',
-      `Continuando sesión de inventario para ${getMonthName(inventory.month)} ${
+      `Continuando sesión de inventario para ${inventory.monthName || getMonthName(inventory.month)} ${
         inventory.year
       } con ${inventory.totalScans} escaneos existentes.`
     );
@@ -392,14 +477,10 @@ const MonthlyInventoryManager: React.FC = () => {
 
       <div className='flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'>
         {/* Header */}
-        <div className='mt-6 sm:mt-8 mb-6 sm:mb-section'>
-          <Header
-            title='MH Automotriz'
-            subtitle={`${selectedAgency.name} - Gestiona y rastrea sesiones de inventario mensuales`}
-            showBackButton={false}
-            showUserInfo={true}
-          />
-        </div>
+        <MonthlyInventoryHeader
+          agencyName={selectedAgency.name}
+          subtitle="Gestiona y rastrea sesiones de inventario mensuales"
+        />
         
         {/* Current Month Info */}
         <div className='card mb-6 sm:mb-section'>
@@ -542,14 +623,38 @@ const MonthlyInventoryManager: React.FC = () => {
         <div className='card mb-6 sm:mb-section'>
           <div className='px-4 sm:px-6 lg:px-8 py-6 sm:py-8 border-b border-white/20'>
             <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
-              <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
-                <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
-                Inventarios Existentes
-              </h2>
-              <div className='text-xs sm:text-sm text-secondaryText'>
-                {inventories.length} inventario
-                {inventories.length !== 1 ? 's' : ''} encontrado
+              <div className='flex items-center space-x-4'>
+                <h2 className='text-lg sm:text-xl lg:text-subheading font-bold uppercase tracking-hero leading-heading flex items-center'>
+                  <FileText className='w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3' />
+                  Inventarios Existentes
+                </h2>
+                <div className='text-xs sm:text-sm text-secondaryText'>
+                  {inventories.length} inventario
+                  {inventories.length !== 1 ? 's' : ''} encontrado
+                </div>
               </div>
+              
+              {/* Download Button - Only show if there are completed inventories available for download */}
+              {inventories.some(inv => inv.status === 'Completed') && (
+                <button
+                  onClick={() => {
+                    const completedInventory = inventories.find(inv => inv.status === 'Completed');
+                    if (completedInventory) {
+                      setSelectedInventoryForDownload(completedInventory);
+                      setShowMultipleInventorySelector(true);
+                    }
+                  }}
+                  className='flex items-center space-x-2 px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-105 font-semibold text-sm'
+                  style={{
+                    background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
+                    backdropFilter: 'blur(20px)',
+                    color: 'white'
+                  }}
+                >
+                  <Download className='w-4 h-4' />
+                  <span>Descargar Inventarios</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -582,26 +687,26 @@ const MonthlyInventoryManager: React.FC = () => {
             <div className='overflow-hidden'>
               {/* Desktop Table View - Design System Compliant */}
               <div className='hidden lg:block overflow-x-auto'>
-                <div className='rounded-2xl border border-white/30 overflow-hidden' style={{ background: 'rgba(0,0,0,0.6)' }}>
-                  <table className='w-full'>
+                <div className='rounded-2xl border border-white/30 overflow-hidden' style={{ background: 'rgba(0,0,0,0.6)', minWidth: '920px' }}>
+                  <table className='w-full' style={{ minWidth: '920px' }}>
                     <thead className='border-b border-white/20' style={{ background: 'rgba(0,0,0,0.8)' }}>
                       <tr>
-                        <th className='px-8 py-6 text-left text-xs font-bold text-white uppercase tracking-wider'>
+                        <th className='px-4 py-4 text-left text-xs font-bold text-white uppercase tracking-wider' style={{ width: '180px' }}>
                           Mes y Año
                         </th>
-                        <th className='px-8 py-6 text-left text-xs font-bold text-white uppercase tracking-wider'>
+                        <th className='px-4 py-4 text-left text-xs font-bold text-white uppercase tracking-wider' style={{ width: '120px' }}>
                           Estado
                         </th>
-                        <th className='px-8 py-6 text-left text-xs font-bold text-white uppercase tracking-wider'>
+                        <th className='px-4 py-4 text-left text-xs font-bold text-white uppercase tracking-wider' style={{ width: '180px' }}>
                           Creado Por
                         </th>
-                        <th className='px-8 py-6 text-left text-xs font-bold text-white uppercase tracking-wider'>
+                        <th className='px-4 py-4 text-left text-xs font-bold text-white uppercase tracking-wider' style={{ width: '180px' }}>
                           Creado En
                         </th>
-                        <th className='px-8 py-6 text-left text-xs font-bold text-white uppercase tracking-wider'>
-                          Total de Escaneos
+                        <th className='px-4 py-4 text-left text-xs font-bold text-white uppercase tracking-wider' style={{ width: '120px' }}>
+                          Escaneos
                         </th>
-                        <th className='px-8 py-6 text-left text-xs font-bold text-white uppercase tracking-wider'>
+                        <th className='px-4 py-4 text-left text-xs font-bold text-white uppercase tracking-wider' style={{ width: '140px' }}>
                           Acciones
                         </th>
                       </tr>
@@ -617,87 +722,82 @@ const MonthlyInventoryManager: React.FC = () => {
                               : 'transparent'
                           }}
                         >
-                          <td className='px-8 py-6 whitespace-nowrap'>
-                            <div className='flex items-center space-x-4'>
-                              <div className='w-10 h-10 rounded-lg flex items-center justify-center border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
-                                <Calendar className='w-5 h-5 text-white' />
+                          <td className='px-4 py-4 whitespace-nowrap' style={{ width: '180px' }}>
+                            <div className='flex items-center space-x-3'>
+                              <div className='w-8 h-8 rounded-lg flex items-center justify-center border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                <Calendar className='w-4 h-4 text-white' />
                               </div>
                               <div>
-                                <span className='font-bold text-white text-lg'>
-                                  {getMonthName(inventory.month)} {inventory.year}
+                                <span className='font-bold text-white text-sm'>
+                                  {inventory.monthName || getMonthName(inventory.month)} {inventory.year}
                                 </span>
-                                <p className='text-sm text-secondaryText'>
-                                  Inventario Mensual
+                                <p className='text-xs text-secondaryText'>
+                                  Mensual
                                 </p>
                               </div>
                             </div>
                           </td>
-                          <td className='px-8 py-6 whitespace-nowrap'>
+                          <td className='px-4 py-4 whitespace-nowrap' style={{ width: '120px' }}>
                             <span
-                              className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold border transition-all duration-300 ${getStatusColor(
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border transition-all duration-300 ${getStatusColor(
                                 inventory.status
                               )}`}
                             >
                               {getStatusIcon(inventory.status)}
-                              <span className='ml-3'>
+                              <span className='ml-2'>
                                 {getStatusText(inventory.status)}
                               </span>
                             </span>
                           </td>
-                          <td className='px-8 py-6 whitespace-nowrap'>
-                            <div className='flex items-center space-x-3'>
+                          <td className='px-4 py-4 whitespace-nowrap' style={{ width: '180px' }}>
+                            <div className='flex items-center space-x-2'>
                               <User className='w-4 h-4 text-white' />
-                              <span className='text-white font-medium'>
+                              <span className='text-white font-medium text-sm truncate'>
                                 {inventory.createdBy}
                               </span>
                             </div>
                           </td>
-                          <td className='px-8 py-6 whitespace-nowrap'>
-                            <div className='flex items-center space-x-3'>
+                          <td className='px-4 py-4 whitespace-nowrap' style={{ width: '180px' }}>
+                            <div className='flex items-center space-x-2'>
                               <Clock className='w-4 h-4 text-white' />
-                              <span className='text-white font-medium'>
+                              <span className='text-white font-medium text-sm'>
                                 {formatDate(inventory.createdAt)}
                               </span>
                             </div>
                           </td>
-                          <td className='px-8 py-6 whitespace-nowrap'>
-                            <span className='font-mono text-xl font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent px-4 py-2 rounded-lg border border-white/30'>
+                          <td className='px-4 py-4 whitespace-nowrap' style={{ width: '120px' }}>
+                            <span className='font-mono text-lg font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent px-3 py-1 rounded-lg border border-white/30'>
                               {inventory.totalScans}
                             </span>
                           </td>
-                          <td className='px-8 py-6 whitespace-nowrap'>
-                            {inventory.status !== 'Completed' && (
+                          <td className='px-4 py-4 whitespace-nowrap' style={{ width: '140px' }}>
+                            {inventory.status !== 'Completed' ? (
                               <button
                                 onClick={() => handleContinueInventory(inventory)}
-                                className='btn-secondary text-sm py-3 px-6 flex items-center space-x-3 rounded-xl border border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-105 font-semibold'
+                                disabled={isSessionActive}
+                                className={`text-xs py-2 px-3 flex items-center space-x-2 rounded-lg border transition-all duration-300 font-semibold ${
+                                  isSessionActive
+                                    ? 'btn-disabled border-gray-500/30 cursor-not-allowed opacity-50'
+                                    : 'btn-secondary border-white/30 hover:border-white/50 hover:scale-105'
+                                }`}
                                 style={{
-                                  background: 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
+                                  background: isSessionActive
+                                    ? 'linear-gradient(135deg, rgba(100,100,100,0.3) 0%, rgba(100,100,100,0.2) 100%)'
+                                    : 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
                                   backdropFilter: 'blur(20px)'
                                 }}
                               >
-                                <span>Continuar</span>
-                                <ChevronRight className='w-4 h-4' />
+                                <span>
+                                  {isSessionActive ? 'Activo' : 'Continuar'}
+                                </span>
+                                {!isSessionActive && <ChevronRight className='w-3 h-3' />}
                               </button>
-                            )}
-                            {inventory.status === 'Completed' && (
-                              <div className='flex items-center space-x-2'>
-                                <div className='flex items-center space-x-2 mr-3'>
-                                  <CheckCircle className='w-5 h-5 text-green-400' />
-                                  <span className='text-white text-sm font-medium'>
-                                    Completado
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => handleDownloadInventory(inventory)}
-                                  className='btn-primary text-xs py-2 px-4 flex items-center space-x-2 rounded-xl transition-all duration-300 hover:scale-105 font-semibold'
-                                  style={{
-                                    background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
-                                    backdropFilter: 'blur(20px)'
-                                  }}
-                                >
-                                  <Download className='w-4 h-4' />
-                                  <span>Descargar CSV</span>
-                                </button>
+                            ) : (
+                              <div className='flex items-center justify-center'>
+                                <span className='text-sm text-green-400 font-medium flex items-center space-x-1'>
+                                  <CheckCircle className='w-4 h-4' />
+                                  <span>Completado</span>
+                                </span>
                               </div>
                             )}
                           </td>
@@ -732,7 +832,7 @@ const MonthlyInventoryManager: React.FC = () => {
                           </div>
                           <div className='min-w-0 flex-1'>
                             <h3 className='text-base font-bold text-white uppercase tracking-wider truncate'>
-                              {getMonthName(inventory.month)} {inventory.year}
+                              {inventory.monthName || getMonthName(inventory.month)} {inventory.year}
                             </h3>
                             <p className='text-xs text-white'>
                               Inventario Mensual
@@ -796,20 +896,36 @@ const MonthlyInventoryManager: React.FC = () => {
                       </div>
                     </div>
                     
-                    {/* Action Section - Only show for non-completed */}
+                    {/* Action Section */}
                     <div className='relative z-10'>
-                      {inventory.status !== 'Completed' && (
+                      {inventory.status !== 'Completed' ? (
                         <button
                           onClick={() => handleContinueInventory(inventory)}
-                          className='w-full btn-secondary text-xs py-3 px-4 flex items-center justify-center space-x-2 rounded-lg border border-white/30 hover:border-white/50 transition-all duration-300 font-semibold'
+                          disabled={isSessionActive}
+                          className={`w-full text-xs py-3 px-4 flex items-center justify-center space-x-2 rounded-lg border transition-all duration-300 font-semibold ${
+                            isSessionActive
+                              ? 'btn-disabled border-gray-500/30 cursor-not-allowed opacity-50'
+                              : 'btn-secondary border-white/30 hover:border-white/50'
+                          }`}
                           style={{
-                            background: 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
+                            background: isSessionActive
+                              ? 'linear-gradient(135deg, rgba(100,100,100,0.3) 0%, rgba(100,100,100,0.2) 100%)'
+                              : 'linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%)',
                             backdropFilter: 'blur(20px)'
                           }}
                         >
-                          <span>Continuar Inventario</span>
-                          <ChevronRight className='w-4 h-4' />
+                          <span>
+                            {isSessionActive ? 'Inventario Ya Activo' : 'Continuar Inventario'}
+                          </span>
+                          {!isSessionActive && <ChevronRight className='w-4 h-4' />}
                         </button>
+                      ) : (
+                        <div className='w-full text-center py-3 px-4 rounded-lg border border-white/30' style={{ background: 'rgba(0,0,0,0.4)' }}>
+                          <span className='text-sm text-green-400 font-medium flex items-center justify-center space-x-2'>
+                            <CheckCircle className='w-4 h-4' />
+                            <span>Inventario Completado</span>
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -846,6 +962,23 @@ const MonthlyInventoryManager: React.FC = () => {
 
       {/* Footer */}
       <Footer />
+
+      {/* Multiple Inventory Selector Modal */}
+      {showMultipleInventorySelector && selectedInventoryForDownload && (
+        <MultipleInventorySelector
+          isOpen={showMultipleInventorySelector}
+          onClose={() => {
+            setShowMultipleInventorySelector(false);
+            setSelectedInventoryForDownload(null);
+          }}
+          onSelectInventory={handleSelectInventoryFromSelector}
+          agency={selectedAgency?.name || ''}
+          month={selectedInventoryForDownload.month}
+          year={selectedInventoryForDownload.year}
+          fileType="csv"
+        />
+      )}
+
     </div>
   );
 };

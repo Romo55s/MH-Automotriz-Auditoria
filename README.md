@@ -22,6 +22,7 @@ A modern React application for automating car inventory management using **QR co
 - **Smart Storage** - Automatic cleanup of scan data after session completion
 - **Multiple Inventories per Month** - Support for multiple inventory sessions per month with unique session IDs
 - **Google Drive Integration** - Automatic backup to Google Drive with 30-day retention policy
+- **File Selection Modal** - Choose specific inventory files from Google Drive with real filenames
 - **Download Preservation** - Keep downloaded inventories until next month
 
 ## 🛠️ Tech Stack
@@ -103,6 +104,7 @@ A modern React application for automating car inventory management using **QR co
 - **Unique Session IDs**: Each inventory session has a unique identifier for precise tracking
 - **Auto-cleanup**: Scan data cleaned after session completion
 - **Google Drive Backup**: Automatic backup to Google Drive with 30-day retention
+- **File Selection**: Choose specific inventory files from available Google Drive backups
 - **Download Preservation**: Downloaded inventories kept until next month
 - **Session Restoration**: Automatic recovery of interrupted sessions
 

@@ -1,6 +1,6 @@
 import { Building2, ChevronDown } from 'lucide-react';
 import React from 'react';
-import { Agency } from '../types';
+import { Agency } from '../../../types';
 
 interface AgencyCardProps {
   agency: Agency;

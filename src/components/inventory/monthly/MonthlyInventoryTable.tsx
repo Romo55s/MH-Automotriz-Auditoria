@@ -1,6 +1,6 @@
 import { Calendar, Database, Play } from 'lucide-react';
 import React from 'react';
-import { MonthlyInventory } from '../types';
+import { MonthlyInventory } from '../../../types';
 
 interface MonthlyInventoryTableProps {
   inventories: MonthlyInventory[];

@@ -1,19 +1,21 @@
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import React, { useEffect } from 'react';
 import {
-    Route,
-    BrowserRouter as Router,
-    Routes,
-    useNavigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+  useNavigate,
 } from 'react-router-dom';
-import AgencySelector from './components/AgencySelector';
-import Auth0ErrorBoundary from './components/Auth0ErrorBoundary';
-import InventoryPage from './components/InventoryPage';
-import InventoryQRPage from './components/InventoryQRPage';
-import Login from './components/Login';
-import MonthlyInventoryManager from './components/MonthlyInventoryManager';
-import ProductionErrorBoundary from './components/ProductionErrorBoundary';
-import ProtectedRoute from './components/ProtectedRoute';
+import {
+  AgencySelector,
+  Auth0ErrorBoundary,
+  InventoryPage,
+  InventoryQRPage,
+  Login,
+  MonthlyInventoryManager,
+  ProductionErrorBoundary,
+  ProtectedRoute
+} from './components';
 import { auth0Config } from './config/auth0-config';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';

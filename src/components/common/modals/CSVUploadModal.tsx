@@ -1,10 +1,10 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { Download, FileSpreadsheet, Upload, X } from 'lucide-react';
 import React, { useState } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { useToast } from '../context/ToastContext';
-import { downloadQRCodes, uploadCSVFile } from '../services/api';
-import LoadingSpinner from './LoadingSpinner';
+import { useAppContext } from '../../../context/AppContext';
+import { useToast } from '../../../context/ToastContext';
+import { downloadQRCodes, uploadCSVFile } from '../../../services/api';
+import { LoadingSpinner } from '../display';
 
 interface CSVUploadModalProps {
   isOpen: boolean;

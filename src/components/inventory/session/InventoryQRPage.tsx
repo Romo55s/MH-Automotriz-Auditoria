@@ -2,10 +2,9 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { FileSpreadsheet, Printer, QrCode, Upload } from 'lucide-react';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import CSVUploadModal from './CSVUploadModal';
-import Footer from './Footer';
-import Header from './Header';
+import { useAppContext } from '../../../context/AppContext';
+import { Footer, Header } from '../../common/display';
+import { CSVUploadModal } from '../../common/modals';
 
 const InventoryQRPage: React.FC = () => {
   const navigate = useNavigate();

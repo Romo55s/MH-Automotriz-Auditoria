@@ -164,14 +164,23 @@ export const getInventoryData = async (
   return apiRequest(`/api/inventory/inventory-data/${encodedAgency}/${month}/${year}`);
 };
 
-// Download inventory as CSV
+// Download inventory as CSV (updated for new Google Drive integration)
 export const downloadInventoryCSV = async (
   agency: string,
   month: string,
-  year: number
+  year: number,
+  sessionId?: string
 ) => {
   const encodedAgency = encodeURIComponent(agency);
-  const url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/csv`);
+  let url: string;
+  
+  if (sessionId) {
+    // Download specific inventory by session ID
+    url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/csv/${sessionId}`);
+  } else {
+    // Download most recent inventory
+    url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/csv`);
+  }
   
   const response = await fetch(url);
   
@@ -286,6 +295,86 @@ export const downloadQRCodes = async (sessionId: string) => {
 // Note: Google Drive integration is now handled automatically by the backend
 // No manual API calls needed - backup happens automatically on download
 
+// Download inventory as Excel (updated for new Google Drive integration)
+export const downloadInventoryExcel = async (
+  agency: string,
+  month: string,
+  year: number,
+  sessionId?: string
+) => {
+  const encodedAgency = encodeURIComponent(agency);
+  let url: string;
+  
+  if (sessionId) {
+    // Download specific inventory by session ID
+    url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/excel/${sessionId}`);
+  } else {
+    // Download most recent inventory
+    url = buildApiUrl(`/api/download/inventory/${encodedAgency}/${month}/${year}/excel`);
+  }
+  
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Download failed: ${response.status} ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.blob();
+};
+
+// Get stored files for an agency (Google Drive files)
+export const getStoredFiles = async (agency: string) => {
+  try {
+    const encodedAgency = encodeURIComponent(agency);
+    const response = await apiRequest(`/api/download/stored-files/${encodedAgency}`);
+    return response;
+  } catch (error) {
+    console.error('Error getting stored files:', error);
+    throw error;
+  }
+};
+
+// Download specific file by ID
+export const downloadStoredFile = async (fileId: string) => {
+  try {
+    const url = buildApiUrl(`/api/download/stored-file/${fileId}`);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Download failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const blob = response.blob();
+    return blob;
+  } catch (error) {
+    console.error('Error downloading stored file:', error);
+    throw error;
+  }
+};
+
+// Check if inventory was completed by another user
+export const checkInventoryCompletionByOther = async (
+  agency: string,
+  month: string,
+  year: number,
+  currentUserId: string,
+  sessionId?: string
+) => {
+  try {
+    const encodedAgency = encodeURIComponent(agency);
+    const sessionParam = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
+    const response = await apiRequest(
+      `/api/inventory/check-completion-by-other/${encodedAgency}/${month}/${year}/${currentUserId}${sessionParam}`
+    );
+    return response;
+  } catch (error) {
+    console.error('Error checking inventory completion by other:', error);
+    throw error;
+  }
+};
+
 // Download specific inventory by session ID (for multiple inventories per month)
 export const downloadInventoryBySessionId = async (
   agency: string,
@@ -323,7 +412,11 @@ export default {
   deleteMultipleScannedEntries,
   getInventoryData,
   downloadInventoryCSV,
+  downloadInventoryExcel, // New function for Excel downloads
+  getStoredFiles, // New function to get stored files from Google Drive
+  downloadStoredFile, // New function to download specific file by ID
   downloadInventoryBySessionId, // New function for specific session downloads
+  checkInventoryCompletionByOther, // New function to check if inventory was completed by another user
   validateMonthlySummary,
   cleanupDuplicates,
   cleanupSpecificDuplicates,

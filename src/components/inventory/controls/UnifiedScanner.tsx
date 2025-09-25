@@ -82,7 +82,6 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
           Quagga.offDetected(() => {});
         }
       } catch (err) {
-        console.log('Quagga cleanup error:', err);
       }
       isQuaggaInitialized.current = false;
     }
@@ -161,7 +160,6 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
       try {
         await initializeBarcodeScanner(stream);
       } catch (err) {
-        console.log('Barcode scanner failed, continuing with QR scanner only:', err);
         // Continue with QR scanner only
       }
 
@@ -197,7 +195,6 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
         reader.hints.set(DecodeHintType.TRY_HARDER, true);
         reader.hints.set(DecodeHintType.PURE_BARCODE, false);
       } catch (e) {
-        console.log('Could not set hints, using default formats');
       }
 
       if (videoRef.current) {
@@ -247,11 +244,6 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
               const resultPoints = result.getResultPoints();
               const confidence = resultPoints ? resultPoints.length : 0;
               
-              console.log('QR Scanner - Detected:', {
-                text: scannedCode,
-                format: format,
-                confidence: confidence
-              });
 
               if (confidence >= 1 && scannedCode.length >= 3) {
                 setDetectedType('qr');
@@ -259,15 +251,11 @@ const UnifiedScanner: React.FC<UnifiedScannerProps> = ({ onScan, onClose }) => {
               }
             }
             if (err && err.name !== 'NotFoundException') {
-              if (err.name === 'ChecksumException' || err.name === 'FormatException') {
-                console.log('QR code error:', err.name);
-                // Don't show error for every failed attempt, just log it
-              }
+              // Silent error handling for common QR code errors
             }
           }
         );
       } catch (err) {
-        console.log('QR scanner start failed:', err);
         // Try alternative approach
         setTimeout(() => {
           if (readerRef.current && videoRef.current) {

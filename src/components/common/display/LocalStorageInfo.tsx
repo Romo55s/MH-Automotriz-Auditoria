@@ -1,6 +1,6 @@
 import { Clock, Database, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { cleanupExpiredLocalStorage, getLocalStorageInfo, LOCAL_STORAGE_PREFIX } from '../utils/localStorageManager';
+import { cleanupExpiredLocalStorage, getLocalStorageInfo, LOCAL_STORAGE_PREFIX } from '../../../utils/localStorageManager';
 
 interface LocalStorageInfoProps {
   agencyName: string;

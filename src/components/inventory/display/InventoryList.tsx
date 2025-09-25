@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import React from 'react';
-import { ScannedCode } from '../types';
+import { ScannedCode } from '../../../types';
 
 interface InventoryListProps {
   scannedCodes: ScannedCode[];

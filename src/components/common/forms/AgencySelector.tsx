@@ -2,11 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { AlertTriangle, Building2, Calendar, ChevronDown, Play } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
-import { agencies } from '../data/agencies';
-import { clearAllSessions, getSessionInfo } from '../utils/sessionManager';
-import Footer from './Footer';
-import Header from './Header';
+import { useAppContext } from '../../../context/AppContext';
+import { agencies } from '../../../data/agencies';
+import { clearAllSessions, getSessionInfo } from '../../../utils/sessionManager';
+import { Footer, Header } from '../display';
 
 const AgencySelector: React.FC = () => {
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>('');

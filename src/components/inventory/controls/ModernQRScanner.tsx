@@ -137,10 +137,6 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
 
       // Success callback
       const onScanSuccess = (decodedText: string, decodedResult: any) => {
-        console.log('HTML5 QR Scanner - Detected:', {
-          text: decodedText,
-          format: decodedResult.result.format
-        });
 
         // Debounce mechanism
         const currentTime = Date.now();
@@ -155,9 +151,7 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
       // Error callback
       const onScanFailure = (error: string) => {
         // Don't log every scan failure, just silent failures
-        if (!error.includes('NotFoundException')) {
-          console.log('Scan error:', error);
-        }
+        // Silent error handling for NotFoundException
       };
 
       // Create and start the scanner
@@ -174,7 +168,6 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
       setIsInitialized(true);
 
     } catch (err) {
-      console.log('HTML5 QR Scanner initialization failed:', err);
       setError('No se pudo inicializar el escáner HTML5 QR');
     }
   };
@@ -188,7 +181,6 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
       const cooldownTime = Math.min(3000 + (duplicateCount * 2000), 15000); // 3s to 15s max
       
       if (timeSinceLastScan < cooldownTime) {
-        console.log(`🚫 Duplicate scan prevented (${Math.round(cooldownTime/1000)}s cooldown, attempt ${duplicateCount + 1}):`, code);
         setDuplicateCount(prev => prev + 1);
         return;
       } else {
@@ -218,7 +210,6 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
             qrData.location &&
             qrData.timestamp) {
           
-          console.log('Modern QR Scanner - Car inventory QR detected:', qrData);
           
           // Extract car information for display
           const carInfo = {
@@ -237,7 +228,6 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
         }
       } catch (e) {
         // Not valid JSON, continue with legacy format attempts
-        console.log('QR code is not valid JSON car inventory format, trying legacy formats...');
       }
     }
 
@@ -394,11 +384,9 @@ const ModernQRScanner: React.FC<ModernQRScannerProps> = ({ onScan, onClose }) =>
                 ] as any
               });
             } catch (err) {
-              console.log('Error resetting to auto mode:', err);
             }
           }, 800);
         } catch (err) {
-          console.log('Manual focus failed:', err);
         }
       }
 
