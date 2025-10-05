@@ -3,10 +3,10 @@
 
 export const config = {
   // API Configuration
-  API_BASE_URL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000',
+  API_BASE_URL: process.env.REACT_APP_API_BASE_URL || 'https://mh-automotriz-auditoria-back-end.onrender.com',
   
   // WebSocket Configuration
-  WS_BASE_URL: process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:5000',
+  WS_BASE_URL: process.env.REACT_APP_WS_BASE_URL || 'wss://mh-automotriz-auditoria-back-end.onrender.com',
   
   // Environment
   NODE_ENV: process.env.NODE_ENV || 'development',
