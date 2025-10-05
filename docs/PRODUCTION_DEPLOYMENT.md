@@ -33,6 +33,9 @@ REACT_APP_AUTH0_AUDIENCE=https://your-production-api.com
 # Backend API
 REACT_APP_API_BASE_URL=https://your-production-api.com/api
 
+# WebSocket Configuration
+REACT_APP_WS_BASE_URL=wss://your-production-api.com
+
 # Production Settings
 NODE_ENV=production
 GENERATE_SOURCEMAP=false
@@ -116,6 +119,7 @@ The production build includes:
    REACT_APP_AUTH0_CLIENT_ID=your-client-id
    REACT_APP_AUTH0_AUDIENCE=https://your-api.com
    REACT_APP_API_BASE_URL=https://your-api.com/api
+   REACT_APP_WS_BASE_URL=wss://your-api.com
    NODE_ENV=production
    GENERATE_SOURCEMAP=false
    ```
@@ -280,6 +284,9 @@ Before going live, verify:
 - [ ] All environment variables are set correctly
 - [ ] Auth0 configuration matches production domain
 - [ ] Backend API is accessible from production domain
+- [ ] **WebSocket server is running on port 5000**
+- [ ] **WebSocket connections work over WSS (secure)**
+- [ ] **Real-time collaboration features work**
 - [ ] HTTPS is properly configured
 - [ ] Security headers are in place
 - [ ] Error pages are working

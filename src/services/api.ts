@@ -99,7 +99,8 @@ export const finishSession = async (data: {
 export const getMonthlyInventory = async (
   agency: string,
   month: string,
-  year: number
+  year: number,
+  sessionId?: string
 ) => {
   const encodedAgency = encodeURIComponent(agency);
   return apiRequest(`/api/inventory/monthly-inventory/${encodedAgency}/${month}/${year}`);

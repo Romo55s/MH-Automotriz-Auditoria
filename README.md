@@ -25,13 +25,15 @@ A modern React application for automating car inventory management using **QR co
 - **File Selection Modal** - Choose specific inventory files from Google Drive with real filenames
 - **Download Preservation** - Keep downloaded inventories until next month
 
-### 🤝 **Real-Time Collaboration System**
+### 🤝 **Real-Time Collaboration System (NEW v2.0)**
+- **WebSocket Integration** - Real-time communication between users using WebSocket technology
 - **Multi-User Sessions** - Multiple users can work on the same inventory simultaneously
-- **Session Joining** - Users can join existing active sessions for collaborative work
-- **Real-Time Sync** - All users see each other's scans immediately
-- **Session Notifications** - Notify users when inventory is completed by another user
-- **Smart Session Management** - Prevents false "session terminated" warnings
-- **Session-Specific Checking** - Only checks completion of current active session
+- **Live Session Updates** - See when other users join/leave sessions in real-time
+- **Instant Scan Sync** - All users see each other's scans immediately without page refresh
+- **Real-Time Session Termination** - Sessions terminate instantly when completed by any user
+- **Smart Connection Management** - Automatic reconnection and error handling
+- **No More Polling** - Eliminates the need for periodic API checks
+- **Enhanced User Experience** - Seamless collaboration with live notifications
 
 ### 🏗️ **Modern Component Architecture**
 - **Organized Structure** - Components organized into logical folders for better maintainability
@@ -46,6 +48,7 @@ A modern React application for automating car inventory management using **QR co
 - **Styling**: Tailwind CSS with custom glass morphism design system
 - **Authentication**: Auth0 with production-ready configuration
 - **QR Code Scanning**: ZXing library with QuaggaJS fallback
+- **Real-Time Communication**: WebSocket (WSS in production)
 - **Routing**: React Router v6
 - **Icons**: Lucide React
 - **Build Tool**: Create React App with production optimizations

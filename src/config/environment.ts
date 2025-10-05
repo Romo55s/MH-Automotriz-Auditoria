@@ -5,6 +5,9 @@ export const config = {
   // API Configuration
   API_BASE_URL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000',
   
+  // WebSocket Configuration
+  WS_BASE_URL: process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:5000',
+  
   // Environment
   NODE_ENV: process.env.NODE_ENV || 'development',
   IS_PRODUCTION: process.env.NODE_ENV === 'production',
@@ -22,6 +25,7 @@ export const config = {
 // Export individual values for convenience
 export const {
   API_BASE_URL,
+  WS_BASE_URL,
   NODE_ENV,
   IS_PRODUCTION,
   IS_DEVELOPMENT,

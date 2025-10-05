@@ -32,6 +32,7 @@ export const useInventory = () => {
   const [currentMonth, setCurrentMonth] = useState<string>('');
   const [currentYear, setCurrentYear] = useState<number>(0);
   const [sessionId, setSessionId] = useState<string>('');
+  const [currentInventoryId, setCurrentInventoryId] = useState<string>('');
   const [isValidatingSession, setIsValidatingSession] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -42,6 +43,11 @@ export const useInventory = () => {
   } | null>(null);
   const [lastCompletionCheck, setLastCompletionCheck] = useState<number>(0);
   const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
+  const [lastNotifiedCompletion, setLastNotifiedCompletion] = useState<string | null>(() => {
+    // Initialize from localStorage to persist across page reloads and session changes
+    const stored = localStorage.getItem('lastNotifiedCompletion');
+    return stored ? JSON.parse(stored) : null;
+  });
 
   // Initialize current month and year
   useEffect(() => {
@@ -206,7 +212,11 @@ export const useInventory = () => {
     setIsValidatingSession(false);
 
     if (wasCompleted) {
-      // Inventory was completed, don't restore any session
+      // Inventory was completed, clear any existing session but allow new sessions
+      clearSession(selectedAgency.name, currentMonth, currentYear);
+      setScannedCodes([]);
+      setIsSessionActive(false);
+      setSessionId('');
       return;
     }
 
@@ -301,7 +311,8 @@ export const useInventory = () => {
         const inventoryResponse = await getMonthlyInventory(
           selectedAgency.name,
           currentMonth,
-          currentYear
+          currentYear,
+          sessionId
         );
 
         if (inventoryResponse.success && inventoryResponse.data.scans) {
@@ -318,10 +329,18 @@ export const useInventory = () => {
 
           setScannedCodes(existingScans);
           setIsSessionActive(true);
-          setSessionId(inventoryResponse.data.id);
+          
+          // Set the current inventory ID when joining an existing inventory
+          setCurrentInventoryId(inventoryResponse.data.id);
+          
+          // Generate a unique user session ID
+          const userSessionId = `sess_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+          setSessionId(userSessionId);
 
           // Save to session storage
-          saveSessionToStorage(existingScans, true, inventoryResponse.data.id);
+          saveSessionToStorage(existingScans, true, userSessionId);
 
           showInfo(
             'Inventory Continued',
@@ -376,13 +395,19 @@ export const useInventory = () => {
       );
 
       // The backend's check-inventory-limits endpoint already handles the 2-inventory limit
-      // This function should only check for active inventories that need to be continued
+      // For active inventories, allow users to join the session (multi-user collaboration)
       if (response.exists && response.status === 'Active') {
         showInfo(
           'Inventario Activo Encontrado',
-          `Hay un inventario activo para ${getMonthName(currentMonth)} ${currentYear}. Puedes continuar trabajando en él.`
+          `Hay un inventario activo para ${getMonthName(currentMonth)} ${currentYear}. Puedes unirte a la sesión existente.`
         );
-        return false;
+        return true; // Allow joining active session
+      }
+
+      // For completed inventories, allow starting new sessions (up to 2 per month)
+      if (response.exists && response.status === 'Completed') {
+        // The backend will handle the 2-inventory limit check
+        return true; // Allow starting new session
       }
 
       // For completed inventories, let the backend's check-inventory-limits handle the blocking
@@ -396,19 +421,44 @@ export const useInventory = () => {
 
   // Check if inventory was completed by another user (with throttling and deduplication)
   const checkForInventoryCompletion = useCallback(async () => {
-    if (!selectedAgency || !currentMonth || !currentYear || !isSessionActive || !user?.sub || !sessionId) {
-      return { wasCompleted: false };
+    console.log('🔍 DEBUG [MAIN CHECK]: Starting completion check');
+    console.log('🔍 DEBUG [MAIN CHECK]: selectedAgency:', selectedAgency?.name);
+    console.log('🔍 DEBUG [MAIN CHECK]: currentMonth:', currentMonth);
+    console.log('🔍 DEBUG [MAIN CHECK]: currentYear:', currentYear);
+    console.log('🔍 DEBUG [MAIN CHECK]: user.sub:', user?.sub);
+    console.log('🔍 DEBUG [MAIN CHECK]: isSessionActive:', isSessionActive);
+    console.log('🔍 DEBUG [MAIN CHECK]: sessionId:', sessionId);
+    
+    if (!selectedAgency || !currentMonth || !currentYear || !user?.sub) {
+      console.log('⏭️ DEBUG [MAIN CHECK]: Missing required data, skipping check');
+      return { wasCompleted: false, completedBy: null };
     }
 
-    // Throttle requests - only check every 60 seconds
+    // Always check for completion, but only notify if it's our current session
+    if (isSessionActive && sessionId) {
+      console.log('✅ DEBUG [MAIN CHECK]: User has active session, checking session completion');
+      return await checkSessionCompletion();
+    }
+
+    // If no active session, check for any completion but don't notify
+    // This helps with session state management
+    console.log('✅ DEBUG [MAIN CHECK]: No active session, checking global completion');
+    return await checkGlobalCompletion();
+  }, [selectedAgency, currentMonth, currentYear, isSessionActive, sessionId, user]);
+
+  // Check completion for specific session
+  const checkSessionCompletion = useCallback(async () => {
+    if (!sessionId) return { wasCompleted: false, completedBy: null };
+
+    // Throttle requests - only check every 3 seconds for immediate responsiveness
     const now = Date.now();
-    if (now - lastCompletionCheck < 60000) {
-      return { wasCompleted: false };
+    if (now - lastCompletionCheck < 3000) {
+      return { wasCompleted: false, completedBy: null };
     }
 
     // Prevent concurrent requests
     if (isCheckingCompletion) {
-      return { wasCompleted: false };
+      return { wasCompleted: false, completedBy: null };
     }
 
     try {
@@ -424,38 +474,172 @@ export const useInventory = () => {
       );
 
       if (result.completed && result.completedBy !== user.name) {
-        // Inventory was completed by another user - show notification but don't terminate session
-        setInventoryCompletedByOther({
-          isCompleted: true,
-          completedBy: result.completedBy || 'Usuario desconocido',
-          completedAt: result.completedAt || new Date().toISOString()
-        });
+        console.log('🔍 DEBUG [SESSION CHECK]: Completion detected!');
+        console.log('🔍 DEBUG [SESSION CHECK]: Result:', result);
+        console.log('🔍 DEBUG [SESSION CHECK]: Inventory completed by:', result.completedBy);
+        console.log('🔍 DEBUG [SESSION CHECK]: isSessionActive:', isSessionActive);
+        console.log('🔍 DEBUG [SESSION CHECK]: Inventory ID:', result.sessionId);
+        console.log('🔍 DEBUG [SESSION CHECK]: Inventory status: completed');
         
-        // Don't clear the session - let users continue working together
-        // The notification will inform them that someone completed the inventory
-        // but they can choose to continue or end their session
-        
-        return {
-          wasCompleted: true,
-          completedBy: result.completedBy || 'Usuario desconocido',
-        };
+        // If inventory is completed, check if we've reached the 2-inventory limit
+        if (result.completed) {
+          console.log('✅ DEBUG [SESSION CHECK]: Inventory ID:', result.sessionId, 'is completed');
+          console.log('🔍 DEBUG [SESSION CHECK]: The inventory', result.sessionId, 'is completed');
+          console.log('🔍 DEBUG [SESSION CHECK]: Current user sessionId:', sessionId);
+          console.log('🔍 DEBUG [SESSION CHECK]: Current user inventoryId:', currentInventoryId);
+          console.log('🔍 DEBUG [SESSION CHECK]: Completed inventory ID:', result.sessionId);
+          
+          // Check if we've reached the 2-inventory limit
+          if (result.completedInventories >= 2) {
+            console.log('🚨 DEBUG [SESSION CHECK]: 2-inventory limit reached - terminating all sessions');
+            
+            // Terminate ALL active sessions when limit is reached
+            if (isSessionActive) {
+              console.log('🧹 DEBUG [SESSION CHECK]: Terminating current user session - 2-inventory limit reached');
+              setIsSessionActive(false);
+              setSessionId('');
+              setCurrentInventoryId('');
+              setScannedCodes([]);
+              
+              // Clear session storage
+              if (selectedAgency && currentMonth && currentYear) {
+                clearSession(selectedAgency.name, currentMonth, currentYear);
+              }
+            }
+            
+            return {
+              wasCompleted: true, // Terminate session
+              completedBy: result.completedBy || 'Usuario desconocido',
+            };
+          } else {
+            console.log('⏭️ DEBUG [SESSION CHECK]: First inventory completed - allowing second inventory');
+            return {
+              wasCompleted: false, // Don't terminate, allow second inventory
+              completedBy: result.completedBy || 'Usuario desconocido',
+            };
+          }
+        } else {
+          console.log('⏭️ DEBUG [SESSION CHECK]: Inventory is not completed, continuing current session');
+        }
+      } else {
+        console.log('🔍 DEBUG [SESSION CHECK]: No completion detected or completed by current user');
+        console.log('🔍 DEBUG [SESSION CHECK]: Result completed:', result.completed);
+        console.log('🔍 DEBUG [SESSION CHECK]: Completed by:', result.completedBy);
+        console.log('🔍 DEBUG [SESSION CHECK]: Current user:', user.name);
       }
 
-      return { wasCompleted: false };
+      return { wasCompleted: false, completedBy: null };
     } catch (error) {
       console.error('Error checking inventory completion:', error);
-      return { wasCompleted: false };
+      return { wasCompleted: false, completedBy: null };
     } finally {
       setIsCheckingCompletion(false);
     }
-  }, [selectedAgency, currentMonth, currentYear, isSessionActive, sessionId, user, lastCompletionCheck, isCheckingCompletion]);
+  }, [selectedAgency, currentMonth, currentYear, sessionId, user, lastCompletionCheck, isCheckingCompletion, lastNotifiedCompletion]);
+
+  // Check global completion - always check but only notify for our specific session
+  const checkGlobalCompletion = useCallback(async () => {
+    // Throttle requests - only check every 3 seconds for immediate responsiveness
+    const now = Date.now();
+    if (now - lastCompletionCheck < 3000) {
+      return { wasCompleted: false, completedBy: null };
+    }
+
+    // Prevent concurrent requests
+    if (isCheckingCompletion) {
+      return { wasCompleted: false, completedBy: null };
+    }
+
+    try {
+      setIsCheckingCompletion(true);
+      setLastCompletionCheck(now);
+
+      // Check for any completed inventory in this month/year
+      const result = await checkInventoryCompletion({
+        agency: selectedAgency.name,
+        month: currentMonth,
+        year: currentYear,
+      });
+
+      if ((result.completed || result.isCompleted) && result.completedBy !== user.name) {
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Completion detected!');
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Result:', result);
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Inventory completed by:', result.completedBy);
+        console.log('🔍 DEBUG [GLOBAL CHECK]: isSessionActive:', isSessionActive);
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Inventory ID:', result.sessionId);
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Inventory status: completed');
+        
+        // If inventory is completed, check if we've reached the 2-inventory limit
+        if (result.completed) {
+          console.log('✅ DEBUG [GLOBAL CHECK]: Inventory ID:', result.sessionId, 'is completed');
+          console.log('🔍 DEBUG [GLOBAL CHECK]: The inventory', result.sessionId, 'is completed');
+          
+          // Check if we've reached the 2-inventory limit
+          if (result.completedInventories >= 2) {
+            console.log('🚨 DEBUG [GLOBAL CHECK]: 2-inventory limit reached - terminating all sessions');
+            
+            // Terminate ALL active sessions when limit is reached
+            if (isSessionActive) {
+              console.log('🧹 DEBUG [GLOBAL CHECK]: Terminating current user session - 2-inventory limit reached');
+              setIsSessionActive(false);
+              setSessionId('');
+              setCurrentInventoryId('');
+              setScannedCodes([]);
+              
+              // Clear session storage
+              if (selectedAgency && currentMonth && currentYear) {
+                clearSession(selectedAgency.name, currentMonth, currentYear);
+              }
+            }
+            
+            return {
+              wasCompleted: true, // Terminate session
+              completedBy: result.completedBy || 'Usuario desconocido',
+            };
+          } else {
+            console.log('⏭️ DEBUG [GLOBAL CHECK]: First inventory completed - allowing second inventory');
+            return {
+              wasCompleted: false, // Don't terminate, allow second inventory
+              completedBy: result.completedBy || 'Usuario desconocido',
+            };
+          }
+        } else {
+          console.log('⏭️ DEBUG [GLOBAL CHECK]: Inventory is not completed, continuing current session');
+        }
+      } else {
+        console.log('🔍 DEBUG [GLOBAL CHECK]: No completion detected or completed by current user');
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Result completed:', result.completed);
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Completed by:', result.completedBy);
+        console.log('🔍 DEBUG [GLOBAL CHECK]: Current user:', user.name);
+      }
+
+      return { wasCompleted: false, completedBy: null };
+    } catch (error) {
+      console.error('Error checking global inventory completion:', error);
+      return { wasCompleted: false, completedBy: null };
+    } finally {
+      setIsCheckingCompletion(false);
+    }
+  }, [selectedAgency, currentMonth, currentYear, user, lastCompletionCheck, isCheckingCompletion, lastNotifiedCompletion, isSessionActive, sessionId]);
 
   // Clear inventory completed by other notification
   const clearInventoryCompletedNotification = useCallback(() => {
     setInventoryCompletedByOther(null);
     setLastCompletionCheck(0); // Reset the throttle timer
     setIsCheckingCompletion(false); // Reset the checking flag
-  }, []);
+    setLastNotifiedCompletion(null); // Reset completion tracking
+    localStorage.removeItem('lastNotifiedCompletion'); // Clear from localStorage
+    
+    // Clear any remaining session state
+    setIsSessionActive(false);
+    setSessionId('');
+    setScannedCodes([]);
+    
+    // Clear session storage
+    if (selectedAgency && currentMonth && currentYear) {
+      clearSession(selectedAgency.name, currentMonth, currentYear);
+    }
+  }, [selectedAgency, currentMonth, currentYear]);
 
   // Get month name from month number
   const getMonthName = (month: string) => {
@@ -599,6 +783,11 @@ export const useInventory = () => {
 
         // Save to session storage
         saveSessionToStorage(updatedCodes, true, sessionId);
+
+        // Check for completion immediately after successful scan
+        setTimeout(async () => {
+          await checkForInventoryCompletion();
+        }, 1000); // Check 1 second after scan
 
         return true;
       } catch (err) {
@@ -838,6 +1027,10 @@ export const useInventory = () => {
     setScannedCodes([]);
     setIsSessionActive(true);
     setError(null);
+    
+    // Set current inventory ID when starting a new session
+    // This will be updated when the user actually joins a specific inventory
+    setCurrentInventoryId('');
 
     // Save to session storage
     saveSessionToStorage([], true, newSessionId);
@@ -878,12 +1071,19 @@ export const useInventory = () => {
 
       setIsSessionActive(true);
       setError(null);
+      
+      // Set current inventory ID when continuing a session
+      // This will be updated when we know which specific inventory the user is working on
+      setCurrentInventoryId('');
     } catch (error) {
       console.error('Error loading existing scans when continuing session:', error);
       // Continue with empty scans if loading fails
       setScannedCodes([]);
       setIsSessionActive(true);
       setError(null);
+      
+      // Set current inventory ID when continuing a session
+      setCurrentInventoryId('');
       showWarning('Advertencia', 'No se pudieron cargar los escaneos existentes, pero la sesión se ha continuado.');
     }
   }, [selectedAgency, currentMonth, currentYear, showError, showInfo, showWarning]);
@@ -1006,6 +1206,7 @@ export const useInventory = () => {
     setError(null);
     setIsLoading(false);
     setSessionId('');
+    setCurrentInventoryId('');
 
     // Clear session storage
     if (selectedAgency && currentMonth && currentYear) {
@@ -1031,20 +1232,9 @@ export const useInventory = () => {
     isSyncing,
     lastSyncTime,
 
-    // Actions
-    addScannedCode,
-    deleteScannedCode,
-    finishInventorySession,
-    pauseInventorySession,
-    startSession,
-    continueSession,
-    clearError,
-    reset,
-
     // New Backend Features
     checkLimits,
     deleteScannedEntryFromBackend,
-    deleteMultipleScannedCodes,
     downloadInventory: useCallback(async (inventoryData: {
       agencyName: string;
       monthName: string;
@@ -1117,6 +1307,17 @@ export const useInventory = () => {
     checkForInventoryCompletion,
     syncSessionData,
     clearInventoryCompletedNotification,
+    reset,
+
+    // Actions
+    addScannedCode,
+    deleteScannedCode,
+    deleteMultipleScannedCodes,
+    finishInventorySession,
+    pauseInventorySession,
+    startSession,
+    continueSession,
+    clearError,
 
     // State
     inventoryCompletedByOther,

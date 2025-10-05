@@ -20,7 +20,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../../../context/AppContext';
 import { useToast } from '../../../context/ToastContext';
 import { useInventory } from '../../../hooks/useInventory';
+import { InventoryWebSocketClient } from '../../../services/InventoryWebSocketClient';
 import {
+  checkInventoryCompletion,
   getAgencyInventories,
   getMonthlyInventory
 } from '../../../services/api';
@@ -30,7 +32,6 @@ import {
   BulkDeleteConfirmationModal,
   CompletionModal,
   ConfirmationModal,
-  DeleteConfirmationModal,
   DownloadConfirmationModal,
   InventoryCompletedByOtherModal,
   ManualInputModal,
@@ -39,6 +40,7 @@ import {
   SessionTerminatedModal,
   WrongLocationModal
 } from '../../common/modals';
+import RealtimeNotificationBanner from '../../common/notifications/RealtimeNotificationBanner';
 import { UnifiedScanner } from '../controls';
 import { ScannedCodesList } from '../display';
 
@@ -63,6 +65,7 @@ const InventoryPage: React.FC = () => {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showNewInventoryConfirmation, setShowNewInventoryConfirmation] = useState(false);
   const [showSessionTerminatedModal, setShowSessionTerminatedModal] = useState(false);
+  const [sessionTerminatedModalShown, setSessionTerminatedModalShown] = useState(false);
   const [completedInventoryData, setCompletedInventoryData] = useState<{
     totalScans: number;
     agencyName: string;
@@ -87,6 +90,7 @@ const InventoryPage: React.FC = () => {
     monthName: string;
     year: number;
   } | null>(null);
+
   const [downloadInventoryData, setDownloadInventoryData] = useState<{
     monthName: string;
     year: number;
@@ -100,6 +104,9 @@ const InventoryPage: React.FC = () => {
     completedBy: string;
     isCurrentUser?: boolean;
   } | null>(null);
+
+  // State for completion tracking
+  const [isCompleting, setIsCompleting] = useState(false);
 
   // State for monthly inventory management
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
@@ -137,6 +144,114 @@ const InventoryPage: React.FC = () => {
     clearInventoryCompletedNotification,
     inventoryCompletedByOther,
   } = useInventory();
+
+  // WebSocket client state
+  const [wsClient, setWsClient] = useState<InventoryWebSocketClient | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
+  const [realtimeNotification, setRealtimeNotification] = useState<{
+    type: 'success' | 'warning' | 'error' | 'info';
+    title: string;
+    message: string;
+    showRefresh?: boolean;
+  } | null>(null);
+
+  // Initialize WebSocket client when session is active
+  useEffect(() => {
+    if (isSessionActive && selectedAgency && user?.sub) {
+      // Prevent multiple WebSocket connections
+      if (wsClient && wsClient.getConnectionStatus()) {
+        console.log('WebSocket already connected, skipping new connection');
+        return;
+      }
+
+      const client = new InventoryWebSocketClient(
+        selectedAgency.name,
+        currentMonth.toString(),
+        currentYear.toString(),
+        user.sub,
+        user.name || user.email || 'Usuario'
+      );
+
+      // Set up event handlers
+      client.onUserJoined = (data) => {
+        setActiveUsers(prev => [...prev.filter(name => name !== data.userName), data.userName]);
+        showInfo('Usuario Conectado', `${data.userName} se ha unido a la sesión de inventario.`);
+      };
+
+      client.onUserLeft = (data) => {
+        setActiveUsers(prev => prev.filter(name => name !== data.userName));
+        showInfo('Usuario Desconectado', `${data.userName} ha dejado la sesión de inventario.`);
+      };
+
+      client.onScanAdded = (data) => {
+        showInfo('Nuevo Escaneo', `${data.userName} escaneó el código ${data.scanData.code}.`);
+      };
+
+      client.onScanRemoved = (data) => {
+        showInfo('Escaneo Eliminado', `${data.userName} eliminó el código ${data.scanData.code}.`);
+      };
+
+      client.onInventoryCompleted = (data) => {
+        // Terminate the session immediately
+        reset();
+        
+        setSessionTerminationData({ 
+          completedBy: data.completedBy,
+          isCurrentUser: false
+        });
+        setShowSessionTerminatedModal(true);
+        setSessionTerminatedModalShown(true);
+      };
+
+      client.onSessionTerminated = (data) => {
+        // Set completion flag to prevent further completion attempts
+        setIsCompleting(true);
+        
+        // Terminate the session immediately
+        reset();
+        
+        setSessionTerminationData({ 
+          completedBy: data.completedBy,
+          isCurrentUser: false
+        });
+        setShowSessionTerminatedModal(true);
+        setSessionTerminatedModalShown(true);
+      };
+
+      client.onDataUpdated = () => {
+        loadInventories();
+      };
+
+      client.onError = (error) => {
+        setConnectionError(error);
+        showError('Error de Conexión', error);
+      };
+
+      client.onConnectionChange = (connected) => {
+        setIsConnected(connected);
+        if (connected) {
+          setConnectionError(null);
+        }
+      };
+
+      client.connect();
+      setWsClient(client);
+
+      return () => {
+        client.disconnect();
+      };
+    } else {
+      if (wsClient) {
+        wsClient.disconnect();
+        setWsClient(null);
+        setIsConnected(false);
+        setConnectionError(null);
+        setActiveUsers([]);
+      }
+    }
+  }, [isSessionActive, selectedAgency, currentMonth, currentYear, user?.sub, user?.name, user?.email, showInfo, showError]);
 
   // Handle agency name from URL
   useEffect(() => {
@@ -237,26 +352,42 @@ const InventoryPage: React.FC = () => {
     loadInventories();
   }, [selectedAgency, navigate, loadInventories]);
 
-  // Check for inventory completion on page load (which would terminate active sessions)
-  useEffect(() => {
-    const checkCompletion = async () => {
-      if (selectedAgency && isSessionActive) {
-        // Add a small delay to prevent immediate calls after session restoration
-        setTimeout(async () => {
-          const result = await checkForInventoryCompletion();
-          if (result.wasCompleted) {
-            setSessionTerminationData({ 
-              completedBy: result.completedBy,
-              isCurrentUser: false
-            });
-            setShowSessionTerminatedModal(true);
-          }
-        }, 5000); // 5 second delay
+  // Check inventory status when user starts a session
+  const checkInventoryStatusOnSessionStart = useCallback(async () => {
+    if (!selectedAgency) return;
+    
+    try {
+      // Use the API that returns inventory count
+      const result = await checkInventoryCompletion({
+        agency: selectedAgency.name,
+        month: currentMonth,
+        year: currentYear,
+      });
+      
+      if (result.completed && result.completedInventories >= 2) {
+        // 2-inventory limit reached - show termination modal
+        setSessionTerminationData({ 
+          completedBy: result.completedBy,
+          isCurrentUser: false
+        });
+        setShowSessionTerminatedModal(true);
+        setSessionTerminatedModalShown(true);
+        return false; // Don't allow session start
+      } else if (result.completed && result.completedInventories === 1) {
+        // First inventory completed - allow second inventory
+        showInfo(
+          'Primer Inventario Completado',
+          'El primer inventario ya fue completado. Puedes iniciar el segundo inventario para este mes.'
+        );
+        return true; // Allow session start
       }
-    };
-
-    checkCompletion();
-  }, [selectedAgency, isSessionActive]); // Removed checkForInventoryCompletion from dependencies
+      
+      return true; // Allow session start
+    } catch (error) {
+      console.error('Error checking inventory status:', error);
+      return true; // Allow session start on error
+    }
+  }, [selectedAgency, currentMonth, currentYear, showInfo]);
 
   // Detect new barcodes added by other users
   useEffect(() => {
@@ -270,18 +401,109 @@ const InventoryPage: React.FC = () => {
     setPreviousScanCount(scannedCodes.length);
   }, [scannedCodes.length, isSessionActive, previousScanCount, showInfo]);
 
-  // Check for inventory completion periodically (with longer interval and better conditions)
-  useEffect(() => {
-    if (isSessionActive && selectedAgency && !inventoryCompletedByOther && !showSessionTerminatedModal) {
-      const interval = setInterval(async () => {
-        await checkForInventoryCompletion();
-      }, 120000); // Check every 2 minutes instead of 30 seconds
-
-      return () => clearInterval(interval);
+  // Check inventory status when user scans first code (creates/joins inventory)
+  const checkInventoryStatusOnFirstScan = useCallback(async () => {
+    if (!selectedAgency || !isSessionActive) return;
+    
+    try {
+      const result = await checkInventoryCompletion({
+        agency: selectedAgency.name,
+        month: currentMonth,
+        year: currentYear,
+      });
+      
+      if (result.completed && result.completedInventories >= 2) {
+        // 2-inventory limit reached during session - terminate
+        setSessionTerminationData({ 
+          completedBy: result.completedBy,
+          isCurrentUser: false
+        });
+        setShowSessionTerminatedModal(true);
+        setSessionTerminatedModalShown(true);
+        return false; // Don't allow scan
+      }
+      
+      return true; // Allow scan
+    } catch (error) {
+      console.error('Error checking inventory status on scan:', error);
+      return true; // Allow scan on error
     }
-  }, [isSessionActive, selectedAgency, checkForInventoryCompletion, inventoryCompletedByOther, showSessionTerminatedModal]);
+  }, [selectedAgency, isSessionActive, currentMonth, currentYear]);
+
+  // Manual check inventory status (for user-triggered checks)
+  const checkInventoryStatusManually = useCallback(async () => {
+    if (!selectedAgency) return;
+    
+    try {
+      const result = await checkInventoryCompletion({
+        agency: selectedAgency.name,
+        month: currentMonth,
+        year: currentYear,
+      });
+      
+      if (result.completed && result.completedInventories >= 2) {
+        showError(
+          'Límite de Inventarios Alcanzado',
+          `Ya se han completado 2 inventarios para ${getMonthName(currentMonth)} ${currentYear}. El límite máximo es de 2 inventarios por mes.`
+        );
+        return false;
+      } else if (result.completed && result.completedInventories === 1) {
+        showInfo(
+          'Primer Inventario Completado',
+          'El primer inventario ya fue completado. Puedes iniciar el segundo inventario para este mes.'
+        );
+        return true;
+      } else {
+        showInfo(
+          'Estado del Inventario',
+          'No hay inventarios completados para este mes. Puedes iniciar un nuevo inventario.'
+        );
+        return true;
+      }
+    } catch (error) {
+      console.error('Error checking inventory status manually:', error);
+      showError('Error', 'No se pudo verificar el estado del inventario.');
+      return false;
+    }
+  }, [selectedAgency, currentMonth, currentYear, showError, showInfo]);
+
+  // WebSocket notification handlers
+  const handleScanSuccess = useCallback((code: string) => {
+    // The WebSocket client will automatically notify other users via API calls
+    console.log('Scan added successfully:', code);
+  }, []);
+
+  const handleScanRemoval = useCallback((code: string) => {
+    // The WebSocket client will automatically notify other users via API calls
+    console.log('Scan removed successfully:', code);
+  }, []);
+
+  // Close notification
+  const closeNotification = useCallback(() => {
+    setRealtimeNotification(null);
+  }, []);
+
+  // Refresh page
+  const refreshPage = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  // Connect/reconnect WebSocket
+  const connect = useCallback(() => {
+    if (wsClient) {
+      wsClient.connect();
+    }
+  }, [wsClient]);
 
   const handleScan = async (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
+    
+    // Check inventory status before processing scan (for first scan)
+    if (isSessionActive && scannedCodes.length === 0) {
+      const canProceed = await checkInventoryStatusOnFirstScan();
+      if (!canProceed) {
+        return; // Session terminated or error occurred
+      }
+    }
     
     // Check if this is from manual input (has carData but from manual input)
     if (carData && code.includes('"location":"Manual Input"')) {
@@ -402,6 +624,9 @@ const InventoryPage: React.FC = () => {
           setShowConfirmation(false);
           setCurrentScannedCode('');
           setCurrentScannedCarData(undefined);
+          
+          // Notify other users about the new scan
+          handleScanSuccess(code);
         }
         // Note: If success is false, the useInventory hook will handle showing the appropriate toast
       }
@@ -447,6 +672,12 @@ const InventoryPage: React.FC = () => {
   };
 
   const handleCompleteSession = async () => {
+    if (isCompleting) {
+      console.log('Completion already in progress');
+      return;
+    }
+
+    setIsCompleting(true);
     setShowStopOptions(false);
 
     try {
@@ -475,6 +706,27 @@ const InventoryPage: React.FC = () => {
         } else {
           // Show completion modal with download functionality for sessions with scans
           handleShowCompletionModal(result.totalScans);
+          
+          // Notify other users that inventory is completed via WebSocket
+          if (wsClient) {
+            try {
+              const completionResult = await wsClient.completeInventory();
+              
+              if (completionResult.alreadyCompleted) {
+                // Handle gracefully - inventory was already completed by another user
+                showInfo(
+                  'Inventario Ya Completado',
+                  'El inventario fue completado por otro usuario mientras procesabas la sesión.'
+                );
+                // Don't show completion modal since it's already completed
+                return;
+              }
+            } catch (wsError) {
+              console.error('WebSocket completion notification failed:', wsError);
+              // Don't fail the entire operation for WebSocket errors
+            }
+          }
+          
           showSuccess(
             'Sesión Completada',
             'La sesión de inventario ha sido finalizada exitosamente'
@@ -489,6 +741,8 @@ const InventoryPage: React.FC = () => {
         'Error de Sesión',
         'Ocurrió un error al finalizar la sesión'
       );
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -847,22 +1101,13 @@ const InventoryPage: React.FC = () => {
         return;
       }
 
-      // Check if the monthly inventory limit is reached (2 completed inventories)
-      const completedCount = inventories.filter(
-        inv => inv.month === currentMonth && 
-               inv.year === currentYear && 
-               inv.status === 'Completed'
-      ).length;
-
-      if (completedCount >= 2) {
-        showError(
-          'Límite de Inventarios Alcanzado',
-          `Ya se han completado 2 inventarios para ${monthName} ${currentYear}. El límite máximo es de 2 inventarios por mes.`
-        );
-        return;
+      // Check inventory status before starting session
+      const canStartSession = await checkInventoryStatusOnSessionStart();
+      if (!canStartSession) {
+        return; // Modal already shown or error occurred
       }
 
-      // Allow starting new session (multiple users can have active sessions)
+      // Start the session
       startSession();
       showSuccess(
         'Nueva Sesión Iniciada',
@@ -1604,10 +1849,15 @@ const InventoryPage: React.FC = () => {
             <div className='space-y-4'>
               <button
                 onClick={() => void handleCompleteSession()}
-                className='w-full btn-primary text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
+                disabled={isCompleting}
+                className={`w-full text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3 ${
+                  isCompleting 
+                    ? 'btn-disabled cursor-not-allowed opacity-50' 
+                    : 'btn-primary'
+                }`}
               >
                 <CheckCircle className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Completar y Finalizar Sesión</span>
+                <span>{isCompleting ? 'Procesando...' : 'Completar y Finalizar Sesión'}</span>
               </button>
 
               <button
@@ -1624,6 +1874,14 @@ const InventoryPage: React.FC = () => {
               >
                 <RotateCcw className='w-5 h-5 sm:w-6 sm:h-6' />
                 <span>Continuar Escaneando</span>
+              </button>
+
+              <button
+                onClick={() => void checkInventoryStatusManually()}
+                className='w-full btn-outline text-sm sm:text-lg py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
+              >
+                <Info className='w-5 h-5 sm:w-6 sm:h-6' />
+                <span>Verificar Estado del Inventario</span>
               </button>
             </div>
           </div>
@@ -1673,9 +1931,14 @@ const InventoryPage: React.FC = () => {
                     setShowFinishConfirmation(false);
                     void handleCompleteSession();
                   }}
-                  className='w-full px-6 py-3 border border-white rounded-pill text-base font-semibold text-black bg-white hover:bg-transparent hover:text-white transition-all duration-300 hover:scale-105'
+                  disabled={isCompleting}
+                  className={`w-full px-6 py-3 border border-white rounded-pill text-base font-semibold transition-all duration-300 hover:scale-105 ${
+                    isCompleting
+                      ? 'cursor-not-allowed opacity-50 text-gray-400 bg-gray-600 border-gray-600'
+                      : 'text-black bg-white hover:bg-transparent hover:text-white'
+                  }`}
                 >
-                  Sí, Finalizar Sesión
+                  {isCompleting ? 'Procesando...' : 'Sí, Finalizar Sesión'}
                 </button>
                 <button
                   onClick={() => setShowFinishConfirmation(false)}
@@ -1727,14 +1990,6 @@ const InventoryPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmation && codeToDelete && (
-        <DeleteConfirmationModal
-          scannedCode={codeToDelete.code}
-          onConfirm={handleDeleteConfirmation}
-          onCancel={handleDeleteCancel}
-        />
-      )}
 
       {/* Completion Modal */}
       {showCompletionModal && completedInventoryData && (
@@ -1764,9 +2019,25 @@ const InventoryPage: React.FC = () => {
       {showSessionTerminatedModal && selectedAgency && sessionTerminationData && (
         <SessionTerminatedModal
           isOpen={showSessionTerminatedModal}
-          onClose={() => setShowSessionTerminatedModal(false)}
+          onClose={() => {
+            setShowSessionTerminatedModal(false);
+            setSessionTerminatedModalShown(false);
+            // Disconnect WebSocket when modal is closed
+            if (wsClient) {
+              wsClient.disconnect();
+              setWsClient(null);
+            }
+            // Reload the page to avoid bad data input
+            window.location.reload();
+          }}
           onStartNewInventory={() => {
             setShowSessionTerminatedModal(false);
+            setSessionTerminatedModalShown(false);
+            // Disconnect WebSocket when navigating away
+            if (wsClient) {
+              wsClient.disconnect();
+              setWsClient(null);
+            }
             navigate(`/monthly-inventories/${selectedAgency.name.toLowerCase()}`);
           }}
           agencyName={selectedAgency.name}
@@ -1854,6 +2125,20 @@ const InventoryPage: React.FC = () => {
           onCancel={handleCancelScan}
         />
       )}
+
+      {/* Real-time Notification Banner */}
+      {realtimeNotification && (
+        <RealtimeNotificationBanner
+          isVisible={!!realtimeNotification}
+          type={realtimeNotification.type}
+          title={realtimeNotification.title}
+          message={realtimeNotification.message}
+          onClose={closeNotification}
+          onRefresh={refreshPage}
+          showRefreshButton={realtimeNotification.showRefresh}
+        />
+      )}
+
     </div>
   );
 };
