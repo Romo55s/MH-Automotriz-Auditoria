@@ -13,16 +13,19 @@ export const auth0Config = {
     scope: 'openid profile email',
   },
   // Production optimizations
-  cacheLocation: 'localstorage',
+  cacheLocation: 'localstorage' as const,
   useRefreshTokens: process.env.NODE_ENV === 'production',
-  // Security settings for production
-  useCookiesForTransactions: process.env.NODE_ENV === 'production',
+  // Security settings for production - disabled for mobile compatibility
+  useCookiesForTransactions: false, // Disabled to prevent mobile SecurityError
   // Error handling
   errorPath: '/error',
   // Advanced settings
   advancedOptions: {
     defaultScope: 'openid profile email',
   },
+  // Mobile-specific optimizations
+  legacySameSiteCookie: false, // Disable legacy cookie handling for mobile
+  now: Math.floor(Date.now() / 1000), // Ensure proper timestamp handling
   // Session management
   sessionCheckExpiryDays: 1,
   // Logout configuration

@@ -1,20 +1,20 @@
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import React, { useEffect } from 'react';
 import {
-  Route,
-  BrowserRouter as Router,
-  Routes,
-  useNavigate,
+    Route,
+    BrowserRouter as Router,
+    Routes,
+    useNavigate,
 } from 'react-router-dom';
 import {
-  AgencySelector,
-  Auth0ErrorBoundary,
-  InventoryPage,
-  InventoryQRPage,
-  Login,
-  MonthlyInventoryManager,
-  ProductionErrorBoundary,
-  ProtectedRoute
+    AgencySelector,
+    Auth0ErrorBoundary,
+    InventoryPage,
+    InventoryQRPage,
+    Login,
+    MonthlyInventoryManager,
+    ProductionErrorBoundary,
+    ProtectedRoute
 } from './components';
 import { auth0Config } from './config/auth0-config';
 import { AppProvider } from './context/AppContext';
@@ -72,8 +72,9 @@ const App: React.FC = () => {
             audience: auth0Config.authorizationParams.audience,
             scope: auth0Config.authorizationParams.scope,
           }}
-          cacheLocation='localstorage'
-          useRefreshTokens={false}
+          cacheLocation={auth0Config.cacheLocation}
+          useRefreshTokens={auth0Config.useRefreshTokens}
+          useCookiesForTransactions={auth0Config.useCookiesForTransactions}
         >
           <AppProvider>
             <ToastProvider>
