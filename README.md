@@ -20,10 +20,13 @@ A modern React application for automating car inventory management using **QR co
 - **Rich Vehicle Cards** - Display Serie, Marca, Color, Ubicación with colored icons
 - **Advanced Search** - Search by any vehicle field (serie, marca, color, ubicación)
 - **Smart Storage** - Automatic cleanup of scan data after session completion
-- **Multiple Inventories per Month** - Support for multiple inventory sessions per month with unique session IDs
+- **Multiple Inventories per Month** - Support for up to 2 inventory sessions per month with unique session IDs
 - **Google Drive Integration** - Automatic backup to Google Drive with 30-day retention policy
 - **File Selection Modal** - Choose specific inventory files from Google Drive with real filenames
 - **Download Preservation** - Keep downloaded inventories until next month
+- **Dynamic Button Text** - Smart UI that shows "Iniciar Inventario" or "Continuar al Inventario" based on status
+- **Automatic Month Reset** - Inventory counters and status automatically reset when new month begins
+- **Per-Agency Tracking** - Each agency maintains independent inventory status and counters
 
 ### 🤝 **Real-Time Collaboration System (NEW v2.0)**
 - **WebSocket Integration** - Real-time communication between users using WebSocket technology
@@ -195,13 +198,27 @@ src/
 - **Real-time Sync**: Multi-user collaboration with live updates
 
 ### 5. **Session Management**
-- **Multiple Inventories per Month**: Support for unlimited inventory sessions per month
+- **Multiple Inventories per Month**: Support for up to 2 inventory sessions per month
 - **Unique Session IDs**: Each inventory session has a unique identifier for precise tracking
 - **Auto-cleanup**: Scan data cleaned after session completion
 - **Google Drive Backup**: Automatic backup to Google Drive with 30-day retention
 - **File Selection**: Choose specific inventory files from available Google Drive backups
 - **Download Preservation**: Downloaded inventories kept until next month
 - **Session Restoration**: Automatic recovery of interrupted sessions
+
+### 6. **Smart UI Features**
+- **Dynamic Button Text**: 
+  - Shows "Iniciar Inventario" when no inventory exists for the current month
+  - Shows "Continuar al Inventario" when at least one inventory exists
+  - Shows "Iniciar Nuevo Inventario" when starting additional inventories (up to 2 per month)
+- **Automatic Month Reset**: 
+  - Inventory counters automatically reset to 0 when a new month begins
+  - System checks for month changes every minute
+  - All cached data is cleared for the new month
+- **Per-Agency Management**: 
+  - Each agency maintains independent inventory status
+  - Month reset applies individually to each agency
+  - Separate 2-inventory-per-month limit for each agency
 
 ## 🎯 Key Workflows
 
@@ -413,4 +430,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**Latest Update**: Complete migration from barcode system to QR code system with full vehicle data capture, location-based management, multiple inventories per month support, Google Drive integration with automatic backup, and enhanced user experience.
+**Latest Update**: Complete migration from barcode system to QR code system with full vehicle data capture, location-based management, multiple inventories per month support (2-inventory limit per agency), Google Drive integration with automatic backup, dynamic button text, automatic month reset, per-agency tracking, and enhanced user experience.

@@ -49,6 +49,28 @@ export const useInventory = () => {
     return stored ? JSON.parse(stored) : null;
   });
 
+  // Reset inventory status when month changes
+  const resetInventoryStatusForNewMonth = useCallback(() => {
+    console.log('🗓️ Month changed - resetting inventory status');
+    
+    // Clear current session data for the new month
+    setScannedCodes([]);
+    setIsSessionActive(false);
+    setSessionId('');
+    setCurrentInventoryId('');
+    setError(null);
+    setIsLoading(false);
+    setInventoryCompletedByOther(null);
+    setLastCompletionCheck(0);
+    setIsCheckingCompletion(false);
+    setLastNotifiedCompletion(null);
+    
+    // Clear any cached session data
+    if (selectedAgency && currentMonth && currentYear) {
+      clearSession(selectedAgency.name, currentMonth, currentYear);
+    }
+  }, [selectedAgency, currentMonth, currentYear]);
+
   // Initialize current month and year
   useEffect(() => {
     const now = new Date();
@@ -57,6 +79,33 @@ export const useInventory = () => {
     setCurrentMonth(month);
     setCurrentYear(year);
   }, []);
+
+  // Periodic check for month changes (in case app is left open across midnight)
+  useEffect(() => {
+    const checkForMonthChange = () => {
+      const now = new Date();
+      const currentMonthNum = (now.getMonth() + 1).toString().padStart(2, '0');
+      const currentYearNum = now.getFullYear();
+      
+      // Check if month or year has changed
+      if (currentMonth && currentYear && 
+          (currentMonth !== currentMonthNum || currentYear !== currentYearNum)) {
+        console.log(`🗓️ Month/Year changed from ${currentMonth}/${currentYear} to ${currentMonthNum}/${currentYearNum}`);
+        
+        // Update the month and year state (this will trigger other effects)
+        setCurrentMonth(currentMonthNum);
+        setCurrentYear(currentYearNum);
+        
+        // Reset inventory status for the new month
+        resetInventoryStatusForNewMonth();
+      }
+    };
+
+    // Check every minute for month changes
+    const interval = setInterval(checkForMonthChange, 60000); // 60 seconds
+    
+    return () => clearInterval(interval);
+  }, [currentMonth, currentYear, resetInventoryStatusForNewMonth]);
 
 
 
@@ -677,7 +726,7 @@ export const useInventory = () => {
 
   // Add scanned code and save to backend
   const addScannedCode = useCallback(
-    async (barcode: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
+    async (barcode: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }, scanTimestamp?: Date) => {
       if (!selectedAgency) {
         setError('No agency selected');
         return false;
@@ -750,8 +799,9 @@ export const useInventory = () => {
       setError(null);
 
       try {
-        // Save to backend/Google Sheets
-        const timestamp = new Date().toISOString();
+        // Use the provided scan timestamp or create a new one if not provided
+        const actualScanTime = scanTimestamp || new Date();
+        const timestamp = actualScanTime.toISOString();
 
         // Prepare the data for the API call
         const scanData = {
@@ -767,11 +817,11 @@ export const useInventory = () => {
 
         const response = await saveScan(scanData);
 
-        // Add to local state
+        // Add to local state with the actual scan time
         const newScan: ScannedCode = {
           id: response.data?.id || Date.now().toString(),
           code: barcode,
-          timestamp: new Date(),
+          timestamp: actualScanTime,
           confirmed: true,
           user: user.name || user.email || 'Usuario desconocido',
           carData: carData, // Include car data if available
@@ -1214,7 +1264,24 @@ export const useInventory = () => {
     }
   }, [selectedAgency, currentMonth, currentYear]);
 
+  // Check if any inventory has been started for the current month/agency
+  const hasAnyInventoryStarted = useCallback(async (): Promise<boolean> => {
+    if (!selectedAgency || !currentMonth || !currentYear) return false;
 
+    try {
+      const response = await checkMonthlyInventory(
+        selectedAgency.name,
+        currentMonth,
+        currentYear
+      );
+
+      // Return true if any inventory exists (active or completed)
+      return response.exists;
+    } catch (error) {
+      console.error('Error checking if inventory has started:', error);
+      return false;
+    }
+  }, [selectedAgency, currentMonth, currentYear]);
 
 
 
@@ -1328,5 +1395,8 @@ export const useInventory = () => {
     canFinishSession: scannedCodes.length > 0 && isSessionActive,
     monthName: currentMonth ? getMonthName(currentMonth) : 'Mes Inválido',
     
+    // Inventory status check
+    hasAnyInventoryStarted,
+    resetInventoryStatusForNewMonth,
   };
 };

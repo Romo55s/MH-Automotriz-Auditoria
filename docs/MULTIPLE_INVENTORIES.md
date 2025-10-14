@@ -2,15 +2,17 @@
 
 ## 🎯 Overview
 
-The Car Inventory App now supports **multiple inventory sessions per month** with unique session IDs, Google Drive integration, and automatic backup management. This allows for unlimited inventory cycles within a single month while maintaining data integrity and proper backup procedures.
+The Car Inventory App now supports **multiple inventory sessions per month** (up to 2 per agency) with unique session IDs, Google Drive integration, automatic backup management, and smart UI features. This allows for flexible inventory cycles within a single month while maintaining data integrity and proper backup procedures. The system automatically resets inventory counters when a new month begins, with each agency maintaining independent tracking.
 
 ## ✨ Key Features
 
 ### **Multiple Inventory Sessions**
-- **Unlimited Sessions**: No limit on the number of inventory sessions per month
+- **2 Sessions Per Month**: Support for up to 2 inventory sessions per month per agency
 - **Unique Session IDs**: Each session gets a unique identifier (e.g., `sess_1758654024132`)
 - **Independent Tracking**: Each session is tracked separately with its own data
 - **Session-Specific Downloads**: Download specific inventory by session ID
+- **Per-Agency Limits**: Each agency has its own independent 2-inventory-per-month limit
+- **Automatic Month Reset**: Counters automatically reset to 0 when a new month begins
 
 ### **Google Drive Integration**
 - **Automatic Backup**: First download triggers automatic Google Drive backup
@@ -32,6 +34,24 @@ The Car Inventory App now supports **multiple inventory sessions per month** wit
 - **Session Notifications**: Notify users when inventory is completed by another user
 - **Smart Session Management**: Prevents false "session terminated" warnings
 - **Session-Specific Checking**: Only checks completion of current active session
+
+### **Smart UI & Automatic Month Reset**
+- **Dynamic Button Text**: 
+  - "Iniciar Inventario" - When no inventory exists for current month
+  - "Continuar al Inventario" - When at least one inventory exists
+  - "Iniciar Nuevo Inventario" - When starting 2nd inventory (limit: 2 per month)
+- **Automatic Month Detection**: 
+  - System checks for month changes every 60 seconds
+  - Automatically resets all inventory counters when new month begins
+  - Clears cached session data for fresh month start
+- **Per-Agency Independence**: 
+  - Each agency maintains separate inventory status
+  - Month reset applies individually to each agency
+  - Independent 2-inventory-per-month limits
+- **Real-Time Status Updates**: 
+  - Button text updates immediately based on current inventory status
+  - Status checks when agency is selected
+  - Automatic refresh when inventories are loaded
 
 ## 🔄 Workflow
 
@@ -60,6 +80,17 @@ The Car Inventory App now supports **multiple inventory sessions per month** wit
    - Downloads from Google Drive backup
    - Uses specific session ID
    - File: `Agency_September_2025_sess_1758654100261.csv`
+
+### **Month Change Workflow**
+1. **End of Month**: Agency A has 2 completed inventories (limit reached)
+2. **New Month Begins**: System automatically detects month change (checks every 60 seconds)
+3. **Automatic Reset**:
+   - Inventory counter resets from 2 to 0
+   - Button text changes from "Continuar al Inventario" to "Iniciar Inventario"
+   - Cached session data is cleared
+   - Agency status is reset for new month
+4. **Fresh Start**: Agency can now start 2 new inventories for the new month
+5. **Per-Agency**: Each agency resets independently
 
 ## 🛠️ Technical Implementation
 
@@ -206,19 +237,47 @@ No additional environment variables are required. The system uses existing Googl
 
 ## 🚀 Usage Examples
 
-### **Example 1: Multiple Inventories in September**
+### **Example 1: Multiple Inventories in September (2-Inventory Limit)**
 ```
-Session 1: sess_1758654024132 (3 vehicles)
-Session 2: sess_1758654100261 (2 vehicles)
-Session 3: sess_1758654200000 (5 vehicles)
+September 2025 - Alfa Romeo Agency:
+
+Session 1: sess_1758654024132 (3 vehicles) - Completed
+Button shows: "Continuar al Inventario" or "Iniciar Nuevo Inventario"
+
+Session 2: sess_1758654100261 (2 vehicles) - Completed
+Limit Reached: Cannot start new inventory (2/2 used)
 
 Downloads:
-- Agency_September_2025_sess_1758654024132.csv (3 vehicles)
-- Agency_September_2025_sess_1758654100261.csv (2 vehicles)
-- Agency_September_2025_sess_1758654200000.csv (5 vehicles)
+- Alfa_Romeo_September_2025_sess_1758654024132.csv (3 vehicles)
+- Alfa_Romeo_September_2025_sess_1758654100261.csv (2 vehicles)
 ```
 
-### **Example 2: Fallback Download**
+### **Example 2: Month Change & Reset**
+```
+September 30, 2025 - 11:59 PM:
+- Alfa Romeo: 2 inventories (limit reached)
+- BMW: 1 inventory
+- Toyota: 0 inventories
+
+October 1, 2025 - 12:01 AM (System detects change):
+- Alfa Romeo: 0 inventories → Button shows "Iniciar Inventario"
+- BMW: 0 inventories → Button shows "Iniciar Inventario"  
+- Toyota: 0 inventories → Button shows "Iniciar Inventario"
+
+All agencies get fresh start with 2 new inventory slots!
+```
+
+### **Example 3: Per-Agency Independence**
+```
+October 2025:
+- Alfa Romeo Agency: 2 inventories completed (limit reached)
+- BMW Agency: 1 inventory completed (can start 1 more)
+- Toyota Agency: 0 inventories (can start 2)
+
+Each agency operates independently!
+```
+
+### **Example 4: Fallback Download**
 ```
 If no session ID is provided:
 - Downloads most recent inventory
@@ -242,16 +301,22 @@ If no session ID is provided:
 ## 📊 Benefits
 
 ### **For Users**
-- **Flexibility**: Unlimited inventory sessions per month
+- **Flexibility**: Up to 2 inventory sessions per month per agency
 - **Precision**: Download specific inventory sessions
 - **Reliability**: Automatic backup and data protection
 - **Simplicity**: Same interface, enhanced functionality
+- **Smart UI**: Button text adapts based on inventory status
+- **No Manual Reset**: System automatically resets each month
+- **Clear Guidance**: Always know if you can start or continue inventory
 
 ### **For Administrators**
 - **Data Integrity**: Each inventory is tracked separately
 - **Backup Management**: Automatic Google Drive integration
 - **Storage Optimization**: 30-day retention policy
 - **Audit Trail**: Complete session tracking with unique IDs
+- **Automatic Cleanup**: Month changes trigger automatic data cleanup
+- **Per-Agency Control**: Independent limits and tracking for each agency
+- **Limit Enforcement**: 2-inventory-per-month limit prevents data overload
 
 ## 🔮 Future Enhancements
 
@@ -285,4 +350,4 @@ For questions or issues related to multiple inventories:
 
 ---
 
-**Last Updated**: September 2025 - Multiple inventories per month with Google Drive integration
+**Last Updated**: October 2025 - Multiple inventories per month (2-inventory limit) with Google Drive integration, dynamic button text, and automatic month reset per agency

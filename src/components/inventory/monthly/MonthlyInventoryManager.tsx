@@ -32,12 +32,13 @@ const MonthlyInventoryManager: React.FC = () => {
   const { user } = useAuth0();
   const { selectedAgency, setSelectedAgency } = useAppContext();
   const { showSuccess, showError, showInfo } = useToast();
-  const { isSessionActive, sessionId } = useInventory();
+  const { isSessionActive, sessionId, hasAnyInventoryStarted, resetInventoryStatusForNewMonth } = useInventory();
 
   const [inventories, setInventories] = useState<MonthlyInventory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<string>('');
+  const [hasAnyStarted, setHasAnyStarted] = useState<boolean>(false);
   const [currentYear, setCurrentYear] = useState<number>(0);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [showMultipleInventorySelector, setShowMultipleInventorySelector] = useState(false);
@@ -51,6 +52,51 @@ const MonthlyInventoryManager: React.FC = () => {
     setCurrentMonth(month);
     setCurrentYear(year);
   }, []);
+
+  // Monitor for month changes and reset status
+  useEffect(() => {
+    const checkForMonthChange = () => {
+      const now = new Date();
+      const currentMonthNum = (now.getMonth() + 1).toString().padStart(2, '0');
+      const currentYearNum = now.getFullYear();
+      
+      if (currentMonth && currentYear && 
+          (currentMonth !== currentMonthNum || currentYear !== currentYearNum)) {
+        console.log(`🗓️ MonthlyInventoryManager: Month/Year changed from ${currentMonth}/${currentYear} to ${currentMonthNum}/${currentYearNum}`);
+        
+        // Update the month and year state
+        setCurrentMonth(currentMonthNum);
+        setCurrentYear(currentYearNum);
+        
+        // Reset inventory status for the new month
+        setHasAnyStarted(false);
+        setInventories([]);
+      }
+    };
+
+    // Check every minute for month changes
+    const interval = setInterval(checkForMonthChange, 60000); // 60 seconds
+    
+    return () => clearInterval(interval);
+  }, [currentMonth, currentYear]);
+
+  // Check if any inventory has started
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (selectedAgency) {
+        try {
+          const hasStarted = await hasAnyInventoryStarted();
+          setHasAnyStarted(hasStarted);
+        } catch (error) {
+          console.error('Error checking inventory status:', error);
+          setHasAnyStarted(false);
+        }
+      }
+    };
+
+    checkStatus();
+  }, [selectedAgency, hasAnyInventoryStarted]);
+
 
   // Handle agency name from URL
   useEffect(() => {
@@ -163,6 +209,10 @@ const MonthlyInventoryManager: React.FC = () => {
       
       setInventories(transformedInventories);
       setLastRefresh(new Date());
+      
+      // Update inventory status based on loaded inventories
+      setHasAnyStarted(transformedInventories.length > 0);
+      
       showSuccess(
         'Datos Cargados',
         `Se cargaron exitosamente ${transformedInventories.length} inventarios desde Google Sheets`
@@ -505,7 +555,12 @@ const MonthlyInventoryManager: React.FC = () => {
                 className='btn-primary text-sm sm:text-base py-3 px-4 sm:px-6 flex items-center justify-center space-x-2 sm:space-x-3'
               >
                 <Plus className='w-4 h-4 sm:w-5 sm:h-5' />
-                <span>Iniciar Nuevo Inventario</span>
+                <span>
+                  {hasAnyStarted 
+                    ? 'Iniciar Nuevo Inventario' 
+                    : 'Iniciar Inventario'
+                  }
+                </span>
               </button>
             </div>
           </div>
@@ -680,7 +735,7 @@ const MonthlyInventoryManager: React.FC = () => {
                 onClick={handleStartNewInventory}
                 className='btn-primary text-sm sm:text-base px-6 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5'
               >
-                Iniciar Primer Inventario
+                Iniciar Inventario
               </button>
             </div>
           ) : (
@@ -948,13 +1003,6 @@ const MonthlyInventoryManager: React.FC = () => {
                 es completado para un mes, no puedes iniciar uno nuevo para el
                 mismo mes. Esto asegura la integridad de los datos y previene duplicados.
               </p>
-              <div className='p-3 sm:p-4 glass-effect border border-blue-500/20 rounded-xl'>
-                <p className='text-xs sm:text-sm text-blue-300'>
-                  <strong>Nota:</strong> Después de completar un inventario, necesitarás
-                  buscar manualmente cada código de barras en el sitio web de REPUVE para
-                  extraer la información completa del vehículo.
-                </p>
-              </div>
             </div>
           </div>
         </div>

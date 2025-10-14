@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Building2, Calendar, ChevronDown, Play } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import { agencies } from '../../../data/agencies';
+import { useInventory } from '../../../hooks/useInventory';
 import { clearAllSessions, getSessionInfo } from '../../../utils/sessionManager';
 import { Footer, Header } from '../display';
 
@@ -13,17 +14,58 @@ const AgencySelector: React.FC = () => {
   const [showSessionConflictModal, setShowSessionConflictModal] = useState(false);
   const [conflictAgency, setConflictAgency] = useState<string>('');
   const [pendingAgency, setPendingAgency] = useState<any>(null);
+  const [hasInventoryStarted, setHasInventoryStarted] = useState<boolean>(false);
+  const [isCheckingInventoryStatus, setIsCheckingInventoryStatus] = useState<boolean>(false);
 
   const { selectedAgency, setSelectedAgency } = useAppContext();
+  const { hasAnyInventoryStarted, resetInventoryStatusForNewMonth } = useInventory();
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Don't auto-redirect - let user see their selection and choose when to proceed
-  // useEffect(() => {
-  //   if (selectedAgency) {
-  //     navigate('/inventory');
-  //   }
-  // }, [selectedAgency, navigate]);
+  // Check inventory status when agency is selected
+  useEffect(() => {
+    const checkInventoryStatus = async () => {
+      if (selectedAgency) {
+        setIsCheckingInventoryStatus(true);
+        try {
+          const hasStarted = await hasAnyInventoryStarted();
+          setHasInventoryStarted(hasStarted);
+        } catch (error) {
+          console.error('Error checking inventory status:', error);
+          setHasInventoryStarted(false);
+        } finally {
+          setIsCheckingInventoryStatus(false);
+        }
+      } else {
+        setHasInventoryStarted(false);
+      }
+    };
+
+    checkInventoryStatus();
+  }, [selectedAgency, hasAnyInventoryStarted]);
+
+  // Monitor for month changes and reset status
+  useEffect(() => {
+    const checkForMonthChange = () => {
+      const now = new Date();
+      const currentMonthNum = (now.getMonth() + 1).toString().padStart(2, '0');
+      const currentYearNum = now.getFullYear();
+      
+      // Reset status when month changes (this will be detected by the useInventory hook)
+      console.log('🗓️ AgencySelector: Checking for month changes');
+    };
+
+    // Check every minute for month changes
+    const interval = setInterval(checkForMonthChange, 60000); // 60 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Reset inventory status when month changes (triggered by useInventory hook)
+  useEffect(() => {
+    setHasInventoryStarted(false);
+    setIsCheckingInventoryStatus(false);
+  }, [resetInventoryStatusForNewMonth]);
 
   // Initialize dropdown selection when component mounts
   useEffect(() => {
@@ -98,9 +140,17 @@ const AgencySelector: React.FC = () => {
               <button
                 onClick={() => navigate(`/inventory/${selectedAgency?.name.toLowerCase()}`)}
                 className='btn-primary text-sm sm:text-base py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-center space-x-2 sm:space-x-3'
+                disabled={isCheckingInventoryStatus}
               >
                 <Play className='w-5 h-5 sm:w-6 sm:h-6' />
-                <span>Continuar al Inventario</span>
+                <span>
+                  {isCheckingInventoryStatus 
+                    ? 'Verificando...' 
+                    : hasInventoryStarted 
+                      ? 'Continuar al Inventario' 
+                      : 'Iniciar Inventario'
+                  }
+                </span>
               </button>
               <button
                 onClick={() => navigate(`/monthly-inventories/${selectedAgency?.name.toLowerCase()}`)}

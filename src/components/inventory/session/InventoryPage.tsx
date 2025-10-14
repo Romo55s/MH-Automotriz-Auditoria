@@ -57,6 +57,7 @@ const InventoryPage: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [currentScannedCode, setCurrentScannedCode] = useState('');
   const [currentScannedCarData, setCurrentScannedCarData] = useState<{ serie: string; marca: string; color: string; ubicaciones: string } | undefined>(undefined);
+  const [currentScanTimestamp, setCurrentScanTimestamp] = useState<Date | undefined>(undefined);
   const [showStopOptions, setShowStopOptions] = useState(false);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -496,6 +497,8 @@ const InventoryPage: React.FC = () => {
   }, [wsClient]);
 
   const handleScan = async (code: string, carData?: { serie: string; marca: string; color: string; ubicaciones: string }) => {
+    // Capture the exact moment of scanning
+    const scanTimestamp = new Date();
     
     // Check inventory status before processing scan (for first scan)
     if (isSessionActive && scannedCodes.length === 0) {
@@ -509,7 +512,7 @@ const InventoryPage: React.FC = () => {
     if (carData && code.includes('"location":"Manual Input"')) {
       // Handle manual input with car data - use regular inventory system
       try {
-        const success = await addScannedCode(carData.serie, carData);
+        const success = await addScannedCode(carData.serie, carData, scanTimestamp);
         if (success) {
           showSuccess(`Vehículo agregado: ${carData.serie} - ${carData.marca} (${carData.color})`);
           setShowScanner(false);
@@ -546,6 +549,7 @@ const InventoryPage: React.FC = () => {
         // Show confirmation modal for QR codes instead of immediately processing
         setCurrentScannedCode(code);
         setCurrentScannedCarData(carData);
+        setCurrentScanTimestamp(scanTimestamp);
         setShowConfirmation(true);
         setShowScanner(false);
         return;
@@ -555,7 +559,7 @@ const InventoryPage: React.FC = () => {
     } else if (/^[A-Z0-9]{17}$/i.test(code)) {
       // Handle 17-character VIN codes (legacy)
       try {
-        const success = await addScannedCode(code);
+        const success = await addScannedCode(code, undefined, scanTimestamp);
         if (success) {
           showSuccess(`Código confirmado: ${code}`);
           setShowScanner(false);
@@ -569,6 +573,7 @@ const InventoryPage: React.FC = () => {
       // Handle legacy barcode scanning (8 digits)
       setCurrentScannedCode(code);
       setCurrentScannedCarData(carData); // Pass carData if available
+      setCurrentScanTimestamp(scanTimestamp);
       setShowScanner(false);
       setShowManualInput(false);
       setShowConfirmation(true);
@@ -587,6 +592,7 @@ const InventoryPage: React.FC = () => {
           setShowConfirmation(false);
           setCurrentScannedCode('');
           setCurrentScannedCarData(undefined);
+          setCurrentScanTimestamp(undefined);
           
           // Ensure session is active and sync data
           if (!isSessionActive) {
@@ -607,13 +613,14 @@ const InventoryPage: React.FC = () => {
             setShowConfirmation(false);
             setCurrentScannedCode('');
             setCurrentScannedCarData(undefined);
+            setCurrentScanTimestamp(undefined);
           } else {
             showError('Error de Escaneo', errorMessage);
           }
         }
       } else {
         // Handle regular barcode
-        const success = await addScannedCode(code, carData);
+        const success = await addScannedCode(code, carData, currentScanTimestamp);
         if (success) {
           showSuccess(
             'Escaneo Confirmado',
@@ -624,6 +631,7 @@ const InventoryPage: React.FC = () => {
           setShowConfirmation(false);
           setCurrentScannedCode('');
           setCurrentScannedCarData(undefined);
+          setCurrentScanTimestamp(undefined);
           
           // Notify other users about the new scan
           handleScanSuccess(code);
@@ -657,6 +665,7 @@ const InventoryPage: React.FC = () => {
     setShowManualInput(false);
     setCurrentScannedCode('');
     setCurrentScannedCarData(undefined);
+    setCurrentScanTimestamp(undefined);
   };
 
   const handleWrongLocationClose = () => {
