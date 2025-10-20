@@ -1,0 +1,609 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\usepackage{tikz}
+
+% Page setup
+\geometry{
+    left=2.5cm,
+    right=2.5cm,
+    top=3cm,
+    bottom=3cm
+}
+
+% Design System Colors (matching desing-syestm.json) - Light Theme
+\definecolor{background}{RGB}{255, 255, 255}
+\definecolor{primarytext}{RGB}{0, 0, 0}
+\definecolor{secondarytext}{RGB}{51, 51, 51}
+\definecolor{accent}{RGB}{246, 211, 101}
+\definecolor{border}{RGB}{204, 204, 204}
+\definecolor{gradient1}{RGB}{246, 211, 101}
+\definecolor{gradient2}{RGB}{253, 160, 133}
+
+% Legacy colors for compatibility
+\definecolor{primaryblue}{RGB}{0, 0, 0}
+\definecolor{secondaryblue}{RGB}{51, 51, 51}
+\definecolor{accentgreen}{RGB}{246, 211, 101}
+\definecolor{warningorange}{RGB}{253, 160, 133}
+\definecolor{dangerred}{RGB}{239, 68, 68}
+\definecolor{lightgray}{RGB}{248, 249, 250}
+\definecolor{darkgray}{RGB}{51, 51, 51}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{\color{primarytext}Sistema de Inventario Automotriz}}
+\fancyhead[R]{\textbf{\color{primarytext}Manual de Usuario v2.0}}
+\fancyfoot[C]{\color{primarytext}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% Title formatting
+\titleformat{\section}
+{\color{primarytext}\Large\bfseries}
+{\color{primarytext}\thesection}{1em}{}
+
+\titleformat{\subsection}
+{\color{secondarytext}\large\bfseries}
+{\color{secondarytext}\thesubsection}{1em}{}
+
+\titleformat{\subsubsection}
+{\color{secondarytext}\normalsize\bfseries}
+{\color{secondarytext}\thesubsubsection}{1em}{}
+
+% Custom boxes with design system colors - Light Theme
+\newtcolorbox{infobox}[1][]{
+    colback=lightgray,
+    colframe=gradient1,
+    colbacktitle=gradient1,
+    coltitle=background,
+    title=#1,
+    fonttitle=\bfseries,
+    boxrule=1pt,
+    arc=5pt
+}
+
+\newtcolorbox{warningbox}[1][]{
+    colback=lightgray,
+    colframe=warningorange,
+    colbacktitle=warningorange,
+    coltitle=background,
+    title=#1,
+    fonttitle=\bfseries,
+    boxrule=1pt,
+    arc=5pt
+}
+
+\newtcolorbox{successbox}[1][]{
+    colback=lightgray,
+    colframe=gradient1,
+    colbacktitle=gradient1,
+    coltitle=background,
+    title=#1,
+    fonttitle=\bfseries,
+    boxrule=1pt,
+    arc=5pt
+}
+
+% Custom commands
+\newcommand{\step}[1]{\textbf{\color{primarytext}Paso #1:}}
+\newcommand{\feature}[1]{\textcolor{gradient1}{$\checkmark$} #1}
+\newcommand{\warning}[1]{\textcolor{warningorange}{$\triangle$} #1}
+\newcommand{\info}[1]{\textcolor{primarytext}{$\bullet$} #1}
+\newcommand{\button}[1]{\textbf{#1}}
+
+% Gradient background for title page - Light Theme
+\newcommand{\gradientbackground}{
+    \begin{tikzpicture}[remember picture,overlay]
+        \fill[background] (current page.south west) rectangle (current page.north east);
+        \fill[gradient1!5] (current page.south west) rectangle (current page.north east);
+        \fill[gradient2!3] (current page.south west) rectangle (current page.north east);
+    \end{tikzpicture}
+}
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+    \gradientbackground
+    \centering
+    \vspace*{1cm}
+    
+    % MH Automotriz Logo
+    \includegraphics[width=4cm]{MH Automotriz-Dark.png}\\[1cm]
+    
+    {\Huge\bfseries\color{primarytext} Sistema de Inventario\\Automotriz}\\[0.5cm]
+    {\Large\color{secondarytext} Aplicación de Gestión de Inventarios con Códigos QR}\\[1cm]
+    
+    \vspace{1cm}
+    
+    {\Large\bfseries\color{primarytext} Manual de Usuario}\\[0.5cm]
+    {\large\color{secondarytext} Versión 2.0}\\[2cm]
+    
+    \begin{infobox}[Características Principales]
+        \begin{itemize}[leftmargin=1cm]
+            \item \feature{Escaneo de códigos QR con datos completos del vehículo}
+            \item \feature{Sistema de múltiples inventarios por mes (máximo 2)}
+            \item \feature{Colaboración en tiempo real entre usuarios}
+            \item \feature{Integración automática con Google Drive}
+            \item \feature{Interfaz inteligente con botones dinámicos}
+            \item \feature{Reseteo automático al cambiar de mes}
+        \end{itemize}
+    \end{infobox}
+    
+    \vfill
+    
+    {\large\bfseries\color{secondarytext} Documento Técnico}\\[0.3cm]
+    {\large\color{secondarytext} Última actualización: Octubre 2025}
+    
+\end{titlepage}
+
+% Table of contents
+\tableofcontents
+\newpage
+
+% Introduction
+\section{Introducción}
+
+\subsection{¿Qué es el Sistema de Inventario Automotriz?}
+
+El Sistema de Inventario Automotriz es una aplicación web moderna diseñada para automatizar y optimizar el proceso de inventario de vehículos utilizando tecnología de códigos QR. El sistema permite capturar información completa de vehículos, gestionar múltiples inventarios por mes y facilitar la colaboración entre equipos de trabajo.
+
+\subsection{Características Principales}
+
+\begin{infobox}[Características del Sistema]
+\begin{itemize}
+    \item \feature{\textbf{Escaneo QR Avanzado}: Captura datos completos del vehículo (Serie, Marca, Color, Ubicación)}
+    \item \feature{\textbf{Múltiples Inventarios}: Hasta 2 inventarios por mes por agencia}
+    \item \feature{\textbf{Colaboración en Tiempo Real}: Múltiples usuarios trabajando simultáneamente}
+    \item \feature{\textbf{Interfaz Inteligente}: Botones que cambian según el estado del inventario}
+    \item \feature{\textbf{Reseteo Automático}: Contadores se reinician automáticamente cada mes}
+    \item \feature{\textbf{Integración Google Drive}: Respaldo automático con retención de 30 días}
+    \item \feature{\textbf{Gestión por Agencia}: Cada agencia mantiene inventarios independientes}
+\end{itemize}
+\end{infobox}
+
+\subsection{Requisitos del Sistema}
+
+\begin{itemize}
+    \item Navegador web moderno (Chrome, Firefox, Safari, Edge)
+    \item Cámara web o dispositivo móvil con cámara
+    \item Conexión a internet estable
+    \item Cuenta de usuario autorizada en el sistema
+\end{itemize}
+
+% Getting Started
+\section{Inicio Rápido}
+
+\subsection{Acceso al Sistema}
+
+\step{1} Abra su navegador web y navegue a la URL del sistema de inventario.
+
+\step{2} Inicie sesión con sus credenciales de usuario autorizadas.
+
+\step{3} Seleccione su agencia de trabajo desde el menú desplegable.
+
+\begin{warningbox}[Importante]
+Asegúrese de seleccionar la agencia correcta, ya que cada agencia mantiene inventarios independientes con sus propios límites de 2 inventarios por mes.
+\end{warningbox}
+
+\subsection{Interfaz Principal}
+
+La interfaz principal del sistema incluye:
+
+\begin{itemize}
+    \item \textbf{Página de Inicio}: Selección de agencia y navegación principal
+    \item \textbf{Inventario Activo}: Escaneo de códigos QR y gestión de sesión
+    \item \textbf{Inventarios Mensuales}: Gestión y descarga de inventarios completados
+    \item \textbf{Generar QR}: Creación de códigos QR para nuevos vehículos
+\end{itemize}
+
+% Agency Selection
+\section{Selección de Agencia}
+
+\subsection{Proceso de Selección}
+
+\step{1} En la página principal, localice el menú desplegable de agencias.
+
+\step{2} Seleccione su agencia de trabajo de la lista disponible:
+\begin{itemize}
+    \item Alfa Romeo
+    \item BMW
+    \item Mercedes-Benz
+    \item Toyota
+    \item Honda
+    \item Nissan
+    \item Suzuki
+    \item Mazda
+\end{itemize}
+
+\step{3} Una vez seleccionada la agencia, el sistema mostrará botones dinámicos según el estado del inventario.
+
+\subsection{Botones Dinámicos}
+
+El sistema utiliza botones inteligentes que cambian según el estado del inventario:
+
+\begin{successbox}[Botones del Sistema]
+\begin{itemize}
+    \item \textbf{``Iniciar Inventario"}: Se muestra cuando no hay inventarios para el mes actual
+    \item \textbf{``Continuar al Inventario"}: Se muestra cuando existe al menos un inventario activo
+    \item \textbf{``Iniciar Nuevo Inventario"}: Se muestra cuando se puede crear un segundo inventario (límite: 2 por mes)
+    \item \textbf{"Verificando..."}: Se muestra mientras el sistema verifica el estado
+\end{itemize}
+\end{successbox}
+
+% Inventory Management
+\section{Gestión de Inventarios}
+
+\subsection{Iniciar un Nuevo Inventario}
+
+\step{1} Seleccione su agencia desde el menú principal.
+
+\step{2} Haga clic en el botón \button{``Iniciar Inventario''} o \button{``Iniciar Nuevo Inventario''}.
+
+\step{3} El sistema creará una nueva sesión de inventario con un ID único.
+
+\step{4} Será redirigido a la página de escaneo activo.
+
+\begin{infobox}[Límites del Sistema]
+Cada agencia puede realizar máximo 2 inventarios por mes. El sistema mostrará un mensaje de error si se intenta crear un tercer inventario.
+\end{infobox}
+
+\subsection{Continuar un Inventario Existente}
+
+\step{1} Si ya existe un inventario activo, el botón mostrará \button{``Continuar al Inventario''}.
+
+\step{2} Haga clic en el botón para unirse a la sesión existente.
+
+\step{3} Podrá ver todos los vehículos ya escaneados y continuar agregando nuevos.
+
+\subsection{Colaboración en Tiempo Real}
+
+El sistema permite que múltiples usuarios trabajen en el mismo inventario:
+
+\begin{itemize}
+    \item \textbf{Múltiples Usuarios}: Varios usuarios pueden escanear simultáneamente
+    \item \textbf{Sincronización Instantánea}: Todos ven los escaneos en tiempo real
+    \item \textbf{Notificaciones}: Alertas cuando otros usuarios completan el inventario
+    \item \textbf{Trabajo Continuo}: Puede seguir trabajando aunque otros completen
+\end{itemize}
+
+% QR Code Scanning
+\section{Escaneo de Códigos QR}
+
+\subsection{Proceso de Escaneo}
+
+\step{1} En la página de inventario activo, active la cámara haciendo clic en \button{``Iniciar Escáner''}.
+
+\step{2} Apunte la cámara hacia el código QR del vehículo.
+
+\step{3} El sistema detectará automáticamente el código y mostrará la información del vehículo.
+
+\step{4} Revise los datos mostrados:
+\begin{itemize}
+    \item \textbf{Serie}: Número de identificación del vehículo (VIN)
+    \item \textbf{Marca}: Marca del vehículo
+    \item \textbf{Color}: Color del vehículo
+    \item \textbf{Ubicación}: Ubicación física del vehículo
+\end{itemize}
+
+\step{5} Confirme el escaneo haciendo clic en \button{``Confirmar''} o cancele si hay un error.
+
+\subsection{Entrada Manual}
+
+Si el código QR está dañado o no se puede escanear:
+
+\step{1} Haga clic en \button{``Entrada Manual''}.
+
+\step{2} Complete manualmente los campos requeridos:
+\begin{itemize}
+    \item Serie (17 caracteres alfanuméricos)
+    \item Marca del vehículo
+    \item Color del vehículo
+    \item Ubicación del vehículo
+\end{itemize}
+
+\step{3} Haga clic en \button{``Guardar''} para agregar el vehículo al inventario.
+
+\subsection{Gestión de Vehículos Escaneados}
+
+En la lista de vehículos escaneados puede:
+
+\begin{itemize}
+    \item \textbf{Ver Detalles}: Expandir para ver información completa
+    \item \textbf{Buscar}: Filtrar vehículos por cualquier campo
+    \item \textbf{Eliminar}: Remover vehículos escaneados por error
+    \item \textbf{Exportar}: Descargar lista en formato CSV/Excel
+\end{itemize}
+
+% Monthly Inventory Management
+\section{Gestión de Inventarios Mensuales}
+
+\subsection{Acceso a Inventarios Mensuales}
+
+\step{1} Desde la página principal, haga clic en \button{``Inventarios Mensuales''}.
+
+\step{2} El sistema mostrará todos los inventarios completados para la agencia seleccionada.
+
+\step{3} Cada inventario muestra:
+\begin{itemize}
+    \item Fecha de creación
+    \item Usuario que lo creó
+    \item Número total de vehículos
+    \item Estado (Completado/Activo)
+    \item ID de sesión único
+\end{itemize}
+
+\subsection{Descarga de Inventarios}
+
+\step{1} Localice el inventario que desea descargar.
+
+\step{2} Haga clic en el botón \button{``Descargar''} correspondiente.
+
+\step{3} Seleccione el formato deseado:
+\begin{itemize}
+    \item \textbf{CSV}: Para análisis en Excel o Google Sheets
+    \item \textbf{Excel}: Formato nativo de Microsoft Excel
+\end{itemize}
+
+\step{4} El archivo se descargará automáticamente con el nombre:
+\begin{verbatim}
+Agencia_Mes_Año_sess_IDsesion.csv
+\end{verbatim}
+
+\begin{successbox}[Respaldo Automático]
+El primer descarga de cada inventario activa automáticamente el respaldo en Google Drive con retención de 30 días.
+\end{successbox}
+
+% QR Code Generation
+\section{Generación de Códigos QR}
+
+\subsection{Creación de Códigos QR}
+
+\step{1} Desde el menú principal, haga clic en \button{``Generar QR''}.
+
+\step{2} Prepare un archivo CSV o Excel con las siguientes columnas:
+\begin{itemize}
+    \item \textbf{Serie}: Número de identificación del vehículo
+    \item \textbf{Marca}: Marca del vehículo
+    \item \textbf{Color}: Color del vehículo
+    \item \textbf{Ubicaciones}: Ubicación física del vehículo
+\end{itemize}
+
+\step{3} Haga clic en \button{``Seleccionar Archivo''} y cargue su archivo.
+
+\step{4} Revise la vista previa de los datos cargados.
+
+\step{5} Haga clic en \button{``Generar Códigos QR''}.
+
+\step{6} El sistema generará un archivo ZIP con todos los códigos QR.
+
+\step{7} Descargue el archivo ZIP e imprima los códigos QR en etiquetas.
+
+\subsection{Formato del Archivo CSV}
+
+El archivo CSV debe tener el siguiente formato:
+
+\begin{verbatim}
+Serie,Marca,Color,Ubicaciones
+1HGCM82633A123456,Honda,Blanco,Lote A-1
+2HGBH41JXMH123456,Honda,Azul,Lote A-2
+3VW2A7AJ9HM123456,Volkswagen,Rojo,Lote B-1
+\end{verbatim}
+
+\begin{warningbox}[Requisitos del Archivo]
+\begin{itemize}
+    \item El archivo debe tener exactamente estas columnas
+    \item La Serie debe ser un VIN válido de 17 caracteres
+    \item No debe haber filas vacías
+    \item El archivo debe estar en formato CSV o Excel
+\end{itemize}
+\end{warningbox}
+
+% System Features
+\section{Características Avanzadas del Sistema}
+
+\subsection{Reseteo Automático Mensual}
+
+El sistema incluye una característica avanzada de reseteo automático:
+
+\begin{itemize}
+    \item \textbf{Detección Automática}: El sistema verifica cambios de mes cada 60 segundos
+    \item \textbf{Reseteo de Contadores}: Los contadores de inventario se reinician automáticamente
+    \item \textbf{Limpieza de Datos}: Se limpian los datos en caché para el nuevo mes
+    \item \textbf{Por Agencia}: Cada agencia se resetea independientemente
+\end{itemize}
+
+\subsection{Gestión Independiente por Agencia}
+
+Cada agencia mantiene su propio estado:
+
+\begin{infobox}[Independencia por Agencia]
+\begin{itemize}
+    \item \textbf{Contadores Separados}: Cada agencia tiene su propio límite de 2 inventarios
+    \item \textbf{Reseteo Individual}: El cambio de mes afecta cada agencia por separado
+    \item \textbf{Datos Aislados}: Los inventarios de una agencia no afectan a otras
+    \item \textbf{Estado Independiente}: Los botones muestran el estado específico de cada agencia
+\end{itemize}
+\end{infobox}
+
+% Troubleshooting
+\section{Solución de Problemas}
+
+\subsection{Problemas Comunes}
+
+\subsubsection{No se puede escanear el código QR}
+
+\begin{enumerate}
+    \item \textbf{Verifique la iluminación}: Asegúrese de que haya suficiente luz
+    \item \textbf{Limpie la cámara}: Limpie el lente de la cámara
+    \item \textbf{Acérquese o aléjese}: Ajuste la distancia al código QR
+    \item \textbf{Use entrada manual}: Si el código está dañado, use la entrada manual
+\end{enumerate}
+
+\subsubsection{Error de conexión}
+
+\begin{enumerate}
+    \item \textbf{Verifique internet}: Asegúrese de tener conexión estable
+    \item \textbf{Recargue la página}: Presione F5 o Ctrl+R
+    \item \textbf{Limpie caché}: Borre el caché del navegador
+    \item \textbf{Contacte soporte}: Si el problema persiste
+\end{enumerate}
+
+\subsubsection{No se puede iniciar nuevo inventario}
+
+\begin{enumerate}
+    \item \textbf{Verifique límites}: Recuerde que son máximo 2 inventarios por mes
+    \item \textbf{Espere al próximo mes}: El sistema se resetea automáticamente
+    \item \textbf{Complete inventarios existentes}: Termine inventarios activos primero
+\end{enumerate}
+
+\subsection{Mensajes de Error Comunes}
+
+\begin{warningbox}[Mensajes de Error]
+\begin{itemize}
+    \item \textbf{"Límite de Inventarios Alcanzado"}: Ya se completaron 2 inventarios este mes
+    \item \textbf{``Inventario Ya Activo"}: Existe un inventario activo que debe completarse primero
+    \item \textbf{``Error de Escaneo"}: El código QR no se pudo leer correctamente
+    \item \textbf{``Error de Conexión"}: Problemas de conectividad con el servidor
+\end{itemize}
+\end{warningbox}
+
+% Best Practices
+\section{Mejores Prácticas}
+
+\subsection{Organización del Trabajo}
+
+\begin{enumerate}
+    \item \textbf{Planifique el Inventario}: Antes de comenzar, planifique qué área va a inventariar
+    \item \textbf{Trabajo en Equipo}: Coordine con otros usuarios para evitar duplicados
+    \item \textbf{Verificación Regular}: Revise periódicamente la lista de vehículos escaneados
+    \item \textbf{Completar Sesiones}: Termine las sesiones cuando haya completado el área asignada
+\end{enumerate}
+
+\subsection{Gestión de Datos}
+
+\begin{enumerate}
+    \item \textbf{Descarga Regular}: Descargue inventarios completados regularmente
+    \item \textbf{Respaldo Local}: Mantenga copias locales de archivos importantes
+    \item \textbf{Verificación de Datos}: Revise los datos antes de confirmar escaneos
+    \item \textbf{Limpieza de Errores}: Elimine vehículos escaneados por error inmediatamente
+\end{enumerate}
+
+% Support and Contact
+\section{Soporte y Contacto}
+
+\subsection{Recursos de Ayuda}
+
+\begin{itemize}
+    \item \textbf{Manual de Usuario}: Este documento
+    \item \textbf{Preguntas Frecuentes}: Sección de solución de problemas
+    \item \textbf{Videos Tutoriales}: Disponibles en el sistema
+    \item \textbf{Soporte Técnico}: Contacto directo con el equipo técnico
+\end{itemize}
+
+\subsection{Información de Contacto}
+
+Para soporte técnico o preguntas sobre el sistema:
+
+\begin{itemize}
+    \item \textbf{Email}: jimenez.romo.jose.antonio@gmail.com
+    \item \textbf{Teléfono}: +52 33 31890526
+    \item \textbf{Horario}: Lunes a Viernes, 4:00 PM - 7:00 PM
+\end{itemize}
+
+\subsection{Reporte de Problemas}
+
+Al reportar un problema, incluya:
+
+\begin{enumerate}
+    \item Descripción detallada del problema
+    \item Pasos para reproducir el error
+    \item Agencia y usuario afectado
+    \item Capturas de pantalla si es posible
+    \item Información del navegador y dispositivo
+\end{enumerate}
+
+% FAQ Section
+\section{Preguntas Frecuentes (FAQ)}
+
+\subsection{Dispositivos y Compatibilidad}
+
+\begin{infobox}[¿Puedo usar el sistema desde mi celular?]
+Sí. El sistema está optimizado para dispositivos móviles y puede utilizarse desde cualquier navegador moderno. Solo asegúrese de otorgar permisos de cámara al sitio para poder escanear los códigos QR correctamente.
+\end{infobox}
+
+\begin{infobox}[¿Qué tipo de cámara se recomienda para escanear los códigos QR?]
+Se recomienda utilizar cámaras HD (720p o superiores) con enfoque automático. En dispositivos móviles, cualquier cámara moderna funcionará correctamente.
+\end{infobox}
+
+\subsection{Límites y Restricciones}
+
+\begin{warningbox}[¿Qué pasa si excedo los 2 inventarios por mes?]
+El sistema mostrará un mensaje de advertencia e impedirá crear un nuevo inventario. Deberá esperar al siguiente mes, cuando los contadores se reinician automáticamente.
+\end{warningbox}
+
+\begin{infobox}[¿Puedo trabajar sin conexión a internet?]
+No. El sistema requiere conexión activa a internet para registrar escaneos y sincronizar la colaboración en tiempo real entre usuarios.
+\end{infobox}
+
+\subsection{Almacenamiento y Respaldo}
+
+\begin{successbox}[¿Dónde se guardan los inventarios completados?]
+Todos los inventarios completados se almacenan localmente en el sistema y se respaldan automáticamente en Google Drive con una retención de 30 días.
+\end{successbox}
+
+\begin{warningbox}[¿Cómo puedo recuperar un inventario borrado por error?]
+Los inventarios eliminados manualmente no pueden recuperarse. Sin embargo, si el respaldo en Google Drive está habilitado, puede restaurarlo desde allí.
+\end{warningbox}
+
+\subsection{Soporte Técnico}
+
+\begin{infobox}[¿Cómo puedo reportar un error o sugerencia?]
+Puede enviar un correo al soporte técnico con la descripción del problema, pasos para reproducirlo y, si es posible, capturas de pantalla. Los datos de contacto se encuentran en la sección "Soporte y Contacto".
+\end{infobox}
+
+
+% Appendix
+\section{Apéndice}
+
+\subsection{Glosario de Términos}
+
+\begin{itemize}
+    \item \textbf{Agencia}: Ubicación física donde se realiza el inventario
+    \item \textbf{Código QR}: Código de barras bidimensional que contiene información del vehículo
+    \item \textbf{Inventario Activo}: Sesión de inventario en progreso
+    \item \textbf{Inventario Completado}: Sesión de inventario finalizada
+    \item \textbf{Sesión}: Período de trabajo en un inventario específico
+    \item \textbf{VIN}: Número de identificación del vehículo (Vehicle Identification Number)
+\end{itemize}
+
+\subsection{Atajos de Teclado}
+
+\begin{itemize}
+    \item \textbf{Ctrl + R}: Recargar página
+    \item \textbf{F5}: Recargar página
+    \item \textbf{Esc}: Cancelar operación actual
+    \item \textbf{Enter}: Confirmar acción
+\end{itemize}
+
+\subsection{Versiones del Sistema}
+
+\begin{itemize}
+    \item \textbf{v2.0} (Actual): Sistema completo con códigos QR y colaboración
+    \item \textbf{v1.0}: Sistema básico con códigos de barras
+\end{itemize}
+
+\end{document}
+
