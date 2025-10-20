@@ -54,8 +54,11 @@ Here's the complete list of documentation files in this folder:
 All documentation has been updated to reflect:
 - ✅ **QR Code System**: Complete migration from barcode to QR code scanning
 - ✅ **Vehicle Data**: Full car data capture (Serie, Marca, Color, Ubicaciones)
-- ✅ **Multiple Inventories**: Support for unlimited inventory sessions per month
+- ✅ **Multiple Inventories**: Support for up to 2 inventory sessions per month per agency
 - ✅ **Google Drive Integration**: Automatic backup with 30-day retention
+- ✅ **Dynamic Button Text**: Smart UI that adapts based on inventory status
+- ✅ **Automatic Month Reset**: Inventory counters reset when new month begins
+- ✅ **Per-Agency Tracking**: Independent inventory management per agency
 - ✅ **Environment Config**: Proper environment variable management
 - ✅ **Clean Architecture**: Organized project structure and API endpoints
 - ✅ **Production Ready**: Deployment guides and best practices
