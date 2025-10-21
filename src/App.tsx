@@ -1,20 +1,21 @@
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import React, { useEffect } from 'react';
 import {
-  Route,
-  BrowserRouter as Router,
-  Routes,
-  useNavigate,
+    Route,
+    BrowserRouter as Router,
+    Routes,
+    useNavigate,
 } from 'react-router-dom';
 import {
-  AgencySelector,
-  Auth0ErrorBoundary,
-  InventoryPage,
-  InventoryQRPage,
-  Login,
-  MonthlyInventoryManager,
-  ProductionErrorBoundary,
-  ProtectedRoute
+    AgencySelector,
+    Auth0ErrorBoundary,
+    InventoryPage,
+    InventoryQRPage,
+    LandingPage,
+    Login,
+    MonthlyInventoryManager,
+    ProductionErrorBoundary,
+    ProtectedRoute
 } from './components';
 import { auth0Config } from './config/auth0-config';
 import { AppProvider } from './context/AppContext';
@@ -36,8 +37,8 @@ const Auth0CallbackHandler: React.FC = () => {
       // The Auth0 provider will automatically process this callback
       // We just need to wait for it to complete
     } else if (!isLoading && !isAuthenticated) {
-      // No callback, redirect to login
-      navigate('/login');
+      // No callback, redirect to landing page
+      navigate('/landing');
     } else if (!isLoading && isAuthenticated && user) {
       // Already authenticated, redirect to next step
       navigate('/select-agency');
@@ -81,6 +82,14 @@ const App: React.FC = () => {
                 <div className='App'>
                   <Routes>
                     <Route path='/' element={<Auth0CallbackHandler />} />
+                    <Route
+                      path='/landing'
+                      element={
+                        <ProtectedRoute requireAuth={false}>
+                          <LandingPage />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route
                       path='/login'
                       element={

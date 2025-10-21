@@ -10,5 +10,6 @@ export { default as ManualInputModal } from './ManualInputModal';
 export { default as NewInventoryConfirmationModal } from './NewInventoryConfirmationModal';
 export { default as SessionEndedModal } from './SessionEndedModal';
 export { default as SessionTerminatedModal } from './SessionTerminatedModal';
+export { default as VideoModal } from './VideoModal';
 export { default as WrongLocationModal } from './WrongLocationModal';
 
