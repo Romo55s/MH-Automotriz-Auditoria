@@ -1,17 +1,17 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import {
-    ArrowRight,
-    BarChart3,
-    Clock,
-    Cloud,
-    Download,
-    FileText,
-    Play,
-    QrCode,
-    Shield,
-    Smartphone,
-    Users,
-    Zap
+  ArrowRight,
+  BarChart3,
+  Clock,
+  Cloud,
+  Download,
+  FileText,
+  Play,
+  QrCode,
+  Shield,
+  Smartphone,
+  Users,
+  Zap
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { VideoModal } from '../modals';
@@ -559,7 +559,7 @@ const LandingPage: React.FC = () => {
         isOpen={isVideoModalOpen}
         onClose={() => setIsVideoModalOpen(false)}
         title="Demo del Sistema de Inventario Automotriz"
-        // videoUrl="https://www.youtube.com/embed/VIDEO_ID" // Reemplaza con tu video real
+        videoUrl="https://player.vimeo.com/video/1129418761"
       />
     </div>
   );
